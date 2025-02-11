@@ -1,6 +1,5 @@
 import requests
 import json
-from bs4 import BeautifulSoup
 import csv
 
 BASKETBALL_LEAGUES = {"nba": "144532", "euroleague": "131600", "eurocup": "131596"}
@@ -131,11 +130,13 @@ def fetch_maxbet_matches():
                         handicap_value = params.get(handicap_key)
                         if handicap_value:
                             # Flip the handicap sign
-                            if handicap_value.startswith('-'):
-                                flipped_handicap = handicap_value[1:]  # Remove the minus
+                            if handicap_value.startswith("-"):
+                                flipped_handicap = handicap_value[
+                                    1:
+                                ]  # Remove the minus
                             else:
                                 flipped_handicap = f"-{handicap_value}"  # Add the minus
-                            
+
                             matches_odds.append(
                                 {
                                     "team1": home_team,
