@@ -10,6 +10,7 @@ from mozzart_shared import BrowserManager
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
+
 def get_tennis_leagues():
     """Fetch current tennis leagues from Mozzart"""
     try:
@@ -38,15 +39,15 @@ def get_tennis_leagues():
 
         response = driver.execute_script(script)
         leagues = []
-        
+
         if response:
             data = json.loads(response)
-            for competition in data.get('competitions', []):
-                league_id = competition.get('id')
-                league_name = competition.get('name')
+            for competition in data.get("competitions", []):
+                league_id = competition.get("id")
+                league_name = competition.get("name")
                 if league_id and league_name:
                     leagues.append((league_id, league_name))
-        
+
         return leagues
 
     except Exception as e:
@@ -87,14 +88,16 @@ def get_all_match_ids(league_id):
                         if data.get("items"):
                             for match in data["items"]:
                                 match_ids.append(match["id"])
-                        return match_ids if match_ids else []  # Return empty list if no matches found
+                        return (
+                            match_ids if match_ids else []
+                        )  # Return empty list if no matches found
                     except json.JSONDecodeError:
                         print(f"Failed to parse JSON on attempt {attempt + 1}")
                 time.sleep(2)
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {str(e)}")
                 time.sleep(3)
-                
+
         return []  # Return empty list if all attempts fail
 
     except Exception as e:
@@ -134,18 +137,18 @@ def get_mozzart_match(match_id, league_id):
                         return data
                 except json.JSONDecodeError:
                     pass
-            time.sleep(2)  # Wait between retries
+            time.sleep(1)  # Wait between retries
 
     except Exception as e:
         print(f"Error fetching match {match_id}: {str(e)}")
-    
+
     return None
 
 
 def get_mozzart_sports():
     try:
         leagues = get_tennis_leagues()
-        
+
         if not leagues:
             print("No leagues found or error occurred while fetching leagues")
             return
@@ -156,7 +159,7 @@ def get_mozzart_sports():
         for league_id, league_name in leagues:
             try:
                 match_ids = get_all_match_ids(league_id)
-                
+
                 if not match_ids:
                     print(f"No matches found for league {league_name}")
                     continue
@@ -164,17 +167,17 @@ def get_mozzart_sports():
                 for match_id in match_ids:
                     try:
                         match_data = get_mozzart_match(match_id, league_id)
-                        
+
                         if not match_data or "match" not in match_data:
                             print(f"No valid data for match {match_id}")
                             continue
-                            
+
                         match = match_data["match"]
-                        
+
                         if "home" not in match or "visitor" not in match:
                             print(f"Missing team data for match {match_id}")
                             continue
-                            
+
                         home_team = match["home"].get("name")
                         away_team = match["visitor"].get("name")
 
@@ -191,7 +194,7 @@ def get_mozzart_sports():
                         # Initialize odds dictionaries with default values
                         match_odds = {"1": "0.00", "2": "0.00"}
                         first_set_odds = {"1": "0.00", "2": "0.00"}
-                        
+
                         # Process odds from oddsGroup instead of odds
                         for odds_group in match.get("oddsGroup", []):
                             for odd in odds_group.get("odds", []):
@@ -201,7 +204,7 @@ def get_mozzart_sports():
                                     value = f"{float(odd.get('value', '0.00')):.2f}"
                                 except:
                                     value = "0.00"
-                                
+
                                 if game_name == "Konačan ishod":
                                     if subgame_name == "1":
                                         match_odds["1"] = value
@@ -214,10 +217,22 @@ def get_mozzart_sports():
                                         first_set_odds["2"] = value
 
                         matches_data.append(
-                            [match_id, "12", match_odds["1"], match_odds["2"]]
+                            [
+                                home_team,
+                                away_team,
+                                "12",
+                                match_odds["1"],
+                                match_odds["2"],
+                            ]
                         )
                         matches_data.append(
-                            [match_id, "12set1", first_set_odds["1"], first_set_odds["2"]]
+                            [
+                                home_team,
+                                away_team,
+                                "12set1",
+                                first_set_odds["1"],
+                                first_set_odds["2"],
+                            ]
                         )
 
                     except Exception as e:
@@ -230,10 +245,12 @@ def get_mozzart_sports():
 
         # Write to CSV only if we have data
         if matches_data:
-            with open("mozzart_tennis_matches.csv", "w", newline="", encoding="utf-8") as f:
-                f.write("Match,BetType,Odd1,Odd2\n")
+            with open(
+                "mozzart_tennis_matches.csv", "w", newline="", encoding="utf-8"
+            ) as f:
+                f.write("Team1,Team2,BetType,Odd1,Odd2\n")
                 for row in matches_data:
-                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]}\n")
+                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]}\n")
         else:
             print("No match data collected")
 

@@ -5,13 +5,9 @@ import csv
 def get_hockey_leagues():
     """Fetch current hockey leagues from MaxBet"""
     url = "https://www.maxbet.rs/restapi/offer/sr/categories/sport/H/l"
-    
-    params = {
-        "annex": "3",
-        "desktopVersion": "1.2.1.10",
-        "locale": "sr"
-    }
-    
+
+    params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
+
     headers = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br",
@@ -22,7 +18,7 @@ def get_hockey_leagues():
         "Referer": "https://www.maxbet.rs/betting",
         "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"'
+        "sec-ch-ua-platform": '"Windows"',
     }
 
     try:
@@ -30,14 +26,14 @@ def get_hockey_leagues():
         if response.status_code == 200:
             data = response.json()
             leagues = {}
-            
-            for category in data.get('categories', []):
-                league_id = category.get('id')
-                league_name = category.get('name')
+
+            for category in data.get("categories", []):
+                league_id = category.get("id")
+                league_name = category.get("name")
                 if league_id and league_name:
                     # Use league name as key and ID as value
                     leagues[league_name.lower().replace(" ", "_")] = league_id
-            
+
             return leagues
         else:
             print(f"Failed to fetch leagues with status code: {response.status_code}")
@@ -48,44 +44,10 @@ def get_hockey_leagues():
         return {}
 
 
-def process_team_names(home_team, away_team):
-    """Convert team names to combined format"""
-    try:
-        teams = [home_team, away_team]
-        processed_names = []
-
-        for team in teams:
-            team = team.strip()
-            words = team.split()
-
-            if not words:
-                return None
-
-            # If team name has only one word and it's 3 characters, use it
-            if len(words) == 1 and len(words[0]) == 3:
-                processed_name = words[0][0].upper() + words[0][1:]
-            else:
-                # Find first word longer than 3 characters
-                first_long_word = next((word for word in words if len(word) > 2), None)
-                if not first_long_word:
-                    return None
-                processed_name = first_long_word[0].upper() + first_long_word[1:]
-
-            processed_names.append(processed_name)
-
-        if len(processed_names) == 2:
-            return f"{processed_names[0]}{processed_names[1]}"
-        return None
-
-    except Exception as e:
-        print(f"Error processing names {home_team} vs {away_team}: {e}")
-        return None
-
-
 def fetch_maxbet_hockey_matches():
     # Get leagues dynamically instead of using hardcoded HOCKEY_LEAGUES
     hockey_leagues = get_hockey_leagues()
-    
+
     if not hockey_leagues:
         print("No leagues found or error occurred while fetching leagues")
         return []
@@ -103,7 +65,7 @@ def fetch_maxbet_hockey_matches():
         "Referer": "https://www.maxbet.rs/betting",
         "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"'
+        "sec-ch-ua-platform": '"Windows"',
     }
 
     for league_name, league_id in hockey_leagues.items():
@@ -121,8 +83,6 @@ def fetch_maxbet_hockey_matches():
                         away_team = match.get("away", "")
                         odds = match.get("odds", {})
 
-                        combined_name = process_team_names(home_team, away_team)
-
                         # 1X2 odds
                         home_win = odds.get("1", "")  # Home win (1)
                         draw = odds.get("2", "")  # Draw (X)
@@ -131,7 +91,8 @@ def fetch_maxbet_hockey_matches():
                         if home_win and draw and away_win:
                             matches_odds.append(
                                 {
-                                    "matchId": combined_name,
+                                    "team1": home_team,
+                                    "team2": away_team,
                                     "odd1": home_win,
                                     "oddX": draw,
                                     "odd2": away_win,
@@ -150,7 +111,9 @@ def fetch_maxbet_hockey_matches():
     # Save to CSV
     if matches_odds:
         with open("maxbet_hockey_matches.csv", "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=["matchId", "odd1", "oddX", "odd2"])
+            writer = csv.DictWriter(
+                f, fieldnames=["team1", "team2", "odd1", "oddX", "odd2"]
+            )
             writer.writerows(matches_odds)
     else:
         print("No hockey odds data to save")

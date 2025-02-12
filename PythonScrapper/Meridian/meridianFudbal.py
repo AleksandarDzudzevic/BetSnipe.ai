@@ -5,7 +5,7 @@ import csv
 
 DESIRED_LEAGUES = {
     ("Premier Liga", "Engleska"),
-    ("Championship", "Engleska"), 
+    ("Championship", "Engleska"),
     ("La Liga", "Španija"),
     ("La Liga 2", "Španija"),
     ("Bundesliga", "Nemačka"),
@@ -24,7 +24,7 @@ DESIRED_LEAGUES = {
     ("Super Liga", "Turska"),
     "UEFA Liga Šampiona",
     "UEFA Liga Evrope",
-    "UEFA Liga Konferencija"
+    "UEFA Liga Konferencija",
 }
 
 
@@ -81,14 +81,6 @@ def get_markets_for_event(event_id, token):
     except Exception:
         pass
     return None
-
-
-def get_first_long_word(team_name):
-    """Get first word longer than 2 letters from team name"""
-    for word in team_name.split():
-        if len(word) > 2:
-            return word
-    return ""
 
 
 def get_soccer_odds():
@@ -298,14 +290,11 @@ def get_soccer_odds():
         writer = csv.writer(f)
         for match in matches_data:
             # Get first long word from each team name
-            team1_word = get_first_long_word(match["team1"])
-            team2_word = get_first_long_word(match["team2"])
-            match_label = f"{team1_word}{team2_word}"
-
             if match["marketType"] in ["1X2", "1X2F", "1X2S"]:
                 writer.writerow(
                     [
-                        match_label,
+                        match["team1"],
+                        match["team2"],
                         match["marketType"],
                         match["odd1"],
                         match["oddX"],
@@ -315,7 +304,8 @@ def get_soccer_odds():
             else:  # GGNG and OU markets
                 writer.writerow(
                     [
-                        match_label,
+                        match["team1"],
+                        match["team2"],
                         match["marketType"],
                         match["odd1"],
                         match["odd2"],

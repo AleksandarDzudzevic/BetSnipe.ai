@@ -6,39 +6,6 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def process_team_names(home_team, away_team):
-    """Convert team names to combined format"""
-    try:
-        teams = [home_team, away_team]
-        processed_names = []
-
-        for team in teams:
-            team = team.strip()
-            words = team.split()
-
-            if not words:
-                return None
-
-            # If team name has only one word and it's 3 characters, use it
-            if len(words) == 1 and len(words[0]) == 3:
-                processed_name = words[0][0].upper() + words[0][1:]
-            else:
-                # Find first word longer than 3 characters
-                first_long_word = next((word for word in words if len(word) > 2), None)
-                if not first_long_word:
-                    return None
-                processed_name = first_long_word[0].upper() + first_long_word[1:]
-
-            processed_names.append(processed_name)
-
-        if len(processed_names) == 2:
-            return f"{processed_names[0]}{processed_names[1]}"
-        return None
-    except Exception as e:
-        print(f"Error processing names {home_team} vs {away_team}: {e}")
-        return None
-
-
 def get_soccerbet_api():
     # Define leagues with their IDs
     leagues = [
@@ -72,12 +39,12 @@ def get_soccerbet_api():
                     match_data = match_response.json()
                     home_team = match["home"]
                     away_team = match["away"]
-                    match_name = process_team_names(home_team, away_team)
                     bet_map = match_data.get("betMap", {})
 
                     # Format winner odds row
                     match_winner = {
-                        "match": match_name,
+                        "Team1": home_team,
+                        "Team2": away_team,
                         "market": "12",
                         "odd1": bet_map.get("50291", {})
                         .get("NULL", {})
@@ -113,7 +80,8 @@ def get_soccerbet_api():
 
                                 # Create single handicap row with both teams' odds
                                 match_handicap = {
-                                    "match": match_name,
+                                    "Team1": home_team,
+                                    "Team2": away_team,
                                     "market": f"H{handicap}",
                                     "odd1": odds2,  # Flipped: Team 2's odds go in odd1
                                     "odd2": odds1,  # Flipped: Team 1's odds go in odd2
@@ -137,7 +105,8 @@ def get_soccerbet_api():
                                 )
 
                                 match_total = {
-                                    "match": match_name,
+                                    "Team1": home_team,
+                                    "Team2": away_team,
                                     "market": f"OU{points}",
                                     "odd1": odds,  # Under odds
                                     "odd2": bet_map.get("50445", {})
@@ -160,10 +129,11 @@ def get_soccerbet_api():
         ) as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["match", "market", "odd1", "odd2", "odd3"],
+                fieldnames=["Team1", "Team2", "market", "odd1", "odd2", "odd3"],
             )
             writer.writeheader()
             writer.writerows(all_matches_data)
+
 
 if __name__ == "__main__":
     get_soccerbet_api()

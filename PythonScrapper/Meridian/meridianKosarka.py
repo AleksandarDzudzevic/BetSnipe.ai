@@ -44,14 +44,6 @@ def get_auth_token():
     return None
 
 
-def get_first_long_word(team_name):
-    """Get first word longer than 2 letters from team name"""
-    for word in team_name.split():
-        if len(word) > 2:
-            return word
-    return ""
-
-
 def get_markets_for_event(event_id, token):
     url = f"https://online.meridianbet.com/betshop/api/v2/events/{event_id}/markets"
     headers = {
@@ -188,16 +180,16 @@ def get_basketball_odds():
         except Exception:
             break
 
-    with open("meridian_basketball_matches.csv", "w", newline="", encoding="utf-8") as f:
+    with open(
+        "meridian_basketball_matches.csv", "w", newline="", encoding="utf-8"
+    ) as f:
         writer = csv.writer(f)
         for match in matches_data:
-            team1_word = get_first_long_word(match["team1"])
-            team2_word = get_first_long_word(match["team2"])
-            match_label = f"{team1_word}{team2_word}"
 
             writer.writerow(
                 [
-                    match_label,
+                    match["team1"],
+                    match["team2"],
                     match["marketType"],
                     match["odd1"],
                     match["odd2"],

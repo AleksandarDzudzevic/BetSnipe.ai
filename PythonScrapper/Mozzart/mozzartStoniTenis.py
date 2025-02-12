@@ -11,33 +11,6 @@ from mozzart_shared import BrowserManager
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def process_team_name(name):
-    """Process team name to get the first word"""
-    try:
-        name = name.strip()
-        if "/" in name:  # Doubles match
-            # Split partners and get first word (lastname) from each
-            partners = name.split("/")
-            names = []
-            for partner in partners:
-                if "," in partner:
-                    lastname = partner.split(",")[0].strip()
-                    names.append(lastname.split()[0])  # Get first word of lastname
-                else:
-                    names.append(partner.strip().split()[0])  # Get first word
-            return names[0]  # Return first player's lastname
-        else:
-            # Singles match - get word before comma or first word
-            if "," in name:
-                lastname = name.split(",")[0].strip()
-                return lastname.split()[0]  # Get first word of lastname
-            else:
-                return name.strip().split()[0]  # Get first word
-    except Exception as e:
-        print(f"Error processing name {name}: {e}")
-        return None
-
-
 def get_table_tennis_leagues():
     """Fetch current table tennis leagues from Mozzart"""
     try:
@@ -66,19 +39,19 @@ def get_table_tennis_leagues():
 
         response = driver.execute_script(script)
         leagues = []
-        
+
         if response:
             try:
                 data = json.loads(response)
-                if 'competitions' in data:
-                    for competition in data['competitions']:
-                        league_id = competition.get('id')
-                        league_name = competition.get('name')
+                if "competitions" in data:
+                    for competition in data["competitions"]:
+                        league_id = competition.get("id")
+                        league_name = competition.get("name")
                         if league_id and league_name:
                             leagues.append((league_id, league_name))
             except json.JSONDecodeError as e:
                 print(f"Error parsing leagues response: {e}")
-        
+
         return leagues
 
     except Exception as e:
@@ -89,7 +62,7 @@ def get_table_tennis_leagues():
 def get_mozzart_sports():
     try:
         leagues = get_table_tennis_leagues()
-        
+
         if not leagues:
             print("No leagues found or error occurred while fetching leagues")
             return
@@ -157,14 +130,23 @@ def get_mozzart_sports():
                                             match_odds["2"] = odd["value"]
 
                                 matches_data.append(
-                                    [match_name, "12", match_odds["1"], match_odds["2"], ""]
+                                    [
+                                        home_team,
+                                        away_team,
+                                        "12",
+                                        match_odds["1"],
+                                        match_odds["2"],
+                                        "",
+                                    ]
                                 )
                             except Exception as e:
                                 print(f"Error processing match: {e}")
                                 continue
 
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing matches response for league {league_name}: {e}")
+                        print(
+                            f"Error parsing matches response for league {league_name}: {e}"
+                        )
                         continue
 
                 except Exception as e:
@@ -176,9 +158,11 @@ def get_mozzart_sports():
                 continue
 
         print(f"Total matches found: {len(matches_data)}")
-        
+
         if matches_data:
-            with open("mozzart_tabletennis_matches.csv", "w", newline="", encoding="utf-8") as f:
+            with open(
+                "mozzart_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
+            ) as f:
                 writer = csv.writer(f)
                 writer.writerows(matches_data)
         else:

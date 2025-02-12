@@ -5,13 +5,9 @@ import csv
 def get_table_tennis_leagues():
     """Fetch current table tennis leagues from MaxBet"""
     url = "https://www.maxbet.rs/restapi/offer/sr/categories/sport/TT/l"
-    
-    params = {
-        "annex": "3",
-        "desktopVersion": "1.2.1.10",
-        "locale": "sr"
-    }
-    
+
+    params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
+
     headers = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br",
@@ -22,7 +18,7 @@ def get_table_tennis_leagues():
         "Referer": "https://www.maxbet.rs/betting",
         "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"'
+        "sec-ch-ua-platform": '"Windows"',
     }
 
     try:
@@ -30,14 +26,14 @@ def get_table_tennis_leagues():
         if response.status_code == 200:
             data = response.json()
             leagues = {}
-            
-            for category in data.get('categories', []):
-                league_id = category.get('id')
-                league_name = category.get('name')
+
+            for category in data.get("categories", []):
+                league_id = category.get("id")
+                league_name = category.get("name")
                 if league_id and league_name:
                     # Use league name as key and ID as value
                     leagues[league_name.lower().replace(" ", "_")] = league_id
-            
+
             return leagues
         else:
             print(f"Failed to fetch leagues with status code: {response.status_code}")
@@ -51,7 +47,7 @@ def get_table_tennis_leagues():
 def fetch_maxbet_table_tennis_matches():
     # Get leagues dynamically instead of using hardcoded TABLE_TENNIS_LEAGUES
     table_tennis_leagues = get_table_tennis_leagues()
-    
+
     if not table_tennis_leagues:
         print("No leagues found or error occurred while fetching leagues")
         return []
@@ -69,7 +65,7 @@ def fetch_maxbet_table_tennis_matches():
         "Referer": "https://www.maxbet.rs/betting",
         "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"'
+        "sec-ch-ua-platform": '"Windows"',
     }
 
     for league_name, league_id in table_tennis_leagues.items():
@@ -85,7 +81,9 @@ def fetch_maxbet_table_tennis_matches():
                     for match in data["esMatches"]:
                         match_ids.append(match["id"])
             else:
-                print(f"Failed to fetch {league_name} with status code: {response.status_code}")
+                print(
+                    f"Failed to fetch {league_name} with status code: {response.status_code}"
+                )
 
         except Exception as e:
             print(f"Error fetching {league_name}: {str(e)}")
@@ -103,7 +101,6 @@ def fetch_maxbet_table_tennis_matches():
 
                 home_team = match_data.get("home", "")
                 away_team = match_data.get("away", "")
-                match_name = f"{home_team}, {away_team}"
                 odds = match_data.get("odds", {})
 
                 # Winner odds (1-2)
@@ -113,7 +110,8 @@ def fetch_maxbet_table_tennis_matches():
                 if home_win and away_win:
                     matches_odds.append(
                         {
-                            "match": match_name,
+                            "team1": home_team,
+                            "team2": away_team,
                             "market": "12",
                             "odd1": home_win,
                             "oddX": away_win,
@@ -130,9 +128,13 @@ def fetch_maxbet_table_tennis_matches():
 
     # Save to CSV
     if matches_odds:
-        with open("maxbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8") as f:
+        with open(
+            "maxbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
+        ) as f:
             for match in matches_odds:
-                f.write(f"{match['match']},{match['market']},{match['odd1']},{match['oddX']},\n")
+                f.write(
+                    f"{match["team1"]},{match["team2"]},{match['market']},{match['odd1']},{match['oddX']},\n"
+                )
     else:
         print("No table tennis odds data to save")
 

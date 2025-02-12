@@ -140,6 +140,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "Bet Type": "1X2",
                                                     "Odds 1": odd1,
                                                     "Odds X": oddX,
                                                     "Odds 2": odd2,
@@ -155,7 +156,15 @@ try:
                     "admiral_hockey_matches.csv", "w", newline="", encoding="utf-8"
                 ) as f:
                     writer = csv.DictWriter(
-                        f, fieldnames=["Team1", "Team2", "Odds 1", "Odds X", "Odds 2"]
+                        f,
+                        fieldnames=[
+                            "Team1",
+                            "Team2",
+                            "Bet Type",
+                            "Odds 1",
+                            "Odds X",
+                            "Odds 2",
+                        ],
                     )
                     writer.writeheader()
                     for match in matches:

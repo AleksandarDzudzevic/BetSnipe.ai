@@ -50,26 +50,6 @@ def get_last_name(player_name):
     return player_name.strip().split()[-1]
 
 
-def process_match_id(player1, player2):
-    # Check if it's a doubles match
-    if "/" in player1 and "/" in player2:
-        # Split both teams
-        team1_players = player1.split("/")
-        team2_players = player2.split("/")
-
-        # Get last names for all players
-        team1_names = [get_last_name(p) for p in team1_players]
-        team2_names = [get_last_name(p) for p in team2_players]
-
-        # Combine all four last names
-        return f"{team1_names[0]}{team1_names[1]}{team2_names[0]}{team2_names[1]}"
-    else:
-        # Singles match - get last names
-        name1 = get_last_name(player1)
-        name2 = get_last_name(player2)
-        return f"{name1}{name2}"
-
-
 def get_tennis_odds():
     token = get_auth_token()
     if not token:
@@ -126,30 +106,36 @@ def get_tennis_odds():
     # Now fetch odds for each event
     for event_id in event_ids:
         try:
-            event_url = f"https://online.meridianbet.com/betshop/api/v2/events/{event_id}"
+            event_url = (
+                f"https://online.meridianbet.com/betshop/api/v2/events/{event_id}"
+            )
             response = requests.get(event_url, headers=headers)
-            
+
             if response.status_code == 200:
                 event_data = response.json()
-                
+
                 # Get player names
-                rivals = event_data.get("payload", {}).get("header", {}).get("rivals", [])
+                rivals = (
+                    event_data.get("payload", {}).get("header", {}).get("rivals", [])
+                )
                 if len(rivals) >= 2:
                     player1, player2 = rivals[0], rivals[1]
-                    match_name = f"{player1}, {player2}"
-                    
+
                     # Look for "Pobednik" market
                     for game in event_data.get("payload", {}).get("games", []):
                         for market in game.get("markets", []):
                             if market.get("name") == "Pobednik":
                                 selections = market.get("selections", [])
                                 if len(selections) >= 2:
-                                    matches_data.append({
-                                        "match": match_name,
-                                        "market": "12",
-                                        "odd1": selections[0].get("price", "N/A"),
-                                        "odd2": selections[1].get("price", "N/A")
-                                    })
+                                    matches_data.append(
+                                        {
+                                            "team1": player1,
+                                            "team2": player2,
+                                            "market": "12",
+                                            "odd1": selections[0].get("price", "N/A"),
+                                            "odd2": selections[1].get("price", "N/A"),
+                                        }
+                                    )
 
             elif response.status_code == 429:
                 time.sleep(2)
@@ -160,9 +146,13 @@ def get_tennis_odds():
 
     # Save to CSV without quotes
     if matches_data:
-        with open("meridian_tabletennis_matches.csv", "w", newline="", encoding="utf-8") as f:
+        with open(
+            "meridian_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
+        ) as f:
             for match in matches_data:
-                f.write(f"{match['match']},{match['market']},{match['odd1']},{match['odd2']},\n")
+                f.write(
+                    f"{match['team1']},{match['team2']},{match['market']},{match['odd1']},{match['odd2']},\n"
+                )
 
 
 if __name__ == "__main__":

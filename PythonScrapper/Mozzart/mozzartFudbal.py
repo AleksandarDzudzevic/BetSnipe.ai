@@ -89,37 +89,9 @@ def get_mozzart_match(match_id, league_id):
 
     except Exception as e:
         print(f"Critical error fetching match {match_id}: {str(e)}")
-    
+
     print(f"Failed to fetch match {match_id} after all attempts")
     return None
-
-
-def get_first_valid_word(team_name):
-    """Process team name with special cases for abbreviated names"""
-    try:
-        team_name = team_name.strip()
-
-        # Special cases mapping
-        special_cases = {
-            "Ath.": "Atletico",
-            "Man.": "Manchester",
-            "Eintr.": "Eintracht",
-            "St.Gilloise": "Royale",
-        }
-
-        # Check for special cases first
-        for abbrev, full_name in special_cases.items():
-            if team_name.startswith(abbrev):
-                return full_name
-
-        # If no special case, get first word
-        words = team_name.split()
-        if words:
-            return words[0]
-        return None
-    except Exception as e:
-        print(f"Error processing team name {team_name}: {e}")
-        return None
 
 
 def scrape_all_matches():
@@ -162,20 +134,20 @@ def scrape_all_matches():
         current_league = None
 
         for league_id, league_name in leagues:
-            
+
             match_ids = get_all_match_ids(league_id)
-            
+
             if not match_ids:
                 continue
 
             for match_id in match_ids:
-                
+
                 try:
                     match_data = get_mozzart_match(match_id, league_id)
-                    
+
                     if match_data is None:
                         continue
-                        
+
                     if "match" not in match_data:
                         continue
 
@@ -186,19 +158,15 @@ def scrape_all_matches():
 
                     home_team = match["home"].get("name")
                     away_team = match["visitor"].get("name")
-                    
+
                     if not home_team or not away_team:
                         print(f"Invalid team names for match {match_id}")
                         continue
 
-                    team1_name = get_first_valid_word(home_team)
-                    team2_name = get_first_valid_word(away_team)
-                    
-                    if not team1_name or not team2_name:
+                    if not home_team or not away_team:
                         print(f"Could not process team names for match {match_id}")
                         continue
 
-                    match_name = f"{team1_name}{team2_name}"
                     odds_1x2 = {"1": "0.00", "X": "0.00", "2": "0.00"}
                     odds_1x2_first = {"1": "0.00", "X": "0.00", "2": "0.00"}
                     odds_1x2_second = {"1": "0.00", "X": "0.00", "2": "0.00"}
@@ -208,7 +176,7 @@ def scrape_all_matches():
                     total_goals_second = {}
                     for odds_group in match.get("oddsGroup", []):
                         group_name = odds_group.get("groupName", "")
-                        
+
                         for odd in odds_group.get("odds", []):
                             game_name = odd.get("game", {}).get("name", "")
                             subgame_name = odd.get("subgame", {}).get("name", "")
@@ -247,7 +215,8 @@ def scrape_all_matches():
                                 total_goals_second[subgame_name] = value
                     csv_data.append(
                         [
-                            match_name,
+                            home_team,
+                            away_team,
                             "1X2",
                             odds_1x2["1"],
                             odds_1x2["X"],
@@ -256,7 +225,8 @@ def scrape_all_matches():
                     )
                     csv_data.append(
                         [
-                            match_name,
+                            home_team,
+                            away_team,
                             "1X2F",
                             odds_1x2_first["1"],
                             odds_1x2_first["X"],
@@ -265,7 +235,8 @@ def scrape_all_matches():
                     )
                     csv_data.append(
                         [
-                            match_name,
+                            home_team,
+                            away_team,
                             "1X2S",
                             odds_1x2_second["1"],
                             odds_1x2_second["X"],
@@ -274,7 +245,8 @@ def scrape_all_matches():
                     )
                     csv_data.append(
                         [
-                            match_name,
+                            home_team,
+                            away_team,
                             "GGNG",
                             odds_gg_ng["gg"],
                             odds_gg_ng["ng"],
@@ -300,7 +272,8 @@ def scrape_all_matches():
                     for total in sorted(set(under_odds.keys()) & set(over_odds.keys())):
                         csv_data.append(
                             [
-                                match_name,
+                                home_team,
+                                away_team,
                                 f"{total:.1f}",
                                 under_odds[total],
                                 over_odds[total],
@@ -332,7 +305,8 @@ def scrape_all_matches():
                         if total in under_odds_first and total in over_odds_first:
                             csv_data.append(
                                 [
-                                    match_name,
+                                    home_team,
+                                    away_team,
                                     f"{total:.1f}F",
                                     under_odds_first[total],
                                     over_odds_first[total],
@@ -364,7 +338,8 @@ def scrape_all_matches():
                         if total in under_odds_second and total in over_odds_second:
                             csv_data.append(
                                 [
-                                    match_name,
+                                    home_team,
+                                    away_team,
                                     f"{total:.1f}S",
                                     under_odds_second[total],
                                     over_odds_second[total],
@@ -377,13 +352,14 @@ def scrape_all_matches():
         with open(
             "mozzart_football_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
-            f.write("Match,BetType,Odd1,Odd2,Odd3\n")
+            f.write("Team1,Team2,BetType,Odd1,Odd2,Odd3\n")
             for row in csv_data:
                 f.write(",".join(row) + "\n")
 
     except Exception as e:
         print(f"Critical error: {str(e)}")
         import traceback
+
         traceback.print_exc()
     finally:
         BrowserManager.cleanup()

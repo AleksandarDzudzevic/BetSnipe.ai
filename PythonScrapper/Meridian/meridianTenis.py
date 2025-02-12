@@ -6,7 +6,6 @@ from datetime import datetime
 import time
 
 
-
 def get_auth_token():
     try:
         session = requests.Session()
@@ -38,6 +37,7 @@ def get_auth_token():
     except Exception as e:
         print(f"Error getting auth token: {e}")
     return None
+
 
 def get_tennis_odds():
     token = get_auth_token()
@@ -95,38 +95,53 @@ def get_tennis_odds():
     # Now fetch odds for each event
     for event_id in event_ids:
         try:
-            event_url = f"https://online.meridianbet.com/betshop/api/v2/events/{event_id}"
+            event_url = (
+                f"https://online.meridianbet.com/betshop/api/v2/events/{event_id}"
+            )
             response = requests.get(event_url, headers=headers)
-            
+
             if response.status_code == 200:
                 event_data = response.json()
-                
+
                 # Get player names
-                rivals = event_data.get("payload", {}).get("header", {}).get("rivals", [])
+                rivals = (
+                    event_data.get("payload", {}).get("header", {}).get("rivals", [])
+                )
                 if len(rivals) >= 2:
                     player1, player2 = rivals[0], rivals[1]
-                    match_name = f"{player1}, {player2}"
-                    
+
                     # Look for markets in games array
                     for game in event_data.get("payload", {}).get("games", []):
                         for market in game.get("markets", []):
                             market_name = market.get("name")
                             selections = market.get("selections", [])
-                            
-                            if market_name == "Pobednik" or market_name == "Pobednik Meča":
-                                matches_data.append({
-                                    "match": match_name,
-                                    "market": "12",
-                                    "odd1": selections[0].get("price", "N/A"),
-                                    "odd2": selections[1].get("price", "N/A")
-                                })
-                            elif market_name == "Osvaja prvi set" and len(selections) >= 2:
-                                matches_data.append({
-                                    "match": match_name,
-                                    "market": "12set1",
-                                    "odd1": selections[0].get("price", "N/A"),
-                                    "odd2": selections[1].get("price", "N/A")
-                                })
+
+                            if (
+                                market_name == "Pobednik"
+                                or market_name == "Pobednik Meča"
+                            ):
+                                matches_data.append(
+                                    {
+                                        "team1": player1,
+                                        "team2": player2,
+                                        "market": "12",
+                                        "odd1": selections[0].get("price", "N/A"),
+                                        "odd2": selections[1].get("price", "N/A"),
+                                    }
+                                )
+                            elif (
+                                market_name == "Osvaja prvi set"
+                                and len(selections) >= 2
+                            ):
+                                matches_data.append(
+                                    {
+                                        "team1": player1,
+                                        "team2": player2,
+                                        "market": "12set1",
+                                        "odd1": selections[0].get("price", "N/A"),
+                                        "odd2": selections[1].get("price", "N/A"),
+                                    }
+                                )
 
             elif response.status_code == 429:
                 time.sleep(2)
@@ -137,23 +152,21 @@ def get_tennis_odds():
 
     # Save to CSV without quotes
     if matches_data:
-        with open("meridian_tennis_matches.csv", "w", newline="", encoding="utf-8") as f:
+        with open(
+            "meridian_tennis_matches.csv", "w", newline="", encoding="utf-8"
+        ) as f:
             writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
             for match in matches_data:
-                match_name = match["match"]
-                
-                # Check if it's a doubles match by looking for "/"
-                if "/" in match_name:  # Doubles match
-                    players = match_name.split(", ")
-                    if len(players) == 4:
-                        match_name = f"{players[0]}/{players[1]}, {players[2]}/{players[3]}"
-                
-                writer.writerow([
-                    match_name,
-                    match["market"],
-                    match["odd1"],
-                    match["odd2"]
-                ])
+
+                writer.writerow(
+                    [
+                        match["team1"],
+                        match["team2"],
+                        match["market"],
+                        match["odd1"],
+                        match["odd2"],
+                    ]
+                )
 
 
 if __name__ == "__main__":

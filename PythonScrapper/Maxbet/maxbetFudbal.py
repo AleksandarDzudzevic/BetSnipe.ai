@@ -108,7 +108,6 @@ def fetch_maxbet_matches():
                 home_team = match_data.get("home", "")
                 away_team = match_data.get("away", "")
                 odds = match_data.get("odds", {})
-                combined_name = process_team_names(home_team, away_team)
 
                 # 1X2 odds
                 home_win = odds.get("1", "")  # Home win (1)
@@ -132,7 +131,8 @@ def fetch_maxbet_matches():
                 if home_win and draw and away_win:
                     matches_odds.append(
                         {
-                            "matchId": combined_name,
+                            "team1": home_team,
+                            "team2": away_team,
                             "marketType": "1X2",
                             "odd1": home_win,
                             "oddX": draw,
@@ -143,7 +143,8 @@ def fetch_maxbet_matches():
                 if home_win_fh and draw_fh and away_win_fh:
                     matches_odds.append(
                         {
-                            "matchId": combined_name,
+                            "team1": home_team,
+                            "team2": away_team,
                             "marketType": "1X2F",
                             "odd1": home_win_fh,
                             "oddX": draw_fh,
@@ -154,7 +155,8 @@ def fetch_maxbet_matches():
                 if home_win_sh and draw_sh and away_win_sh:
                     matches_odds.append(
                         {
-                            "matchId": combined_name,
+                            "team1": home_team,
+                            "team2": away_team,
                             "marketType": "1X2S",
                             "odd1": home_win_sh,
                             "oddX": draw_sh,
@@ -165,7 +167,8 @@ def fetch_maxbet_matches():
                 if gg and ng:
                     matches_odds.append(
                         {
-                            "matchId": combined_name,
+                            "team1": home_team,
+                            "team2": away_team,
                             "marketType": "GGNG",
                             "odd1": gg,
                             "odd2": ng,
@@ -202,7 +205,8 @@ def fetch_maxbet_matches():
                     if under_odd and over_odd:
                         matches_odds.append(
                             {
-                                "matchId": combined_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "marketType": f"{total}",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -215,7 +219,8 @@ def fetch_maxbet_matches():
                     if under_odd and over_odd:
                         matches_odds.append(
                             {
-                                "matchId": combined_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "marketType": f"{total}F",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -228,7 +233,8 @@ def fetch_maxbet_matches():
                     if under_odd and over_odd:
                         matches_odds.append(
                             {
-                                "matchId": combined_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "marketType": f"{total}S",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -245,7 +251,7 @@ def fetch_maxbet_matches():
     if matches_odds:
         with open("maxbet_football_matches.csv", "w", newline="") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["matchId", "marketType", "odd1", "oddX", "odd2"]
+                f, fieldnames=["team1", "team2", "marketType", "odd1", "oddX", "odd2"]
             )
             # Clean up empty oddX values before writing
             for match in matches_odds:

@@ -5,40 +5,6 @@ import csv
 BASKETBALL_LEAGUES = {"nba": "144532", "euroleague": "131600", "eurocup": "131596"}
 
 
-def process_team_names(home_team, away_team):
-    """Convert team names to combined format"""
-    try:
-        teams = [home_team, away_team]
-        processed_names = []
-
-        for team in teams:
-            team = team.strip()
-            words = team.split()
-
-            if not words:
-                return None
-
-            # If team name has only one word and it's 3 characters, use it
-            if len(words) == 1 and len(words[0]) == 3:
-                processed_name = words[0][0].upper() + words[0][1:]
-            else:
-                # Find first word longer than 3 characters
-                first_long_word = next((word for word in words if len(word) > 2), None)
-                if not first_long_word:
-                    return None
-                processed_name = first_long_word[0].upper() + first_long_word[1:]
-
-            processed_names.append(processed_name)
-
-        if len(processed_names) == 2:
-            return f"{processed_names[0]}{processed_names[1]}"
-        return None
-
-    except Exception as e:
-        print(f"Error processing names {home_team} vs {away_team}: {e}")
-        return None
-
-
 def fetch_maxbet_matches():
     match_ids = []
 
@@ -170,18 +136,19 @@ def fetch_maxbet_matches():
     # Save to CSV
     with open("maxbet_basketball_matches.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["matchId", "marketType", "oddHome", "oddAway"])
+        writer.writerow(["team1", "team2", "marketType", "oddHome", "oddAway"])
         for match in matches_odds:
-            combined_name = process_team_names(match["team1"], match["team2"])
-            if combined_name:
+            if home_team and away_team:
                 writer.writerow(
                     [
-                        combined_name,
+                        home_team,
+                        away_team,
                         match["marketType"],
                         match["oddHome"],
                         match["oddAway"],
                     ]
                 )
+
     return matches_odds
 
 

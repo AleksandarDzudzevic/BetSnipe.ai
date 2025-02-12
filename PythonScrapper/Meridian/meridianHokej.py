@@ -39,14 +39,6 @@ def get_auth_token():
     return None
 
 
-def get_first_long_word(team_name):
-    """Get first word longer than 2 letters from team name"""
-    for word in team_name.split():
-        if len(word) > 2:
-            return word
-    return ""
-
-
 def get_hockey_odds():
     token = get_auth_token()
     if not token:
@@ -123,13 +115,11 @@ def get_hockey_odds():
     with open("meridian_hockey_matches.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         for match in matches_data:
-            team1_word = get_first_long_word(match["team1"])
-            team2_word = get_first_long_word(match["team2"])
-            match_label = f"{team1_word}{team2_word}"
 
             writer.writerow(
                 [
-                    match_label,
+                    match["team1"],
+                    match["team2"],
                     match["marketType"],
                     match["odd1"],
                     match["oddX"],

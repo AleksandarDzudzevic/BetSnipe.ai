@@ -8,51 +8,32 @@ import csv
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def get_first_valid_word(team_name):
-    """Get first valid word longer than 2 letters with special case for Atletico"""
-    try:
-        team_name = team_name.strip()
-
-        # Special case for Atletico
-        if team_name.startswith("Ath"):
-            return "Atletico"
-        if team_name.startswith("Bodo/Glimt"):
-            return "Bodo"
-        words = team_name.split()
-        return next(
-            (word for word in words if len(word) > 2 and "." not in word), words[-1]
-        )
-    except Exception as e:
-        print(f"Error processing team name {team_name}: {e}")
-        return None
-
-
 def get_soccerbet_api():
     # Define all leagues
     leagues = [
-    # European Competitions
-    ("2519992", "Liga Šampiona"),        # Champions League
-    ("2520043", "Liga Evrope"),          # Europa League
-    ("2520044", "Liga Konferencije"),    # Conference League
-    ("2516076", "Premijer Liga"),        # Premier League
-    ("2515993", "Druga Engleska Liga"),  # Championship
-    ("2516061", "La Liga"),              # La Liga
-    ("2516062", "La Liga 2"),            # La Liga 2
-    ("2516000", "Serie A"),              # Serie A
-    ("2516001", "Serie B"),              # Serie B
-    ("2515986", "Bundesliga"),           # Bundesliga
-    ("2515987", "Bundesliga 2"),         # Bundesliga 2
-    ("2515968", "Ligue 1"),              # Ligue 1
-    ("2515969", "Ligue 2"),              # Ligue 2
-    ("2516055", "Holandija 1"),          # Eredivisie
-    ("2516056", "Belgija 1"),            # Belgian Pro League
-    ("2516057", "Turska 1"),             # Super Lig
-    ("2516058", "Grčka 1"),              # Greek Super League
-    ("2516059", "Saudijska Liga"),       # Saudi Pro League
-    ("2532290", "Argentiska Liga"),      # Argentina Primera Division
-    ("2516060", "Brazil 1"),             # Brasileirao
-    ("2516063", "Australija 1"),         # A-League
-]
+        # European Competitions
+        ("2519992", "Liga Šampiona"),  # Champions League
+        ("2520043", "Liga Evrope"),  # Europa League
+        ("2520044", "Liga Konferencije"),  # Conference League
+        ("2516076", "Premijer Liga"),  # Premier League
+        ("2515993", "Druga Engleska Liga"),  # Championship
+        ("2516061", "La Liga"),  # La Liga
+        ("2516062", "La Liga 2"),  # La Liga 2
+        ("2516000", "Serie A"),  # Serie A
+        ("2516001", "Serie B"),  # Serie B
+        ("2515986", "Bundesliga"),  # Bundesliga
+        ("2515987", "Bundesliga 2"),  # Bundesliga 2
+        ("2515968", "Ligue 1"),  # Ligue 1
+        ("2515969", "Ligue 2"),  # Ligue 2
+        ("2516055", "Holandija 1"),  # Eredivisie
+        ("2516056", "Belgija 1"),  # Belgian Pro League
+        ("2516057", "Turska 1"),  # Super Lig
+        ("2516058", "Grčka 1"),  # Greek Super League
+        ("2516059", "Saudijska Liga"),  # Saudi Pro League
+        ("2532290", "Argentiska Liga"),  # Argentina Primera Division
+        ("2516060", "Brazil 1"),  # Brasileirao
+        ("2516063", "Australija 1"),  # A-League
+    ]
 
     all_matches_data = []
 
@@ -74,13 +55,11 @@ def get_soccerbet_api():
                     bet_map = match_data.get("betMap", {})
                     home_team = match["home"]
                     away_team = match["away"]
-                    team1_name = get_first_valid_word(home_team)
-                    team2_name = get_first_valid_word(away_team)
-                    match_name = f"{team1_name}{team2_name}"
 
                     # Format 1X2 odds row
                     match_1x2 = {
-                        "match": match_name,
+                        "team1": home_team,
+                        "team2": away_team,
                         "market": "1X2",
                         "odd1": bet_map.get("1", {}).get("NULL", {}).get("ov", "N/A"),
                         "odd2": bet_map.get("2", {}).get("NULL", {}).get("ov", "N/A"),
@@ -88,7 +67,8 @@ def get_soccerbet_api():
                     }
                     # Format First Half 1X2 odds row
                     match_1x2_first = {
-                        "match": match_name,
+                        "team1": home_team,
+                        "team2": away_team,
                         "market": "1X2F",
                         "odd1": bet_map.get("4", {})
                         .get("NULL", {})
@@ -103,7 +83,8 @@ def get_soccerbet_api():
 
                     # Format Second Half 1X2 odds row
                     match_1x2_second = {
-                        "match": match_name,
+                        "team1": home_team,
+                        "team2": away_team,
                         "market": "1X2S",
                         "odd1": bet_map.get("235", {})
                         .get("NULL", {})
@@ -118,7 +99,8 @@ def get_soccerbet_api():
 
                     # Format GG/NG odds row
                     match_ggng = {
-                        "match": match_name,
+                        "team1": home_team,
+                        "team2": away_team,
                         "market": "GGNG",
                         "odd1": bet_map.get("272", {}).get("NULL", {}).get("ov", "N/A"),
                         "odd2": bet_map.get("273", {}).get("NULL", {}).get("ov", "N/A"),
@@ -147,7 +129,8 @@ def get_soccerbet_api():
 
                         if under_odd != "N/A" or over_odd != "N/A":
                             match_total = {
-                                "match": match_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "market": str(total),
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -179,7 +162,8 @@ def get_soccerbet_api():
 
                         if under_odd != "N/A" or over_odd != "N/A":
                             match_total = {
-                                "match": match_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "market": f"{total}F",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -211,7 +195,8 @@ def get_soccerbet_api():
 
                         if under_odd != "N/A" or over_odd != "N/A":
                             match_total = {
-                                "match": match_name,
+                                "team1": home_team,
+                                "team2": away_team,
                                 "market": f"{total}S",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -234,7 +219,7 @@ def get_soccerbet_api():
         ) as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["match", "market", "odd1", "odd2", "odd3"],
+                fieldnames=["team1", "team2", "market", "odd1", "odd2", "odd3"],
             )
             writer.writerows(all_matches_data)
 
