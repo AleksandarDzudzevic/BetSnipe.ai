@@ -4,66 +4,36 @@ from pathlib import Path
 from datetime import datetime
 import time
 import csv
+import importlib.util
 
 
-# ajmo kvotara
-def save_arbitrage(text):
-    """Save arbitrage opportunity to file if it's unique and meets profit criteria"""
-    match_name = text.split("!")[0].split("for ")[-1]
-    profit_lines = [line for line in text.split("\n") if "Profit:" in line]
-    if not profit_lines:
-        return
-
-    profit = float(profit_lines[0].split("$")[1].strip())
-    if profit < 1.4 or profit > 4.0:
-        return
-
-    try:
-        with open("arbitrageopps.txt", "r", encoding="utf-8") as f:
-            content = f.read()
-        arb_count = content.count("Arbitrage #")
-        if match_name in content:
-            print(f"Arbitrage for {match_name} already recorded")
-            return
-    except FileNotFoundError:
-        content = ""
-        arb_count = 0
-
-    with open("arbitrageopps.txt", "a", encoding="utf-8") as f:
-        f.write("\n" + "=" * 50 + "\n")
-        f.write(f"Arbitrage #{arb_count + 1}\n")
-        f.write(f"Found at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(text + "\n")
 
 
-async def run_script(script):
-    """Run a Python script with the correct path"""
-    # Get absolute path to the script directly - no need to handle bookmaker separately
-    script_path = Path(__file__).parent / script
-
-    try:
-        if not script_path.exists():
-            print(f"❌ Script not found: {script_path}")
-            return False
-
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,  # Use sys.executable instead of "python"
-            str(script_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await process.communicate()
-        success = process.returncode == 0
-        if success:
-            print(f"✅ {script} completed successfully")
-        else:
-            print(f"❌ {script} failed")
-            if stderr:
-                print(f"Error: {stderr.decode()}")
-        return success
-    except Exception as e:
-        print(f"❌ {script} failed with error: {str(e)}")
-        return False
+async def run_script(script_path):
+    while True:
+        try:
+            spec = importlib.util.spec_from_file_location("module", script_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            if hasattr(module, 'main'):
+                await module.main()
+            elif hasattr(module, 'scrape_all_matches'):
+                module.scrape_all_matches()
+            elif hasattr(module, 'get_mozzart_sports'):
+                module.get_mozzart_sports()
+            elif hasattr(module, 'get_soccerbet_sports'):
+                module.get_soccerbet_sports()
+            elif hasattr(module, 'fetch_maxbet_matches'):
+                module.fetch_maxbet_matches()
+            elif hasattr(module, 'get_tennis_odds'):
+                module.get_tennis_odds()
+            
+            # Wait 5 minutes before next run
+            await asyncio.sleep(300)
+        except Exception as e:
+            print(f"Error running {script_path}: {e}")
+            await asyncio.sleep(60)  # Wait 1 minute on error
 
 
 async def run_combine_script():
@@ -90,16 +60,6 @@ async def run_combine_script():
         output = line.decode().strip()
         print(output)
 
-        if "ARBITRAGE OPPORTUNITY FOUND" in output:
-            capturing = True
-            current_arb = [output]
-        elif capturing and "Profit:" in output:
-            current_arb.append(output)
-            save_arbitrage("\n".join(current_arb))
-            capturing = False
-            current_arb = []
-        elif capturing:
-            current_arb.append(output)
 
 
 def create_missing_csv_files():
@@ -178,66 +138,48 @@ async def main():
         "Maxbet/maxbetTenis.py",
         "Meridian/meridianTenis.py",
         "Soccerbet/soccerbetTenis.py",
-        # "Superbet/superbetTenis.py",
         # Table Tennis
         "Mozzart/mozzartStoniTenis.py",
         "Admiral/admiralStoniTenis.py",
         "Maxbet/maxbetStoniTenis.py",
         "Meridian/meridianStoniTenis.py",
         "Soccerbet/soccerbetStoniTenis.py",
-        # "Superbet/superbetStoniTenis.py",
         # Football
         "Mozzart/mozzartFudbal.py",
         "Admiral/admiralFudbal.py",
         "Maxbet/maxbetFudbal.py",
         "Meridian/meridianFudbal.py",
         "Soccerbet/soccerbetFudbal.py",
-        # "Superbet/superbetFudbal.py",
         # Basketball
         "Mozzart/mozzartKosarka.py",
         "Admiral/admiralKosarka.py",
         "Maxbet/maxbetKosarka.py",
         "Meridian/meridianKosarka.py",
         "Soccerbet/soccerbetKosarka.py",
-        # "Superbet/superbetKosarka.py",
         # Hockey
         "Mozzart/mozzartHokej.py",
         "Admiral/admiralHokej.py",
         "Maxbet/maxbetHokej.py",
         "Meridian/meridianHokej.py",
         "Soccerbet/soccerbetHokej.py",
-        # "Superbet/superbetHokej.py",
     ]
 
-    # Filter only existing scripts and print status
-    existing_scripts = []
-    print("\nChecking for scripts:")
+    tasks = []
+    print("\nStarting scrapers:")
     for script in scripts:
         script_path = base_path / script
         if script_path.exists():
-            existing_scripts.append(script)
-            print(f"✅ Found {script}")
+            print(f"✅ Starting {script}")
+            task = asyncio.create_task(run_script(script_path))
+            tasks.append(task)
         else:
             print(f"❌ Missing {script}")
 
-    if not existing_scripts:
+    if not tasks:
         print("\nNo scripts found to execute!")
         return
 
-    # Run all scripts in parallel
-    tasks = [run_script(script) for script in existing_scripts]
-    results = await asyncio.gather(*tasks)
-
-    # Print summary
-    successful = sum(1 for r in results if r)
-    total = len(results)
-    print(f"\nCompleted: {successful}/{total} scripts successful")
-
-    if successful < total:
-        print("\nFailed scripts:")
-        for script, result in zip(existing_scripts, results):
-            if not result:
-                print(f"❌ {script}")
+    await asyncio.gather(*tasks)
 
     # Calculate and print total runtime
     total_time = time.time() - start_time

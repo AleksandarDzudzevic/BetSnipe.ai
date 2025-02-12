@@ -8,6 +8,11 @@ import os
 import csv
 from mozzart_shared import BrowserManager
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
+from database_utils import get_db_connection, insert_match
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -156,22 +161,18 @@ def convert_unix_to_iso(unix_ms):
 
 def get_mozzart_sports():
     try:
+        conn = get_db_connection()
         leagues = get_tennis_leagues()
 
         if not leagues:
-            print("No leagues found or error occurred while fetching leagues")
+            print("No leagues found")
             return
 
-        matches_data = []  # List to store match data for CSV
         processed_matches = set()
 
         for league_id, league_name in leagues:
             try:
                 match_ids = get_all_match_ids(league_id)
-
-                if not match_ids:
-                    print(f"No matches found for league {league_name}")
-                    continue
 
                 for match_id in match_ids:
                     try:
@@ -227,25 +228,34 @@ def get_mozzart_sports():
 
                         kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
 
-                        matches_data.append(
-                            [
-                                home_team,
-                                away_team,
-                                kick_off_time,  # Add datetime
-                                "12",
-                                match_odds["1"],
-                                match_odds["2"],
-                            ]
+                        # For match winner odds
+                        insert_match(
+                            conn=conn,
+                            team_home=home_team,
+                            team_away=away_team,
+                            bookmaker_id=1,  # Mozzart
+                            sport_id=3,      # Tennis
+                            bet_type_id=1,   # 12
+                            margin=0,        # Default margin
+                            odd1=float(match_odds["1"]),
+                            odd2=float(match_odds["2"]),
+                            odd3=0,          # Default for tennis
+                            start_time=kick_off_time
                         )
-                        matches_data.append(
-                            [
-                                home_team,
-                                away_team,
-                                kick_off_time,  # Add datetime
-                                "12set1",
-                                first_set_odds["1"],
-                                first_set_odds["2"],
-                            ]
+
+                        # For first set odds
+                        insert_match(
+                            conn=conn,
+                            team_home=home_team,
+                            team_away=away_team,
+                            bookmaker_id=1,
+                            sport_id=3,
+                            bet_type_id=11,   # 12set1 (changed from 3 to 11)
+                            margin=0,
+                            odd1=float(first_set_odds["1"]),
+                            odd2=float(first_set_odds["2"]),
+                            odd3=0,
+                            start_time=kick_off_time
                         )
 
                     except Exception as e:
@@ -256,20 +266,11 @@ def get_mozzart_sports():
                 print(f"Error processing league {league_name}: {str(e)}")
                 continue
 
-        # Write to CSV only if we have data
-        if matches_data:
-            with open(
-                "mozzart_tennis_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
-                f.write("Team1,Team2,DateTime,BetType,Odd1,Odd2\n")
-                for row in matches_data:
-                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]},{row[5]}\n")
-        else:
-            print("No match data collected")
-
     except Exception as e:
         print(f"Critical error: {str(e)}")
     finally:
+        if conn:
+            conn.close()
         BrowserManager.cleanup()
 
 
