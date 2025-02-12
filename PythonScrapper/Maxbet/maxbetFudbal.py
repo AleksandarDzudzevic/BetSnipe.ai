@@ -27,40 +27,6 @@ SOCCER_LEAGUES = {
 }
 
 
-def process_team_names(home_team, away_team):
-    """Convert team names to combined format"""
-    try:
-        teams = [home_team, away_team]
-        processed_names = []
-
-        for team in teams:
-            team = team.strip()
-            words = team.split()
-
-            if not words:
-                return None
-
-            # If team name has only one word and it's 3 characters, use it
-            if len(words) == 1 and len(words[0]) == 3:
-                processed_name = words[0][0].upper() + words[0][1:]
-            else:
-                # Find first word longer than 3 characters
-                first_long_word = next((word for word in words if len(word) > 2), None)
-                if not first_long_word:
-                    return None
-                processed_name = first_long_word[0].upper() + first_long_word[1:]
-
-            processed_names.append(processed_name)
-
-        if len(processed_names) == 2:
-            return f"{processed_names[0]}{processed_names[1]}"
-        return None
-
-    except Exception as e:
-        print(f"Error processing names {home_team} vs {away_team}: {e}")
-        return None
-
-
 def fetch_maxbet_matches():
     match_ids = []
 

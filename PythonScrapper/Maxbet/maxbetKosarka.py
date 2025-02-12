@@ -134,20 +134,17 @@ def fetch_maxbet_matches():
             continue
 
     # Save to CSV
-    with open("maxbet_basketball_matches.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["team1", "team2", "marketType", "oddHome", "oddAway"])
-        for match in matches_odds:
-            if home_team and away_team:
-                writer.writerow(
-                    [
-                        home_team,
-                        away_team,
-                        match["marketType"],
-                        match["oddHome"],
-                        match["oddAway"],
-                    ]
-                )
+    if matches_odds:
+        with open(
+            "maxbet_basketball_matches.csv", "w", newline="", encoding="utf-8"
+        ) as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["team1", "team2", "marketType", "oddHome", "oddAway"]
+            )
+            writer.writeheader()
+            writer.writerows(matches_odds)
+    else:
+        print("No odds data to save")
 
     return matches_odds
 
