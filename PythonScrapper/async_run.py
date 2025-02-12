@@ -36,10 +36,18 @@ def save_arbitrage(text):
 
 
 async def run_script(script):
+    """Run a Python script with the correct path"""
+    # Get absolute path to the script directly - no need to handle bookmaker separately
+    script_path = Path(__file__).parent / script
+    
     try:
+        if not script_path.exists():
+            print(f"❌ Script not found: {script_path}")
+            return False
+            
         process = await asyncio.create_subprocess_exec(
-            "python",
-            script,
+            sys.executable,  # Use sys.executable instead of "python"
+            str(script_path),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
@@ -94,7 +102,13 @@ async def run_combine_script():
 
 
 def create_missing_csv_files():
-    """Create CSV files if they don't exist"""
+    """Create CSV files in PythonScrapper folder only"""
+    # Get the PythonScrapper directory path
+    base_path = Path(__file__).parent
+    if base_path.name != "betsnipe.ai":
+        print("Warning: Script is not in PythonScrapper directory")
+        return
+
     csv_files = {
         "Tennis": [
             "admiral_tennis_matches.csv",
@@ -135,14 +149,16 @@ def create_missing_csv_files():
 
     for sport, files in csv_files.items():
         print(f"\nChecking {sport} CSV files:")
-        for file in files:
-            if not Path(file).exists():
-                print(f"Creating {file}")
-                with open(file, "w", newline="", encoding="utf-8") as f:
+        for filename in files:
+            file_path = base_path / filename
+            # Only create if we're in PythonScrapper directory
+            if not file_path.exists():
+                print(f"Creating {file_path}")
+                with open(file_path, "w", newline="", encoding="utf-8") as f:
                     writer = csv.writer(f)
                     writer.writerow(["Match", "Type", "Odds 1", "Odds 2", "Odds 3"])
             else:
-                print(f"✅ {file} exists")
+                print(f"✅ {file_path} exists")
 
 
 async def main():
@@ -150,42 +166,62 @@ async def main():
 
     create_missing_csv_files()
 
+    # Get the base path for scripts
+    base_path = Path(__file__).parent
+    
     # Run all scripts in parallel
     scripts = [
         # Tennis
-        "mozzartTenis.py",
-        "admiralTenis.py",
-        "maxbetTenis.py",
-        "meridianTenis.py",
-        "soccerbetTenis.py",
+        "Mozzart/mozzartTenis.py",
+        "Admiral/admiralTenis.py",
+        "Maxbet/maxbetTenis.py",
+        "Meridian/meridianTenis.py",
+        "Soccerbet/soccerbetTenis.py",
+        #"Superbet/superbetTenis.py",
         # Table Tennis
-        "mozzartStoniTenis.py",
-        "admiralStoniTenis.py",
-        "maxbetStoniTenis.py",
-        "meridianStoniTenis.py",
-        "soccerbetStoniTenis.py",
+        "Mozzart/mozzartStoniTenis.py",
+        "Admiral/admiralStoniTenis.py",
+        "Maxbet/maxbetStoniTenis.py",
+        "Meridian/meridianStoniTenis.py",
+        "Soccerbet/soccerbetStoniTenis.py",
+        #"Superbet/superbetStoniTenis.py",
         # Football
-        "mozzartFudbal.py",
-        "admiralFudbal.py",
-        "maxbetFudbal.py",
-        "meridianFudbal.py",
-        "soccerbetFudbal.py",
+        "Mozzart/mozzartFudbal.py",
+        "Admiral/admiralFudbal.py",
+        "Maxbet/maxbetFudbal.py",
+        "Meridian/meridianFudbal.py",
+        "Soccerbet/soccerbetFudbal.py",
+        #"Superbet/superbetFudbal.py",
         # Basketball
-        "mozzartKosarka.py",
-        "admiralKosarka.py",
-        "maxbetKosarka.py",
-        "meridianKosarka.py",
-        "soccerbetKosarka.py",
+        "Mozzart/mozzartKosarka.py",
+        "Admiral/admiralKosarka.py",
+        "Maxbet/maxbetKosarka.py",
+        "Meridian/meridianKosarka.py",
+        "Soccerbet/soccerbetKosarka.py",
+        #"Superbet/superbetKosarka.py",
         # Hockey
-        "mozzartHokej.py",
-        "admiralHokej.py",
-        "maxbetHokej.py",
-        "meridianHokej.py",
-        "soccerbetHokej.py",
+        "Mozzart/mozzartHokej.py",
+        "Admiral/admiralHokej.py",
+        "Maxbet/maxbetHokej.py",
+        "Meridian/meridianHokej.py",
+        "Soccerbet/soccerbetHokej.py",
+        #"Superbet/superbetHokej.py",
     ]
 
-    # Filter only existing scripts
-    existing_scripts = [s for s in scripts if Path(s).exists()]
+    # Filter only existing scripts and print status
+    existing_scripts = []
+    print("\nChecking for scripts:")
+    for script in scripts:
+        script_path = base_path / script
+        if script_path.exists():
+            existing_scripts.append(script)
+            print(f"✅ Found {script}")
+        else:
+            print(f"❌ Missing {script}")
+
+    if not existing_scripts:
+        print("\nNo scripts found to execute!")
+        return
 
     # Run all scripts in parallel
     tasks = [run_script(script) for script in existing_scripts]
@@ -201,11 +237,6 @@ async def main():
         for script, result in zip(existing_scripts, results):
             if not result:
                 print(f"❌ {script}")
-
-    # Run combine_games.py after all other scripts
-    if successful > 0:
-        print("\nRunning combine_games.py to analyze results...")
-        await run_script("combine_games.py")
 
     # Calculate and print total runtime
     total_time = time.time() - start_time

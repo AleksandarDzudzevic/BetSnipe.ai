@@ -6,12 +6,14 @@ import ssl
 import certifi
 import os
 import csv
+from mozzart_shared import BrowserManager
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def get_all_match_ids(driver, league_id):
+def get_all_match_ids(league_id):
     try:
+        driver = BrowserManager.get_browser()
         script = (
             """
         return fetch('https://www.mozzartbet.com/betting/matches', {
@@ -50,8 +52,9 @@ def get_all_match_ids(driver, league_id):
         return []
 
 
-def get_mozzart_match(match_id, league_id, driver):
+def get_mozzart_match(match_id, league_id):
     try:
+        driver = BrowserManager.get_browser()
         script = f"""
         return fetch('https://www.mozzartbet.com/match/{match_id}', {{
             method: 'POST',
@@ -125,26 +128,7 @@ def process_team_names(home_team, away_team):
 
 
 def scrape_all_matches():
-    driver = None
     try:
-        options = uc.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-logging")
-        options.add_argument("--ignore-certificate-errors")
-        options.add_argument("--ignore-ssl-errors")
-        options.add_argument(f"--certfile={certifi.where()}")
-
-        # Set version to match your Chrome version
-        driver = uc.Chrome(options=options, version_main=132)  # Explicitly set to 132
-        atexit.register(lambda: driver.quit() if driver else None)
-
-        driver.get("https://www.mozzartbet.com/sr/kladjenje")
-        time.sleep(2)
-
         leagues = [
             (23, "NBA"),
             (26, "Evroliga"),
@@ -161,152 +145,148 @@ def scrape_all_matches():
         processed_matches = set()
 
         for league_id, league_name in leagues:
-            match_ids = get_all_match_ids(driver, league_id)
+            match_ids = get_all_match_ids(league_id)
             if match_ids:
                 for match_id in match_ids:
-                    match_data = get_mozzart_match(match_id, league_id, driver)
-                    if match_data is None:  # Explicit check for None
-                        print(f"Skipping match {match_id} due to fetch failure")
-                        continue
-                    
-                    if "match" not in match_data:  # Additional validation
-                        print(f"No match data found for {match_id}")
-                        continue
-
-                    match = match_data["match"]
-                    if "specialMatchGroupId" in match:
-                        continue
-
-                    if match.get("sport", {}).get("id") != 2:
-                        continue
-
-                    home_team = match["home"]["name"]
-                    away_team = match["visitor"]["name"]
-
-                    match_name = process_team_names(home_team, away_team)
-                    if not match_name or match_name in processed_matches:
-                        continue
-
-                    processed_matches.add(match_name)
-
-                    # Winner odds
-                    winner_odds = {"1": "0.00", "2": "0.00"}
-                    total_points_odds = {}
-                    handicap_odds = {}
-
-                    odds_groups = match.get("oddsGroup", [])
-                    if not odds_groups:
-                        print(f"No odds groups found for match: {match_name}")
-                        continue
-
-                    for odds_group in odds_groups:
-                        # Skip handicaps for first and second halftime
-                        group_name = odds_group.get("groupName", "")
-                        if "poluvreme" in group_name.lower():
+                    try:
+                        match_data = get_mozzart_match(match_id, league_id)
+                        
+                        if match_data is None:  # Explicit check for None
+                            print(f"Skipping match {match_id} due to fetch failure")
+                            continue
+                        
+                        if "match" not in match_data:  # Additional validation
+                            print(f"No match data found for {match_id}")
                             continue
 
-                        for odd in odds_group.get("odds", []):
-                            game_name = odd.get("game", {}).get("name", "")
-                            subgame_name = odd.get("subgame", {}).get("name", "")
-                            special_value = odd.get("specialOddValue", "")
-                            value_type = odd.get("game", {}).get(
-                                "specialOddValueType", ""
+                        match = match_data["match"]
+                        if "specialMatchGroupId" in match:
+                            continue
+
+                        home_team = match.get("home", {}).get("name")
+                        away_team = match.get("visitor", {}).get("name")
+
+                        match_name = process_team_names(home_team, away_team)
+                        if not match_name or match_name in processed_matches:
+                            continue
+
+                        processed_matches.add(match_name)
+
+                        # Winner odds
+                        winner_odds = {"1": "0.00", "2": "0.00"}
+                        total_points_odds = {}
+                        handicap_odds = {}
+
+                        odds_groups = match.get("oddsGroup", [])
+                        if not odds_groups:
+                            continue
+
+                        for odds_group in odds_groups:
+                            # Skip handicaps for first and second halftime
+                            group_name = odds_group.get("groupName", "")
+                            if "poluvreme" in group_name.lower():
+                                continue
+
+                            for odd in odds_group.get("odds", []):
+                                game_name = odd.get("game", {}).get("name", "")
+                                subgame_name = odd.get("subgame", {}).get("name", "")
+                                special_value = odd.get("specialOddValue", "")
+                                value_type = odd.get("game", {}).get(
+                                    "specialOddValueType", ""
+                                )
+
+                                try:
+                                    value = f"{float(odd.get('value', '0.00')):.2f}"
+                                except:
+                                    value = "0.00"
+
+                                if game_name == "Pobednik meča":
+                                    if subgame_name in ["1", "2"]:
+                                        winner_odds[subgame_name] = value
+                                elif value_type == "HANDICAP":
+                                    if special_value and subgame_name in ["1", "2"]:
+                                        # Skip first and second halftime handicaps
+                                        group_name = odd.get("game", {}).get(
+                                            "groupName", ""
+                                        )
+                                        if "poluvreme" in group_name.lower():
+                                            continue
+
+                                        handicap = special_value
+                                        if handicap not in handicap_odds:
+                                            handicap_odds[handicap] = {
+                                                "1": "",
+                                                "2": "",
+                                            }
+                                        handicap_odds[handicap][subgame_name] = value
+                                elif value_type == "MARGIN":
+                                    if special_value:
+                                        try:
+                                            points = float(special_value)
+                                            if points > 130:
+                                                if subgame_name == "manje":
+                                                    total_points_odds[
+                                                        f"{special_value}_under"
+                                                    ] = value
+                                                elif subgame_name == "više":
+                                                    total_points_odds[
+                                                        f"{special_value}_over"
+                                                    ] = value
+                                        except ValueError:
+                                            continue
+
+                        # Add winner bet
+                        csv_data.append(
+                            [match_name, "12", winner_odds["1"], winner_odds["2"], ""]
+                        )
+
+                        # Add total points bets
+                        sorted_points = sorted(
+                            set(k.split("_")[0] for k in total_points_odds.keys()),
+                            key=float,
+                        )
+                        for handicap in sorted(handicap_odds.keys(), key=float):
+                            csv_data.append(
+                                [
+                                    match_name,
+                                    f"H{handicap}",
+                                    handicap_odds[handicap]["1"],
+                                    handicap_odds[handicap]["2"],
+                                    "",
+                                ]
                             )
 
-                            try:
-                                value = f"{float(odd.get('value', '0.00')):.2f}"
-                            except:
-                                value = "0.00"
+                        for points in sorted_points:
+                            under_key = f"{points}_under"
+                            over_key = f"{points}_over"
+                            csv_data.append(
+                                [
+                                    match_name,
+                                    f"OU{points}",
+                                    total_points_odds.get(under_key, "0.00"),
+                                    total_points_odds.get(over_key, "0.00"),
+                                    "",
+                                ]
+                            )
 
-                            if game_name == "Pobednik meča":
-                                if subgame_name in ["1", "2"]:
-                                    winner_odds[subgame_name] = value
-                            elif value_type == "HANDICAP":
-                                if special_value and subgame_name in ["1", "2"]:
-                                    # Skip first and second halftime handicaps
-                                    group_name = odd.get("game", {}).get(
-                                        "groupName", ""
-                                    )
-                                    if "poluvreme" in group_name.lower():
-                                        continue
-
-                                    handicap = special_value
-                                    if handicap not in handicap_odds:
-                                        handicap_odds[handicap] = {
-                                            "1": "",
-                                            "2": "",
-                                        }
-                                    handicap_odds[handicap][subgame_name] = value
-                            elif value_type == "MARGIN":
-                                if special_value:
-                                    try:
-                                        points = float(special_value)
-                                        if points > 130:
-                                            if subgame_name == "manje":
-                                                total_points_odds[
-                                                    f"{special_value}_under"
-                                                ] = value
-                                            elif subgame_name == "više":
-                                                total_points_odds[
-                                                    f"{special_value}_over"
-                                                ] = value
-                                    except ValueError:
-                                        continue
-
-                    # Add winner bet
-                    csv_data.append(
-                        [match_name, "12", winner_odds["1"], winner_odds["2"], ""]
-                    )
-
-                    # Add total points bets
-                    sorted_points = sorted(
-                        set(k.split("_")[0] for k in total_points_odds.keys()),
-                        key=float,
-                    )
-                    for handicap in sorted(handicap_odds.keys(), key=float):
-                        csv_data.append(
-                            [
-                                match_name,
-                                f"H{handicap}",
-                                handicap_odds[handicap]["1"],
-                                handicap_odds[handicap]["2"],
-                                "",
-                            ]
-                        )
-
-                    for points in sorted_points:
-                        under_key = f"{points}_under"
-                        over_key = f"{points}_over"
-                        csv_data.append(
-                            [
-                                match_name,
-                                f"OU{points}",
-                                total_points_odds.get(under_key, "0.00"),
-                                total_points_odds.get(over_key, "0.00"),
-                                "",
-                            ]
-                        )
+                    except Exception as e:
+                        continue  # Skip this match and continue with next one
 
         if not csv_data:
             print("No data collected to write to CSV")
             return
 
-        with open(
-            "mozzart_basketball_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
+        with open("mozzart_basketball_matches.csv", "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["Match", "BetType", "Odd1", "Odd2", "Odd3"])
             writer.writerows(csv_data)
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Critical error: {str(e)}")
+        import traceback
+        traceback.print_exc()
     finally:
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
-        atexit.unregister(lambda: driver.quit() if driver else None)
+        BrowserManager.cleanup()
 
 
 if __name__ == "__main__":

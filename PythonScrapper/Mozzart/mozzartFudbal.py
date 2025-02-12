@@ -6,12 +6,14 @@ import ssl
 import certifi
 import os
 import csv
+from mozzart_shared import BrowserManager
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
-def get_all_match_ids(driver, league_id):
+def get_all_match_ids(league_id):
     try:
+        driver = BrowserManager.get_browser()
         script = (
             """
         return fetch('https://www.mozzartbet.com/betting/matches', {
@@ -50,8 +52,9 @@ def get_all_match_ids(driver, league_id):
         return []
 
 
-def get_mozzart_match(match_id, league_id, driver):
+def get_mozzart_match(match_id, league_id):
     try:
+        driver = BrowserManager.get_browser()
         time.sleep(0.5)
         script = f"""
         return fetch('https://www.mozzartbet.com/match/{match_id}', {{
@@ -120,21 +123,7 @@ def get_first_valid_word(team_name):
 
 
 def scrape_all_matches():
-    driver = None
     try:
-        options = uc.ChromeOptions()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-logging")
-
-        driver = uc.Chrome(options=options, version_main=132)
-        atexit.register(lambda: driver.quit() if driver else None)
-
-        driver.get("https://www.mozzartbet.com/sr/kladjenje")
-
         leagues = [
             # European Competitions
             (60, "Liga Šampiona"),  # matches Maxbet's "champions_league"
@@ -174,38 +163,25 @@ def scrape_all_matches():
 
         for league_id, league_name in leagues:
             
-            match_ids = get_all_match_ids(driver, league_id)
+            match_ids = get_all_match_ids(league_id)
             
             if not match_ids:
-                print(f"No matches found for league {league_name}")
                 continue
 
             for match_id in match_ids:
                 
                 try:
-                    match_data = get_mozzart_match(match_id, league_id, driver)
+                    match_data = get_mozzart_match(match_id, league_id)
                     
                     if match_data is None:
-                        print(f"Skipping match {match_id} due to fetch failure")
                         continue
                         
                     if "match" not in match_data:
-                        print(f"No match data found for {match_id}")
                         continue
 
                     match = match_data["match"]
-                    
-                    # Additional validations
+
                     if "specialMatchGroupId" in match:
-                        print(f"Skipping special match {match_id}")
-                        continue
-                        
-                    if match.get("sport", {}).get("id") != 1:
-                        print(f"Skipping non-football match {match_id}")
-                        continue
-                        
-                    if "home" not in match or "visitor" not in match:
-                        print(f"Missing team data for match {match_id}")
                         continue
 
                     home_team = match["home"].get("name")
@@ -396,7 +372,6 @@ def scrape_all_matches():
                             )
 
                 except Exception as e:
-                    print(f"Error processing match {match_id}: {str(e)}")
                     continue
 
         with open(
@@ -411,12 +386,7 @@ def scrape_all_matches():
         import traceback
         traceback.print_exc()
     finally:
-        if driver:
-            try:
-                driver.quit()
-            except:
-                pass
-        atexit.unregister(lambda: driver.quit() if driver else None)
+        BrowserManager.cleanup()
 
 
 if __name__ == "__main__":
