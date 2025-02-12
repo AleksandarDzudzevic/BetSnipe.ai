@@ -72,18 +72,16 @@ try:
                         if match.get("id") and match.get("name", "").count(" - ") == 1:
                             try:
                                 team1, team2 = match["name"].split(" - ")
+                                match_datetime = match.get("dateTime", "")  # Get match datetime
 
                                 # Process team names for CSV labeling
 
-                                odds_url = f"{url_odds}/2/{competition['regionId']}/{competition['competitionId']}/{match['id']}"  # Changed to sportId 2
+                                odds_url = f"{url_odds}/2/{competition['regionId']}/{competition['competitionId']}/{match['id']}"
                                 odds_response = requests.get(odds_url, headers=headers)
 
                                 if odds_response.status_code == 200:
                                     odds_data = odds_response.json()
-                                    if (
-                                        isinstance(odds_data, dict)
-                                        and "bets" in odds_data
-                                    ):
+                                    if isinstance(odds_data, dict) and "bets" in odds_data:
                                         bets = odds_data["bets"]
 
                                         # Process each bet type
@@ -91,21 +89,17 @@ try:
                                             bet_type_id = bet.get("betTypeId")
 
                                             # 1. Full time 1X2 (no overtime)
-                                            if (
-                                                bet_type_id
-                                                == BET_TYPES["full_time_1x2"]
-                                            ):
+                                            if bet_type_id == BET_TYPES["full_time_1x2"]:
                                                 outcomes = sorted(
                                                     bet["betOutcomes"],
                                                     key=lambda x: x["orderNo"],
                                                 )
-                                                if (
-                                                    len(outcomes) >= 2
-                                                ):  # Basketball typically has 2 outcomes (1,2)
+                                                if len(outcomes) >= 2:
                                                     csvwriter.writerow(
                                                         [
                                                             team1,
                                                             team2,
+                                                            match_datetime,  # Add datetime
                                                             "12",
                                                             outcomes[0]["odd"],
                                                             outcomes[1]["odd"],
@@ -114,9 +108,7 @@ try:
                                                     )
 
                                             # 2. Total Points
-                                            elif (
-                                                bet_type_id == BET_TYPES["total_points"]
-                                            ):
+                                            elif bet_type_id == BET_TYPES["total_points"]:
                                                 for outcome in bet["betOutcomes"]:
                                                     total = outcome.get("sBV")
                                                     if (
@@ -141,6 +133,7 @@ try:
                                                                 [
                                                                     team1,
                                                                     team2,
+                                                                    match_datetime,  # Add datetime
                                                                     f"OU{total}",
                                                                     under_odd,
                                                                     over_odd,
@@ -180,6 +173,7 @@ try:
                                                             [
                                                                 team1,
                                                                 team2,
+                                                                match_datetime,  # Add datetime
                                                                 f"H{handicap}",
                                                                 odds["team1"],
                                                                 odds["team2"],

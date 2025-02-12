@@ -7,6 +7,7 @@ import certifi
 import os
 import csv
 from mozzart_shared import BrowserManager
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -93,6 +94,14 @@ def get_mozzart_match(match_id, league_id):
     return None  # Explicit return None
 
 
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
+
+
 def scrape_all_matches():
     try:
         leagues = [
@@ -131,6 +140,7 @@ def scrape_all_matches():
 
                         home_team = match.get("home", {}).get("name")
                         away_team = match.get("visitor", {}).get("name")
+                        kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
 
                         match_name = f"{home_team} {away_team}"
                         if not match_name or match_name in processed_matches:
@@ -206,6 +216,7 @@ def scrape_all_matches():
                             [
                                 home_team,
                                 away_team,
+                                kick_off_time,  # Add datetime
                                 "12",
                                 winner_odds["1"],
                                 winner_odds["2"],
@@ -223,6 +234,7 @@ def scrape_all_matches():
                                 [
                                     home_team,
                                     away_team,
+                                    kick_off_time,  # Add datetime
                                     f"H{handicap}",
                                     handicap_odds[handicap]["1"],
                                     handicap_odds[handicap]["2"],
@@ -237,6 +249,7 @@ def scrape_all_matches():
                                 [
                                     home_team,
                                     away_team,
+                                    kick_off_time,  # Add datetime
                                     f"OU{points}",
                                     total_points_odds.get(under_key, "0.00"),
                                     total_points_odds.get(over_key, "0.00"),
@@ -255,7 +268,7 @@ def scrape_all_matches():
             "mozzart_basketball_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
             writer = csv.writer(f)
-            writer.writerow(["Team1", "Team2", "BetType", "Odd1", "Odd2", "Odd3"])
+            writer.writerow(["Team1", "Team2", "DateTime", "BetType", "Odd1", "Odd2", "Odd3"])
             writer.writerows(csv_data)
 
     except Exception as e:

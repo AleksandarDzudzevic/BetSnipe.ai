@@ -119,6 +119,7 @@ try:
                         # Process each match
                         for match in data2:
                             match_name = match.get("name", "")
+                            match_datetime = match.get("dateTime", "")  # Get match datetime
 
                             if " - " in match_name:
                                 team1, team2 = match_name.split(" - ")
@@ -140,6 +141,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "DateTime": match_datetime,  # Add datetime
                                                     "Bet Type": "1X2",
                                                     "Odds 1": odd1,
                                                     "Odds X": oddX,
@@ -160,6 +162,7 @@ try:
                         fieldnames=[
                             "Team1",
                             "Team2",
+                            "DateTime",
                             "Bet Type",
                             "Odds 1",
                             "Odds X",

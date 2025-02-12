@@ -79,6 +79,7 @@ try:
                 for match in data:
                     if match.get("name", "").count(" - ") == 1:
                         team1, team2 = match["name"].split(" - ")
+                        match_datetime = match.get("dateTime", "")  # Get match datetime
 
                         # Process team name
 
@@ -106,6 +107,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "DateTime": match_datetime,  # Add datetime
                                                     "BetType": "1X2",
                                                     "Odd1": outcomes[0]["odd"],
                                                     "Odd2": outcomes[1]["odd"],
@@ -124,6 +126,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "DateTime": match_datetime,  # Add datetime
                                                     "BetType": "1X2F",
                                                     "Odd1": outcomes[0]["odd"],
                                                     "Odd2": outcomes[1]["odd"],
@@ -142,6 +145,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "DateTime": match_datetime,  # Add datetime
                                                     "BetType": "1X2S",
                                                     "Odd1": outcomes[0]["odd"],
                                                     "Odd2": outcomes[1]["odd"],
@@ -160,6 +164,7 @@ try:
                                                 {
                                                     "Team1": team1,
                                                     "Team2": team2,
+                                                    "DateTime": match_datetime,  # Add datetime
                                                     "BetType": "GGNG",
                                                     "Odd1": outcomes[0]["odd"],
                                                     "Odd2": outcomes[1]["odd"],
@@ -196,7 +201,8 @@ try:
                                                     {
                                                         "Team1": team1,
                                                         "Team2": team2,
-                                                        "BetType": f"{total}{suffix}",
+                                                        "DateTime": match_datetime,  # Add datetime
+                                                        "BetType": f"TG{total}{suffix}",
                                                         "Odd1": odds["under"],
                                                         "Odd2": odds["over"],
                                                         "Odd3": "",
@@ -213,7 +219,7 @@ try:
             "admiral_football_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
             writer = csv.DictWriter(
-                f, fieldnames=["Team1", "Team2", "BetType", "Odd1", "Odd2", "Odd3"]
+                f, fieldnames=["Team1", "Team2", "DateTime", "BetType", "Odd1", "Odd2", "Odd3"]
             )
             writer.writeheader()
             writer.writerows(matches)

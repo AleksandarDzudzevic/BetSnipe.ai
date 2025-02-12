@@ -99,6 +99,7 @@ def get_admiral_stoni_tenis():
 
                     for match in matches:
                         match_name = match.get("name", "")
+                        match_datetime = match.get("dateTime", "")  # Get match datetime
                         if " - " not in match_name:
                             continue
 
@@ -118,9 +119,9 @@ def get_admiral_stoni_tenis():
                                         odd2 = outcomes[1].get("odd", "N/A")
                                         if odd1 != "N/A" and odd2 != "N/A":
                                             all_matches_data.append(
-                                                [match_name, "12", odd1, odd2]
+                                                [match_name, match_datetime, "12", odd1, odd2]  # Add datetime
                                             )
-                                            break  # Found what we need, no need to check other bets
+                                            break
 
             except Exception as e:
                 print(f"Error processing league {league['name']}: {str(e)}")
@@ -128,13 +129,11 @@ def get_admiral_stoni_tenis():
 
         # Save to CSV
         if all_matches_data:
-            with open(
-                "admiral_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
+            with open("admiral_tabletennis_matches.csv", "w", newline="", encoding="utf-8") as f:
                 for row in all_matches_data:
                     match_name = row[0].replace(",", "")  # Remove all commas
                     team1, team2 = match_name.split(" - ")  # Split on " - "
-                    f.write(f"{team1},{team2},{row[1]},{row[2]},{row[3]}\n")
+                    f.write(f"{team1},{team2},{row[1]},{row[2]},{row[3]},{row[4]}\n")  # Include datetime
         else:
             print("No matches data to save")
 

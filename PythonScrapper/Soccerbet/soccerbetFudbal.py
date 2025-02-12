@@ -4,9 +4,17 @@ import csv
 import undetected_chromedriver as uc
 import ssl
 import csv
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 def get_soccerbet_api():
     # Define all leagues
@@ -55,11 +63,13 @@ def get_soccerbet_api():
                     bet_map = match_data.get("betMap", {})
                     home_team = match["home"]
                     away_team = match["away"]
+                    kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Get and convert kickoff time
 
                     # Format 1X2 odds row
                     match_1x2 = {
                         "team1": home_team,
                         "team2": away_team,
+                        "dateTime": kick_off_time,  # Add datetime
                         "market": "1X2",
                         "odd1": bet_map.get("1", {}).get("NULL", {}).get("ov", "N/A"),
                         "odd2": bet_map.get("2", {}).get("NULL", {}).get("ov", "N/A"),
@@ -69,6 +79,7 @@ def get_soccerbet_api():
                     match_1x2_first = {
                         "team1": home_team,
                         "team2": away_team,
+                        "dateTime": kick_off_time,  # Add datetime
                         "market": "1X2F",
                         "odd1": bet_map.get("4", {})
                         .get("NULL", {})
@@ -85,6 +96,7 @@ def get_soccerbet_api():
                     match_1x2_second = {
                         "team1": home_team,
                         "team2": away_team,
+                        "dateTime": kick_off_time,  # Add datetime
                         "market": "1X2S",
                         "odd1": bet_map.get("235", {})
                         .get("NULL", {})
@@ -101,6 +113,7 @@ def get_soccerbet_api():
                     match_ggng = {
                         "team1": home_team,
                         "team2": away_team,
+                        "dateTime": kick_off_time,  # Add datetime
                         "market": "GGNG",
                         "odd1": bet_map.get("272", {}).get("NULL", {}).get("ov", "N/A"),
                         "odd2": bet_map.get("273", {}).get("NULL", {}).get("ov", "N/A"),
@@ -131,7 +144,8 @@ def get_soccerbet_api():
                             match_total = {
                                 "team1": home_team,
                                 "team2": away_team,
-                                "market": str(total),
+                                "dateTime": kick_off_time,  # Add datetime
+                                "market": f"TG{total}",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
                                 "odd3": "",
@@ -164,7 +178,8 @@ def get_soccerbet_api():
                             match_total = {
                                 "team1": home_team,
                                 "team2": away_team,
-                                "market": f"{total}F",
+                                "dateTime": kick_off_time,  # Add datetime
+                                "market": f"TG{total}F",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
                                 "odd3": "",
@@ -197,7 +212,8 @@ def get_soccerbet_api():
                             match_total = {
                                 "team1": home_team,
                                 "team2": away_team,
-                                "market": f"{total}S",
+                                "dateTime": kick_off_time,  # Add datetime
+                                "market": f"TG{total}S",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
                                 "odd3": "",
@@ -219,7 +235,7 @@ def get_soccerbet_api():
         ) as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["team1", "team2", "market", "odd1", "odd2", "odd3"],
+                fieldnames=["team1", "team2", "dateTime", "market", "odd1", "odd2", "odd3"],
             )
             writer.writerows(all_matches_data)
 

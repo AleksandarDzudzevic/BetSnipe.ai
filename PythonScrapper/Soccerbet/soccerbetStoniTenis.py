@@ -2,8 +2,17 @@ import requests
 import json
 import csv
 import ssl
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def get_table_tennis_leagues():
@@ -63,6 +72,13 @@ def get_soccerbet_sports():
 
                 if "esMatches" in data and data["esMatches"]:
                     for match in data["esMatches"]:
+                        match_id = match["id"]
+                        # Get detailed match odds
+                        match_url = f"https://www.soccerbet.rs/restapi/offer/sr/match/{match_id}"
+                        match_response = requests.get(match_url, params=params)
+                        match_data = match_response.json()
+                        kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Get and convert kickoff time
+
                         home_team = match["home"]
                         away_team = match["away"]
 
@@ -70,6 +86,7 @@ def get_soccerbet_sports():
                         match_data = [
                             home_team,
                             away_team,
+                            kick_off_time,  # Add datetime
                             "12",  # Add Type column
                             match["betMap"]
                             .get("1", {})
@@ -92,8 +109,9 @@ def get_soccerbet_sports():
             with open(
                 "soccerbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
-                for row in all_matches_data:
-                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]}\n")
+                writer = csv.writer(f)
+                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "Odds 2"])  # Add DateTime
+                writer.writerows(all_matches_data)
 
     except Exception as e:
         print(f"Error in main execution: {str(e)}")

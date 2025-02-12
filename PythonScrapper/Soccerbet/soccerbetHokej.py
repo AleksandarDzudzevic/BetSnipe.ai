@@ -2,8 +2,17 @@ import requests
 import json
 import csv
 import ssl
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def get_hockey_leagues():
@@ -79,15 +88,26 @@ def get_soccerbet_sports():
                         away_win = bet_map.get("3", {}).get("NULL", {}).get("ov", "N/A")
 
                         if home_win != "N/A" and draw != "N/A" and away_win != "N/A":
-                            match_data = [
-                                home_team,
-                                away_team,
-                                "1X2",
-                                home_win,
-                                draw,
-                                away_win,
-                            ]
-                            all_matches_data.append(match_data)
+                            match_id = match["id"]
+                            match_url = f"https://www.soccerbet.rs/restapi/offer/sr/match/{match_id}"
+                            match_response = requests.get(match_url, params=params)
+                            match_data = match_response.json()
+                            kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Get and convert kickoff time
+
+                            home_team = match_data.get("home", "")
+                            away_team = match_data.get("away", "")
+
+                            if home_team and away_team:
+                                match_data = [
+                                    home_team,
+                                    away_team,
+                                    kick_off_time,  # Add datetime
+                                    "1X2",
+                                    home_win,
+                                    draw,
+                                    away_win,
+                                ]
+                                all_matches_data.append(match_data)
 
             except Exception as e:
                 print(f"Error getting matches from league {league_name}: {str(e)}")
@@ -99,7 +119,7 @@ def get_soccerbet_sports():
                 "soccerbet_hockey_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
                 writer = csv.writer(f)
-                writer.writerow(["Team1", "Team2", "Bet Type", "Odds 1", "X", "Odds 2"])
+                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "X", "Odds 2"])
                 writer.writerows(all_matches_data)
         else:
             print("No matches data to save")

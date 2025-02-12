@@ -1,6 +1,7 @@
 import requests
 import json
 import csv
+from datetime import datetime
 
 SOCCER_LEAGUES = {
     "champions_league": "136866",
@@ -26,6 +27,13 @@ SOCCER_LEAGUES = {
     "turkey_1": "119607",
 }
 
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 def fetch_maxbet_matches():
     match_ids = []
@@ -73,6 +81,7 @@ def fetch_maxbet_matches():
 
                 home_team = match_data.get("home", "")
                 away_team = match_data.get("away", "")
+                kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Convert Unix timestamp
                 odds = match_data.get("odds", {})
 
                 # 1X2 odds
@@ -99,6 +108,7 @@ def fetch_maxbet_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "marketType": "1X2",
                             "odd1": home_win,
                             "oddX": draw,
@@ -111,6 +121,7 @@ def fetch_maxbet_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "marketType": "1X2F",
                             "odd1": home_win_fh,
                             "oddX": draw_fh,
@@ -123,6 +134,7 @@ def fetch_maxbet_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "marketType": "1X2S",
                             "odd1": home_win_sh,
                             "oddX": draw_sh,
@@ -135,6 +147,7 @@ def fetch_maxbet_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "marketType": "GGNG",
                             "odd1": gg,
                             "odd2": ng,
@@ -173,7 +186,8 @@ def fetch_maxbet_matches():
                             {
                                 "team1": home_team,
                                 "team2": away_team,
-                                "marketType": f"{total}",
+                                "dateTime": kick_off_time,  # Add datetime
+                                "marketType": f"TG{total}",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
                             }
@@ -187,6 +201,7 @@ def fetch_maxbet_matches():
                             {
                                 "team1": home_team,
                                 "team2": away_team,
+                                "dateTime": kick_off_time,  # Add datetime
                                 "marketType": f"{total}F",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
@@ -201,7 +216,8 @@ def fetch_maxbet_matches():
                             {
                                 "team1": home_team,
                                 "team2": away_team,
-                                "marketType": f"{total}S",
+                                "dateTime": kick_off_time,  # Add datetime
+                                "marketType": f"TG{total}S",
                                 "odd1": under_odd,
                                 "odd2": over_odd,
                             }
@@ -217,11 +233,10 @@ def fetch_maxbet_matches():
     if matches_odds:
         with open("maxbet_football_matches.csv", "w", newline="") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["team1", "team2", "marketType", "odd1", "oddX", "odd2"]
+                f, fieldnames=["team1", "team2", "dateTime", "marketType", "odd1", "oddX", "odd2"]  # Add dateTime to fieldnames
             )
             # Clean up empty oddX values before writing
             for match in matches_odds:
-                # Handle both GGNG and total goals markets
                 if match["marketType"] == "GGNG" or any(
                     x in match["marketType"]
                     for x in ["0.5", "1.5", "2.5", "3.5", "4.5", "5.5"]

@@ -1,8 +1,17 @@
 import requests
 import json
 import csv
+from datetime import datetime
 
 BASKETBALL_LEAGUES = {"nba": "144532", "euroleague": "131600", "eurocup": "131596"}
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def fetch_maxbet_matches():
@@ -72,6 +81,7 @@ def fetch_maxbet_matches():
 
                 home_team = match_data.get("home", "")
                 away_team = match_data.get("away", "")
+                kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Convert Unix timestamp
                 odds = match_data.get("odds", {})
                 params = match_data.get("params", {})
 
@@ -84,6 +94,7 @@ def fetch_maxbet_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "marketType": "12",
                             "oddHome": home_odd,
                             "oddAway": away_odd,
@@ -107,6 +118,7 @@ def fetch_maxbet_matches():
                                 {
                                     "team1": home_team,
                                     "team2": away_team,
+                                    "dateTime": kick_off_time,  # Add datetime
                                     "marketType": f"H{flipped_handicap}",
                                     "oddHome": odds[home_code],
                                     "oddAway": odds[away_code],
@@ -122,6 +134,7 @@ def fetch_maxbet_matches():
                                 {
                                     "team1": home_team,
                                     "team2": away_team,
+                                    "dateTime": kick_off_time,  # Add datetime
                                     "marketType": f"OU{total_value}",
                                     "oddHome": odds[under_code],  # Under
                                     "oddAway": odds[over_code],  # Over
@@ -139,7 +152,7 @@ def fetch_maxbet_matches():
             "maxbet_basketball_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
             writer = csv.DictWriter(
-                f, fieldnames=["team1", "team2", "marketType", "oddHome", "oddAway"]
+                f, fieldnames=["team1", "team2", "dateTime", "marketType", "oddHome", "oddAway"]
             )
             writer.writeheader()
             writer.writerows(matches_odds)

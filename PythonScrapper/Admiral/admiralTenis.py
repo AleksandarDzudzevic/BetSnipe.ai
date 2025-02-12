@@ -131,6 +131,7 @@ def get_admiral_tennis():
 
                     for match in matches:
                         match_name = match.get("name", "")
+                        match_datetime = match.get("dateTime", "")  # Get match datetime
                         if " - " not in match_name:
                             continue
 
@@ -151,7 +152,7 @@ def get_admiral_tennis():
                                     odd2 = outcomes[1].get("odd", "N/A")
                                     if odd1 != "N/A" and odd2 != "N/A":
                                         all_matches_data.append(
-                                            [match_name, "12", odd1, odd2]
+                                            [match_name, match_datetime, "12", odd1, odd2]  # Add datetime
                                         )
 
                                 elif (
@@ -162,7 +163,7 @@ def get_admiral_tennis():
                                     odd2 = outcomes[1].get("odd", "N/A")
                                     if odd1 != "N/A" and odd2 != "N/A":
                                         all_matches_data.append(
-                                            [match_name, "12set1", odd1, odd2]
+                                            [match_name, match_datetime, "12set1", odd1, odd2]  # Add datetime
                                         )
 
             except Exception as e:
@@ -177,7 +178,7 @@ def get_admiral_tennis():
                 for row in all_matches_data:
                     match_name = row[0].replace(",", "")  # Remove all commas
                     team1, team2 = match_name.split(" - ")  # Split on " - "
-                    f.write(f"{team1},{team2},{row[1]},{row[2]},{row[3]}\n")
+                    f.write(f"{team1},{team2},{row[1]},{row[2]},{row[3]},{row[4]}\n")  # Include datetime
             print("Data saved to admiral_tennis_matches.csv")
         else:
             print("No matches data to save")

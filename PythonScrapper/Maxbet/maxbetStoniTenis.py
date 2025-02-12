@@ -1,5 +1,6 @@
 import requests
 import csv
+from datetime import datetime
 
 
 def get_table_tennis_leagues():
@@ -42,6 +43,14 @@ def get_table_tennis_leagues():
     except Exception as e:
         print(f"Error fetching leagues: {str(e)}")
         return {}
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def fetch_maxbet_table_tennis_matches():
@@ -101,6 +110,7 @@ def fetch_maxbet_table_tennis_matches():
 
                 home_team = match_data.get("home", "")
                 away_team = match_data.get("away", "")
+                kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Convert Unix timestamp
                 odds = match_data.get("odds", {})
 
                 # Winner odds (1-2)
@@ -112,6 +122,7 @@ def fetch_maxbet_table_tennis_matches():
                         {
                             "team1": home_team,
                             "team2": away_team,
+                            "dateTime": kick_off_time,  # Add datetime
                             "market": "12",
                             "odd1": home_win,
                             "oddX": away_win,
@@ -128,13 +139,11 @@ def fetch_maxbet_table_tennis_matches():
 
     # Save to CSV
     if matches_odds:
-        with open(
-            "maxbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            for match in matches_odds:
-                f.write(
-                    f"{match["team1"]},{match["team2"]},{match['market']},{match['odd1']},{match['oddX']},\n"
-                )
+        with open("maxbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["team1", "team2", "dateTime", "market", "odd1", "oddX", "odd2"]  # Add dateTime
+            )
+            writer.writerows(matches_odds)
     else:
         print("No table tennis odds data to save")
 

@@ -7,6 +7,7 @@ import certifi
 import os
 import csv
 from mozzart_shared import BrowserManager
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -145,6 +146,14 @@ def get_mozzart_match(match_id, league_id):
     return None
 
 
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
+
+
 def get_mozzart_sports():
     try:
         leagues = get_tennis_leagues()
@@ -216,10 +225,13 @@ def get_mozzart_sports():
                                     elif subgame_name == "2":
                                         first_set_odds["2"] = value
 
+                        kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
+
                         matches_data.append(
                             [
                                 home_team,
                                 away_team,
+                                kick_off_time,  # Add datetime
                                 "12",
                                 match_odds["1"],
                                 match_odds["2"],
@@ -229,6 +241,7 @@ def get_mozzart_sports():
                             [
                                 home_team,
                                 away_team,
+                                kick_off_time,  # Add datetime
                                 "12set1",
                                 first_set_odds["1"],
                                 first_set_odds["2"],
@@ -248,9 +261,9 @@ def get_mozzart_sports():
             with open(
                 "mozzart_tennis_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
-                f.write("Team1,Team2,BetType,Odd1,Odd2\n")
+                f.write("Team1,Team2,DateTime,BetType,Odd1,Odd2\n")
                 for row in matches_data:
-                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]}\n")
+                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]},{row[5]}\n")
         else:
             print("No match data collected")
 

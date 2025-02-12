@@ -7,6 +7,7 @@ import certifi
 import os
 import csv
 from mozzart_shared import BrowserManager
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -152,6 +153,14 @@ def get_hockey_leagues():
         return []
 
 
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
+
+
 def scrape_all_matches():
     try:
         leagues = get_hockey_leagues()
@@ -227,10 +236,13 @@ def scrape_all_matches():
                                 ]:
                                     winner_odds[subgame_name] = value
 
+                        kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
+
                         csv_data.append(
                             [
                                 home_team,
                                 away_team,
+                                kick_off_time,  # Add datetime
                                 "1X2",
                                 winner_odds["1"],
                                 winner_odds["X"],
@@ -251,7 +263,7 @@ def scrape_all_matches():
                 "mozzart_hockey_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
                 writer = csv.writer(f)
-                writer.writerow(["team1", "team2", "Bet Type", "Odds 1", "X", "Odds 2"])
+                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "X", "Odds 2"])
                 writer.writerows(csv_data)
         else:
             print("No match data collected")

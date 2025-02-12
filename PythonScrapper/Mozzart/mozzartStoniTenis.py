@@ -7,6 +7,7 @@ import certifi
 import os
 import csv
 from mozzart_shared import BrowserManager
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -57,6 +58,14 @@ def get_table_tennis_leagues():
     except Exception as e:
         print(f"Error fetching leagues: {str(e)}")
         return []
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def get_mozzart_sports():
@@ -114,6 +123,7 @@ def get_mozzart_sports():
                             try:
                                 home_team = match["home"]["name"]
                                 away_team = match["visitor"]["name"]
+                                kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
                                 match_name = f"{home_team}, {away_team}"
 
                                 if match_name in processed_matches:
@@ -133,6 +143,7 @@ def get_mozzart_sports():
                                     [
                                         home_team,
                                         away_team,
+                                        kick_off_time,  # Add datetime
                                         "12",
                                         match_odds["1"],
                                         match_odds["2"],
@@ -164,6 +175,7 @@ def get_mozzart_sports():
                 "mozzart_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
                 writer = csv.writer(f)
+                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "Odds 2"])  # Add DateTime
                 writer.writerows(matches_data)
         else:
             print("No matches data to write to CSV")

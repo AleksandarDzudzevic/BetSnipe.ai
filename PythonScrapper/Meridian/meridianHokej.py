@@ -39,6 +39,14 @@ def get_auth_token():
     return None
 
 
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
+
+
 def get_hockey_odds():
     token = get_auth_token()
     if not token:
@@ -80,7 +88,7 @@ def get_hockey_odds():
                     for event in league.get("events", []):
                         header = event.get("header", {})
                         rivals = header.get("rivals", [])
-                        start_time = header.get("startTime")
+                        start_time = convert_unix_to_iso(header.get("startTime", 0))
 
                         if len(rivals) >= 2:
                             # Look for "Konačan ishod" market
@@ -92,6 +100,7 @@ def get_hockey_odds():
                                             match_data = {
                                                 "team1": rivals[0],
                                                 "team2": rivals[1],
+                                                "dateTime": start_time,
                                                 "marketType": "1X2",
                                                 "odd1": selections[0].get("price"),
                                                 "oddX": selections[1].get("price"),
@@ -115,11 +124,11 @@ def get_hockey_odds():
     with open("meridian_hockey_matches.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         for match in matches_data:
-
             writer.writerow(
                 [
                     match["team1"],
                     match["team2"],
+                    match["dateTime"],
                     match["marketType"],
                     match["odd1"],
                     match["oddX"],

@@ -7,6 +7,7 @@ import certifi
 import os
 import csv
 from mozzart_shared import BrowserManager
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -92,6 +93,14 @@ def get_mozzart_match(match_id, league_id):
 
     print(f"Failed to fetch match {match_id} after all attempts")
     return None
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def scrape_all_matches():
@@ -213,10 +222,13 @@ def scrape_all_matches():
                                 total_goals_first[subgame_name] = value
                             elif game_name == "Ukupno golova drugo poluvreme":
                                 total_goals_second[subgame_name] = value
+                    kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
+
                     csv_data.append(
                         [
                             home_team,
                             away_team,
+                            kick_off_time,  # Add datetime
                             "1X2",
                             odds_1x2["1"],
                             odds_1x2["X"],
@@ -227,6 +239,7 @@ def scrape_all_matches():
                         [
                             home_team,
                             away_team,
+                            kick_off_time,  # Add datetime
                             "1X2F",
                             odds_1x2_first["1"],
                             odds_1x2_first["X"],
@@ -237,6 +250,7 @@ def scrape_all_matches():
                         [
                             home_team,
                             away_team,
+                            kick_off_time,  # Add datetime
                             "1X2S",
                             odds_1x2_second["1"],
                             odds_1x2_second["X"],
@@ -247,6 +261,7 @@ def scrape_all_matches():
                         [
                             home_team,
                             away_team,
+                            kick_off_time,  # Add datetime
                             "GGNG",
                             odds_gg_ng["gg"],
                             odds_gg_ng["ng"],
@@ -274,7 +289,8 @@ def scrape_all_matches():
                             [
                                 home_team,
                                 away_team,
-                                f"{total:.1f}",
+                                kick_off_time,  # Add datetime
+                                f"TG{total:.1f}",
                                 under_odds[total],
                                 over_odds[total],
                             ]
@@ -307,7 +323,8 @@ def scrape_all_matches():
                                 [
                                     home_team,
                                     away_team,
-                                    f"{total:.1f}F",
+                                    kick_off_time,  # Add datetime
+                                    f"TG{total:.1f}F",
                                     under_odds_first[total],
                                     over_odds_first[total],
                                 ]
@@ -340,7 +357,8 @@ def scrape_all_matches():
                                 [
                                     home_team,
                                     away_team,
-                                    f"{total:.1f}S",
+                                    kick_off_time,  # Add datetime
+                                    f"TG{total:.1f}S",
                                     under_odds_second[total],
                                     over_odds_second[total],
                                 ]
@@ -352,7 +370,7 @@ def scrape_all_matches():
         with open(
             "mozzart_football_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
-            f.write("Team1,Team2,BetType,Odd1,Odd2,Odd3\n")
+            f.write("Team1,Team2,DateTime,BetType,Odd1,Odd2,Odd3\n")
             for row in csv_data:
                 f.write(",".join(row) + "\n")
 

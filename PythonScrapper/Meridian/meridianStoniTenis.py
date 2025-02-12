@@ -50,6 +50,14 @@ def get_last_name(player_name):
     return player_name.strip().split()[-1]
 
 
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
+
+
 def get_tennis_odds():
     token = get_auth_token()
     if not token:
@@ -114,10 +122,11 @@ def get_tennis_odds():
             if response.status_code == 200:
                 event_data = response.json()
 
-                # Get player names
-                rivals = (
-                    event_data.get("payload", {}).get("header", {}).get("rivals", [])
-                )
+                # Get player names and start time
+                header = event_data.get("payload", {}).get("header", {})
+                rivals = header.get("rivals", [])
+                start_time = convert_unix_to_iso(header.get("startTime", 0))  # Get and convert start time
+
                 if len(rivals) >= 2:
                     player1, player2 = rivals[0], rivals[1]
 
@@ -131,6 +140,7 @@ def get_tennis_odds():
                                         {
                                             "team1": player1,
                                             "team2": player2,
+                                            "dateTime": start_time,  # Add datetime
                                             "market": "12",
                                             "odd1": selections[0].get("price", "N/A"),
                                             "odd2": selections[1].get("price", "N/A"),
@@ -149,10 +159,10 @@ def get_tennis_odds():
         with open(
             "meridian_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
         ) as f:
-            for match in matches_data:
-                f.write(
-                    f"{match['team1']},{match['team2']},{match['market']},{match['odd1']},{match['odd2']},\n"
-                )
+            writer = csv.DictWriter(
+                f, fieldnames=["team1", "team2", "dateTime", "market", "odd1", "odd2"]  # Add datetime
+            )
+            writer.writerows(matches_data)
 
 
 if __name__ == "__main__":

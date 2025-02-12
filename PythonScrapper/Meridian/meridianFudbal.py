@@ -2,6 +2,7 @@ import requests
 import json
 from bs4 import BeautifulSoup
 import csv
+from datetime import datetime
 
 DESIRED_LEAGUES = {
     ("Premier Liga", "Engleska"),
@@ -26,6 +27,14 @@ DESIRED_LEAGUES = {
     "UEFA Liga Evrope",
     "UEFA Liga Konferencija",
 }
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def get_auth_token():
@@ -132,6 +141,7 @@ def get_soccer_odds():
                     for event in events:
                         event_id = event.get("header", {}).get("eventId")
                         rivals = event.get("header", {}).get("rivals", [])
+                        start_time = convert_unix_to_iso(event.get("header", {}).get("startTime", 0))  # Get and convert start time
 
                         if event_id and len(rivals) >= 2:
                             market_data = get_markets_for_event(event_id, token)
@@ -223,7 +233,7 @@ def get_soccer_odds():
                                                     {
                                                         "team1": team1,
                                                         "team2": team2,
-                                                        "marketType": f"{over_under}",
+                                                        "marketType": f"TG{over_under}",
                                                         "odd1": selections[0].get(
                                                             "price"
                                                         ),  # Over
@@ -241,7 +251,7 @@ def get_soccer_odds():
                                                     {
                                                         "team1": team1,
                                                         "team2": team2,
-                                                        "marketType": f"{over_under}F",
+                                                        "marketType": f"TG{over_under}F",
                                                         "odd1": selections[0].get(
                                                             "price"
                                                         ),  # Under
@@ -259,7 +269,7 @@ def get_soccer_odds():
                                                     {
                                                         "team1": team1,
                                                         "team2": team2,
-                                                        "marketType": f"{over_under}S",
+                                                        "marketType": f"TG{over_under}S",
                                                         "odd1": selections[0].get(
                                                             "price"
                                                         ),  # Under
@@ -270,16 +280,26 @@ def get_soccer_odds():
                                                 )
 
                                 if odds_1x2:
+                                    odds_1x2["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2)
                                 if odds_1x2f:
+                                    odds_1x2f["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2f)
                                 if odds_1x2s:
+                                    odds_1x2s["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2s)
                                 if odds_ggng:
+                                    odds_ggng["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_ggng)
-                                matches_data.extend(odds_ou)
-                                matches_data.extend(odds_fht)  # Add first half totals
-                                matches_data.extend(odds_sht)  # Add second half totals
+                                for ou in odds_ou:
+                                    ou["dateTime"] = start_time  # Add datetime
+                                    matches_data.append(ou)
+                                for fht in odds_fht:
+                                    fht["dateTime"] = start_time  # Add datetime
+                                    matches_data.append(fht)
+                                for sht in odds_sht:
+                                    sht["dateTime"] = start_time  # Add datetime
+                                    matches_data.append(sht)
 
             page += 1
 
@@ -289,12 +309,12 @@ def get_soccer_odds():
     with open("meridian_football_matches.csv", "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         for match in matches_data:
-            # Get first long word from each team name
             if match["marketType"] in ["1X2", "1X2F", "1X2S"]:
                 writer.writerow(
                     [
                         match["team1"],
                         match["team2"],
+                        match["dateTime"],  # Add datetime
                         match["marketType"],
                         match["odd1"],
                         match["oddX"],
@@ -306,6 +326,7 @@ def get_soccer_odds():
                     [
                         match["team1"],
                         match["team2"],
+                        match["dateTime"],  # Add datetime
                         match["marketType"],
                         match["odd1"],
                         match["odd2"],

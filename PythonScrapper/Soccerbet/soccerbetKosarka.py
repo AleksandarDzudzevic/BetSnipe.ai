@@ -2,9 +2,17 @@ import requests
 import json
 import csv
 import ssl
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 def get_soccerbet_api():
     # Define leagues with their IDs
@@ -39,12 +47,14 @@ def get_soccerbet_api():
                     match_data = match_response.json()
                     home_team = match["home"]
                     away_team = match["away"]
+                    kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Get and convert kickoff time
                     bet_map = match_data.get("betMap", {})
 
                     # Format winner odds row
                     match_winner = {
                         "Team1": home_team,
                         "Team2": away_team,
+                        "dateTime": kick_off_time,  # Add datetime
                         "market": "12",
                         "odd1": bet_map.get("50291", {})
                         .get("NULL", {})
@@ -82,6 +92,7 @@ def get_soccerbet_api():
                                 match_handicap = {
                                     "Team1": home_team,
                                     "Team2": away_team,
+                                    "dateTime": kick_off_time,  # Add datetime
                                     "market": f"H{handicap}",
                                     "odd1": odds2,  # Flipped: Team 2's odds go in odd1
                                     "odd2": odds1,  # Flipped: Team 1's odds go in odd2
@@ -107,6 +118,7 @@ def get_soccerbet_api():
                                 match_total = {
                                     "Team1": home_team,
                                     "Team2": away_team,
+                                    "dateTime": kick_off_time,  # Add datetime
                                     "market": f"OU{points}",
                                     "odd1": odds,  # Under odds
                                     "odd2": bet_map.get("50445", {})
@@ -129,7 +141,7 @@ def get_soccerbet_api():
         ) as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["Team1", "Team2", "market", "odd1", "odd2", "odd3"],
+                fieldnames=["Team1", "Team2", "dateTime", "market", "odd1", "odd2", "odd3"],
             )
             writer.writeheader()
             writer.writerows(all_matches_data)

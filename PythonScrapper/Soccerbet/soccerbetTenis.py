@@ -2,8 +2,17 @@ import requests
 import json
 import csv
 import ssl
+from datetime import datetime
 
 ssl._create_default_https_context = ssl._create_unverified_context
+
+
+def convert_unix_to_iso(unix_ms):
+    """Convert Unix timestamp in milliseconds to ISO format datetime string"""
+    try:
+        return datetime.fromtimestamp(unix_ms / 1000).isoformat()
+    except:
+        return ""
 
 
 def get_tennis_leagues():
@@ -79,6 +88,7 @@ def get_soccerbet_sports():
                 if response.status_code == 200:
                     match_data = response.json()
                     bet_map = match_data.get("betMap", {})
+                    kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))  # Get and convert kickoff time
 
                     home_team = match_data.get("home", "")
                     away_team = match_data.get("away", "")
@@ -92,7 +102,14 @@ def get_soccerbet_sports():
                         # Add match winner odds
                         if home_win != "N/A" and away_win != "N/A":
                             all_matches_data.append(
-                                [home_team, away_team, "12", home_win, away_win]
+                                [
+                                    home_team,
+                                    away_team,
+                                    kick_off_time,  # Add datetime
+                                    "12",
+                                    home_win,
+                                    away_win,
+                                ]
                             )
 
                         # Get first set winner odds
@@ -109,6 +126,7 @@ def get_soccerbet_sports():
                                 [
                                     home_team,
                                     away_team,
+                                    kick_off_time,  # Add datetime
                                     "12set1",
                                     first_set_home,
                                     first_set_away,
@@ -124,8 +142,9 @@ def get_soccerbet_sports():
             with open(
                 "soccerbet_tennis_matches.csv", "w", newline="", encoding="utf-8"
             ) as f:
-                for row in all_matches_data:
-                    f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]}\n")
+                writer = csv.writer(f)
+                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "Odds 2"])  # Add DateTime
+                writer.writerows(all_matches_data)
         else:
             print("No matches data to save")
 
