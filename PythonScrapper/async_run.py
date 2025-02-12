@@ -6,6 +6,7 @@ import time
 import csv
 
 
+# ajmo kvotara
 def save_arbitrage(text):
     """Save arbitrage opportunity to file if it's unique and meets profit criteria"""
     match_name = text.split("!")[0].split("for ")[-1]
@@ -39,12 +40,12 @@ async def run_script(script):
     """Run a Python script with the correct path"""
     # Get absolute path to the script directly - no need to handle bookmaker separately
     script_path = Path(__file__).parent / script
-    
+
     try:
         if not script_path.exists():
             print(f"❌ Script not found: {script_path}")
             return False
-            
+
         process = await asyncio.create_subprocess_exec(
             sys.executable,  # Use sys.executable instead of "python"
             str(script_path),
@@ -168,7 +169,7 @@ async def main():
 
     # Get the base path for scripts
     base_path = Path(__file__).parent
-    
+
     # Run all scripts in parallel
     scripts = [
         # Tennis
@@ -177,35 +178,35 @@ async def main():
         "Maxbet/maxbetTenis.py",
         "Meridian/meridianTenis.py",
         "Soccerbet/soccerbetTenis.py",
-        #"Superbet/superbetTenis.py",
+        # "Superbet/superbetTenis.py",
         # Table Tennis
         "Mozzart/mozzartStoniTenis.py",
         "Admiral/admiralStoniTenis.py",
         "Maxbet/maxbetStoniTenis.py",
         "Meridian/meridianStoniTenis.py",
         "Soccerbet/soccerbetStoniTenis.py",
-        #"Superbet/superbetStoniTenis.py",
+        # "Superbet/superbetStoniTenis.py",
         # Football
         "Mozzart/mozzartFudbal.py",
         "Admiral/admiralFudbal.py",
         "Maxbet/maxbetFudbal.py",
         "Meridian/meridianFudbal.py",
         "Soccerbet/soccerbetFudbal.py",
-        #"Superbet/superbetFudbal.py",
+        # "Superbet/superbetFudbal.py",
         # Basketball
         "Mozzart/mozzartKosarka.py",
         "Admiral/admiralKosarka.py",
         "Maxbet/maxbetKosarka.py",
         "Meridian/meridianKosarka.py",
         "Soccerbet/soccerbetKosarka.py",
-        #"Superbet/superbetKosarka.py",
+        # "Superbet/superbetKosarka.py",
         # Hockey
         "Mozzart/mozzartHokej.py",
         "Admiral/admiralHokej.py",
         "Maxbet/maxbetHokej.py",
         "Meridian/meridianHokej.py",
         "Soccerbet/soccerbetHokej.py",
-        #"Superbet/superbetHokej.py",
+        # "Superbet/superbetHokej.py",
     ]
 
     # Filter only existing scripts and print status
