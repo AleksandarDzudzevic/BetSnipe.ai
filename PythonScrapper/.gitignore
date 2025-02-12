@@ -1,8 +1,0 @@
-# CSV files
-*.csv
-*.venv
-
-# Chrome driver logs and cache
-chromedriver.log
-__pycache__/
-*.pyc 
