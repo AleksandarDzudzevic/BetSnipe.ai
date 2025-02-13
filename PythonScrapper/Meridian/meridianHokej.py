@@ -1,9 +1,12 @@
 import requests
 import json
 from bs4 import BeautifulSoup
-import csv
 from datetime import datetime
 import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 
 def get_auth_token():
@@ -54,6 +57,8 @@ def get_hockey_odds():
         return
 
     url = "https://online.meridianbet.com/betshop/api/v1/standard/sport/59/leagues"
+    matches_data = []
+    matches_to_insert = []  # List for database insertion
 
     headers = {
         "Accept": "application/json",
@@ -64,7 +69,6 @@ def get_hockey_odds():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     }
 
-    matches_data = []
     page = 0
 
     while True:
@@ -83,7 +87,6 @@ def get_hockey_odds():
                 if not leagues:
                     break
 
-                # Process all available leagues instead of filtering
                 for league in leagues:
                     for event in league.get("events", []):
                         header = event.get("header", {})
@@ -91,7 +94,6 @@ def get_hockey_odds():
                         start_time = convert_unix_to_iso(header.get("startTime", 0))
 
                         if len(rivals) >= 2:
-                            # Look for "Konačan ishod" market
                             for position in event.get("positions", []):
                                 for group in position.get("groups", []):
                                     if group.get("name") == "Konačan Ishod":
@@ -107,6 +109,18 @@ def get_hockey_odds():
                                                 "odd2": selections[2].get("price"),
                                             }
                                             matches_data.append(match_data)
+                                            matches_to_insert.append((
+                                                rivals[0],
+                                                rivals[1],
+                                                2,  # Meridian
+                                                4,  # Hockey
+                                                2,  # 1X2
+                                                0,  # No margin
+                                                float(selections[0].get("price", 0)),
+                                                float(selections[1].get("price", 0)),
+                                                float(selections[2].get("price", 0)),
+                                                start_time
+                                            ))
 
             elif response.status_code == 429:
                 time.sleep(2)
@@ -121,20 +135,15 @@ def get_hockey_odds():
 
         page += 1
 
-    with open("meridian_hockey_matches.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        for match in matches_data:
-            writer.writerow(
-                [
-                    match["team1"],
-                    match["team2"],
-                    match["dateTime"],
-                    match["marketType"],
-                    match["odd1"],
-                    match["oddX"],
-                    match["odd2"],
-                ]
-            )
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+
+    return matches_data
 
 
 if __name__ == "__main__":

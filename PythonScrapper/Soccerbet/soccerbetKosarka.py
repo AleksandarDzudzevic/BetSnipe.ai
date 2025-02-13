@@ -3,6 +3,10 @@ import json
 import csv
 import ssl
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -29,7 +33,8 @@ def get_soccerbet_api():
         ("2516277", "Francuska Liga"),
     ]
 
-    all_matches_data = []
+    matches_data = []
+    matches_to_insert = []
 
     for league_id, league_name in leagues:
         url = f"https://www.soccerbet.rs/restapi/offer/sr/sport/B/league/{league_id}/mob?annex=0&desktopVersion=2.36.3.7&locale=sr"
@@ -98,7 +103,19 @@ def get_soccerbet_api():
                                     "odd2": odds1,  # Flipped: Team 1's odds go in odd2
                                     "odd3": "",
                                 }
-                                all_matches_data.append(match_handicap)
+                                matches_data.append(match_handicap)
+                                matches_to_insert.append((
+                                    home_team,
+                                    away_team,
+                                    5,  # Soccerbet
+                                    2,  # Basketball
+                                    9,  # Handicap
+                                    float(handicap),  # Handicap value as margin
+                                    float(odds2),
+                                    float(odds1),
+                                    0,  # No third odd
+                                    kick_off_time
+                                ))
 
                     # Find all total points values from the API
                     total_points_code = "50444"  # Total points code
@@ -126,25 +143,47 @@ def get_soccerbet_api():
                                     .get("ov", "N/A"),  # Over odds
                                     "odd3": "",
                                 }
-                                all_matches_data.append(match_total)
+                                matches_data.append(match_total)
+                                matches_to_insert.append((
+                                    home_team,
+                                    away_team,
+                                    5,  # Soccerbet
+                                    2,  # Basketball
+                                    10,  # Total Points
+                                    float(points),  # Points value as margin
+                                    float(odds),  # Under
+                                    float(bet_map.get("50445", {}).get(key, {}).get("ov", 0)),  # Over
+                                    0,  # No third odd
+                                    kick_off_time
+                                ))
 
-                    all_matches_data.append(match_winner)
+                    matches_data.append(match_winner)
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        5,  # Soccerbet
+                        2,  # Basketball
+                        1,  # Winner
+                        0,  # No margin
+                        float(bet_map.get("50291", {}).get("NULL", {}).get("ov", 0)),
+                        float(bet_map.get("50293", {}).get("NULL", {}).get("ov", 0)),
+                        0,  # No third odd
+                        kick_off_time
+                    ))
 
         except Exception as e:
             print(f"Error processing league {league_name}: {str(e)}")
             continue
 
-    # Save to CSV
-    if all_matches_data:
-        with open(
-            "soccerbet_basketball_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=["Team1", "Team2", "dateTime", "market", "odd1", "odd2", "odd3"],
-            )
-            writer.writeheader()
-            writer.writerows(all_matches_data)
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+
+    return matches_data
 
 
 if __name__ == "__main__":

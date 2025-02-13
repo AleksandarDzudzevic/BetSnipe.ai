@@ -1,61 +1,61 @@
-import undetected_chromedriver as uc
 import json
 import atexit
 import time
 import ssl
 import certifi
 import os
-import csv
-from mozzart_shared import BrowserManager
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, insert_match, batch_insert_matches
+from Mozzart.mozzart_shared import browser_manager
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
 def get_all_match_ids(league_id):
+    tab_handle = None
     try:
-        driver = BrowserManager.get_browser()
-        script = (
-            """
-        return fetch('https://www.mozzartbet.com/betting/matches', {
+        tab_handle = browser_manager.create_tab()
+        script = f"""
+        return fetch('https://www.mozzartbet.com/betting/matches', {{
             method: 'POST',
-            headers: {
+            headers: {{
                 'Accept': 'application/json, text/plain, /',
                 'Content-Type': 'application/json',
                 'Origin': 'https://www.mozzartbet.com',
                 'Medium': 'WEB'
-            },
-            body: JSON.stringify({
+            }},
+            body: JSON.stringify({{
                 "date": "all_days",
                 "type": "all",
                 "sportIds": [1],
-                "competitionIds": ["""
-            + str(league_id)
-            + """],
+                "competitionIds": [{league_id}],
                 "pageSize": 100,
                 "currentPage": 0
-            })
-        }).then(response => response.text());
+            }})
+        }}).then(response => response.text());
         """
-        )
 
-        response = driver.execute_script(script)
+        response = browser_manager.execute_script(script, tab_handle)
         if response:
             data = json.loads(response)
             match_ids = []
-
             if data.get("items"):
                 for match in data["items"]:
                     match_ids.append(match["id"])
-
             return match_ids
-    except Exception as e:
         return []
+    finally:
+        if tab_handle:
+            browser_manager.close_tab(tab_handle)
 
 
 def get_mozzart_match(match_id, league_id):
+    tab_handle = None
     try:
-        driver = BrowserManager.get_browser()
+        tab_handle = browser_manager.create_tab()
         time.sleep(0.5)
         script = f"""
         return fetch('https://www.mozzartbet.com/match/{match_id}', {{
@@ -77,8 +77,8 @@ def get_mozzart_match(match_id, league_id):
         }}).then(response => response.text());
         """
 
-        for attempt in range(3):  # Try up to 3 times
-            response = driver.execute_script(script)
+        for attempt in range(3):
+            response = browser_manager.execute_script(script, tab_handle)
             if response:
                 try:
                     data = json.loads(response)
@@ -86,13 +86,10 @@ def get_mozzart_match(match_id, league_id):
                         return data
                 except json.JSONDecodeError:
                     pass
-            time.sleep(2)  # Wait between retries
-
-    except Exception as e:
-        print(f"Critical error fetching match {match_id}: {str(e)}")
-
-    print(f"Failed to fetch match {match_id} after all attempts")
-    return None
+            time.sleep(2)
+    finally:
+        if tab_handle:
+            browser_manager.close_tab(tab_handle)
 
 
 def convert_unix_to_iso(unix_ms):
@@ -105,6 +102,9 @@ def convert_unix_to_iso(unix_ms):
 
 def scrape_all_matches():
     try:
+        conn = get_db_connection()
+        matches_to_insert = []  # Will store tuples of match data
+        
         leagues = [
             # European Competitions
             (60, "Liga Šampiona"),  # matches Maxbet's "champions_league"
@@ -139,41 +139,25 @@ def scrape_all_matches():
             (634, "Australija 1"),  # matches Maxbet's "australia_1"
         ]
 
-        csv_data = []
-        current_league = None
-
         for league_id, league_name in leagues:
-
             match_ids = get_all_match_ids(league_id)
 
             if not match_ids:
                 continue
 
             for match_id in match_ids:
-
                 try:
                     match_data = get_mozzart_match(match_id, league_id)
 
-                    if match_data is None:
-                        continue
-
-                    if "match" not in match_data:
+                    if not match_data or "match" not in match_data:
                         continue
 
                     match = match_data["match"]
-
-                    if "specialMatchGroupId" in match:
-                        continue
-
                     home_team = match["home"].get("name")
                     away_team = match["visitor"].get("name")
+                    kick_off_time = convert_unix_to_iso(match.get("startTime", 0))
 
-                    if not home_team or not away_team:
-                        print(f"Invalid team names for match {match_id}")
-                        continue
-
-                    if not home_team or not away_team:
-                        print(f"Could not process team names for match {match_id}")
+                    if "specialMatchGroupId" in match:
                         continue
 
                     odds_1x2 = {"1": "0.00", "X": "0.00", "2": "0.00"}
@@ -224,49 +208,6 @@ def scrape_all_matches():
                                 total_goals_second[subgame_name] = value
                     kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
 
-                    csv_data.append(
-                        [
-                            home_team,
-                            away_team,
-                            kick_off_time,  # Add datetime
-                            "1X2",
-                            odds_1x2["1"],
-                            odds_1x2["X"],
-                            odds_1x2["2"],
-                        ]
-                    )
-                    csv_data.append(
-                        [
-                            home_team,
-                            away_team,
-                            kick_off_time,  # Add datetime
-                            "1X2F",
-                            odds_1x2_first["1"],
-                            odds_1x2_first["X"],
-                            odds_1x2_first["2"],
-                        ]
-                    )
-                    csv_data.append(
-                        [
-                            home_team,
-                            away_team,
-                            kick_off_time,  # Add datetime
-                            "1X2S",
-                            odds_1x2_second["1"],
-                            odds_1x2_second["X"],
-                            odds_1x2_second["2"],
-                        ]
-                    )
-                    csv_data.append(
-                        [
-                            home_team,
-                            away_team,
-                            kick_off_time,  # Add datetime
-                            "GGNG",
-                            odds_gg_ng["gg"],
-                            odds_gg_ng["ng"],
-                        ]
-                    )
                     # Convert and write full match total goals
                     under_odds = {}
                     over_odds = {}
@@ -274,113 +215,168 @@ def scrape_all_matches():
                     for subgame_name, odd in total_goals_odds.items():
                         if subgame_name.startswith("0-"):  # Under odds
                             goals = float(subgame_name.split("-")[1])
-                            under_odds[goals + 0.5] = (
-                                odd  # Changed from goals - 0.5 to goals + 0.5
-                            )
+                            under_odds[goals + 0.5] = odd
                         elif subgame_name.endswith("+"):  # Over odds
                             goals = float(subgame_name[:-1])
                             over_odds[goals - 0.5] = odd
+
                     # Add special case for under 1.5 if we have 0-1
                     if "0-1" in total_goals_odds:
                         under_odds[1.5] = total_goals_odds["0-1"]
-                    # Match and write the over/under pairs
-                    for total in sorted(set(under_odds.keys()) & set(over_odds.keys())):
-                        csv_data.append(
-                            [
-                                home_team,
-                                away_team,
-                                kick_off_time,  # Add datetime
-                                f"TG{total:.1f}",
-                                under_odds[total],
-                                over_odds[total],
-                            ]
-                        )
+
                     # Similar conversion for first half totals
                     under_odds_first = {}
                     over_odds_first = {}
                     for subgame_name, odd in total_goals_first.items():
                         if subgame_name.startswith("0-"):
                             goals = float(subgame_name.split("-")[1])
-                            under_odds_first[goals + 0.5] = (
-                                odd  # Changed from goals - 0.5 to goals + 0.5
-                            )
+                            under_odds_first[goals + 0.5] = odd
                         elif subgame_name.endswith("+"):
                             goals = float(subgame_name[:-1])
                             over_odds_first[goals - 0.5] = odd
+
                     # Add special cases for first half
                     if "0-0" in total_goals_first:
                         under_odds_first[0.5] = total_goals_first["0-0"]
                     if "0-1" in total_goals_first:
                         under_odds_first[1.5] = total_goals_first["0-1"]
-                    # Add over 0.5 from 1+ if available
                     if "1+" in total_goals_first:
                         over_odds_first[0.5] = total_goals_first["1+"]
-                    for total in sorted(
-                        set(under_odds_first.keys()) | set(over_odds_first.keys())
-                    ):
-                        if total in under_odds_first and total in over_odds_first:
-                            csv_data.append(
-                                [
-                                    home_team,
-                                    away_team,
-                                    kick_off_time,  # Add datetime
-                                    f"TG{total:.1f}F",
-                                    under_odds_first[total],
-                                    over_odds_first[total],
-                                ]
-                            )
+
                     # Similar conversion for second half totals
                     under_odds_second = {}
                     over_odds_second = {}
                     for subgame_name, odd in total_goals_second.items():
                         if subgame_name.startswith("0-"):
                             goals = float(subgame_name.split("-")[1])
-                            under_odds_second[goals + 0.5] = (
-                                odd  # Changed from goals - 0.5 to goals + 0.5
-                            )
+                            under_odds_second[goals + 0.5] = odd
                         elif subgame_name.endswith("+"):
                             goals = float(subgame_name[:-1])
                             over_odds_second[goals - 0.5] = odd
+
                     # Add special cases for second half
                     if "0-0" in total_goals_second:
                         under_odds_second[0.5] = total_goals_second["0-0"]
                     if "0-1" in total_goals_second:
                         under_odds_second[1.5] = total_goals_second["0-1"]
-                    # Add over 0.5 from 1+ if available
                     if "1+" in total_goals_second:
                         over_odds_second[0.5] = total_goals_second["1+"]
-                    for total in sorted(
-                        set(under_odds_second.keys()) | set(over_odds_second.keys())
-                    ):
-                        if total in under_odds_second and total in over_odds_second:
-                            csv_data.append(
-                                [
-                                    home_team,
-                                    away_team,
-                                    kick_off_time,  # Add datetime
-                                    f"TG{total:.1f}S",
-                                    under_odds_second[total],
-                                    over_odds_second[total],
-                                ]
-                            )
+
+                    # Match and insert the over/under pairs for full match
+                    for total in sorted(set(under_odds.keys()) & set(over_odds.keys())):
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            1,              # bookmaker_id
+                            1,              # sport_id (Football)
+                            5,              # bet_type_id (Total Goals)
+                            total,          # margin
+                            float(under_odds[total]),  # Under odds first
+                            float(over_odds[total]),   # Over odds second
+                            0,
+                            kick_off_time
+                        ))
+
+                    # Match and insert the over/under pairs for first half
+                    for total in sorted(set(under_odds_first.keys()) & set(over_odds_first.keys())):
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            1,              # bookmaker_id
+                            1,              # sport_id (Football)
+                            6,              # bet_type_id (Total Goals First Half)
+                            total,          # margin
+                            float(under_odds_first[total]),  # Under odds first
+                            float(over_odds_first[total]),   # Over odds second
+                            0,
+                            kick_off_time
+                        ))
+
+                    # Match and insert the over/under pairs for second half
+                    for total in sorted(set(under_odds_second.keys()) & set(over_odds_second.keys())):
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            1,              # bookmaker_id
+                            1,              # sport_id (Football)
+                            7,              # bet_type_id (Total Goals Second Half)
+                            total,          # margin
+                            float(under_odds_second[total]),  # Under odds first
+                            float(over_odds_second[total]),   # Over odds second
+                            0,
+                            kick_off_time
+                        ))
+
+                    # Insert match winner odds (1X2)
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        1,              # bookmaker_id
+                        1,              # sport_id (Football)
+                        2,              # bet_type_id (1X2)
+                        0,              # margin
+                        float(odds_1x2["1"]),
+                        float(odds_1x2["X"]),
+                        float(odds_1x2["2"]),
+                        kick_off_time
+                    ))
+
+                    # Insert first half odds (1X2F)
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        1,              # bookmaker_id
+                        1,              # sport_id (Football)
+                        3,              # bet_type_id (1X2F)
+                        0,              # margin
+                        float(odds_1x2_first["1"]),
+                        float(odds_1x2_first["X"]),
+                        float(odds_1x2_first["2"]),
+                        kick_off_time
+                    ))
+
+                    # Insert second half odds (1X2S)
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        1,              # bookmaker_id
+                        1,              # sport_id (Football)
+                        4,              # bet_type_id (1X2S)
+                        0,              # margin
+                        float(odds_1x2_second["1"]),
+                        float(odds_1x2_second["X"]),
+                        float(odds_1x2_second["2"]),
+                        kick_off_time
+                    ))
+
+                    # Insert GG/NG odds
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        1,              # bookmaker_id
+                        1,              # sport_id (Football)
+                        8,              # bet_type_id (GGNG)
+                        0,              # margin
+                        float(odds_gg_ng["gg"]),
+                        float(odds_gg_ng["ng"]),
+                        0,
+                        kick_off_time
+                    ))
 
                 except Exception as e:
                     continue
 
-        with open(
-            "mozzart_football_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            f.write("Team1,Team2,DateTime,BetType,Odd1,Odd2,Odd3\n")
-            for row in csv_data:
-                f.write(",".join(row) + "\n")
+        # Single batch insert for all matches
+        if matches_to_insert:
+            batch_insert_matches(conn, matches_to_insert)
 
     except Exception as e:
         print(f"Critical error: {str(e)}")
         import traceback
-
         traceback.print_exc()
     finally:
-        BrowserManager.cleanup()
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":

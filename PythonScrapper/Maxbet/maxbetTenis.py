@@ -1,7 +1,10 @@
 import requests
 import csv
 from datetime import datetime
-
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 def get_tennis_leagues():
     """Fetch current tennis leagues from MaxBet"""
@@ -58,9 +61,10 @@ def convert_unix_to_iso(unix_ms):
 
 
 def fetch_maxbet_tennis_matches():
-    # Get leagues dynamically instead of using hardcoded TENNIS_LEAGUES
     tennis_leagues = get_tennis_leagues()
-    
+    matches_data = []
+    matches_to_insert = []
+
     if not tennis_leagues:
         print("No leagues found or error occurred while fetching leagues")
         return []
@@ -101,8 +105,6 @@ def fetch_maxbet_tennis_matches():
             continue
 
     # Now process each match individually
-    matches_odds = []
-
     for match_id in match_ids:
         match_url = f"https://www.maxbet.rs/restapi/offer/sr/match/{match_id}"
         try:
@@ -120,34 +122,54 @@ def fetch_maxbet_tennis_matches():
                 away_win = odds.get("3", "")  # Player 2 win
 
                 if home_win and away_win:
-                    matches_odds.append(
-                        {
-                            "homeTeam": home_team,
-                            "awayTeam": away_team,
-                            "dateTime": kick_off_time,  # Add datetime
-                            "market": "12",
-                            "odd1": home_win,
-                            "oddX": away_win,
-                            "odd2": "",
-                        }
-                    )
+                    matches_data.append({
+                        "homeTeam": home_team,
+                        "awayTeam": away_team,
+                        "dateTime": kick_off_time,
+                        "market": "12",
+                        "odd1": home_win,
+                        "oddX": away_win,
+                        "odd2": "",
+                    })
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        3,  # Maxbet
+                        3,  # Tennis
+                        1,  # Winner
+                        0,  # No margin
+                        float(home_win),
+                        float(away_win),
+                        0,  # No third odd
+                        kick_off_time
+                    ))
 
                 # First Set Winner odds
                 first_set_home = odds.get("50510", "")  # First set player 1 win
                 first_set_away = odds.get("50511", "")  # First set player 2 win
 
                 if first_set_home and first_set_away:
-                    matches_odds.append(
-                        {
-                            "homeTeam": home_team,
-                            "awayTeam": away_team,
-                            "dateTime": kick_off_time,  # Add datetime
-                            "market": "12set1",
-                            "odd1": first_set_home,
-                            "oddX": first_set_away,
-                            "odd2": "",
-                        }
-                    )
+                    matches_data.append({
+                        "homeTeam": home_team,
+                        "awayTeam": away_team,
+                        "dateTime": kick_off_time,
+                        "market": "12set1",
+                        "odd1": first_set_home,
+                        "oddX": first_set_away,
+                        "odd2": "",
+                    })
+                    matches_to_insert.append((
+                        home_team,
+                        away_team,
+                        3,  # Maxbet
+                        3,  # Tennis
+                        11,  # First Set Winner
+                        0,  # No margin
+                        float(first_set_home),
+                        float(first_set_away),
+                        0,  # No third odd
+                        kick_off_time
+                    ))
 
             else:
                 print(f"Failed to fetch match ID {match_id}: {response.status_code}")
@@ -155,17 +177,15 @@ def fetch_maxbet_tennis_matches():
             print(f"Error fetching match ID {match_id}: {str(e)}")
             continue
 
-    # Save to CSV
-    if matches_odds:
-        with open("maxbet_tennis_matches.csv", "w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["homeTeam", "awayTeam", "dateTime", "market", "odd1", "oddX", "odd2"]  # Add dateTime
-            )
-            writer.writerows(matches_odds)
-    else:
-        print("No tennis odds data to save")
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
 
-    return matches_odds
+    return matches_data
 
 
 if __name__ == "__main__":

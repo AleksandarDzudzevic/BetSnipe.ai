@@ -3,6 +3,10 @@ import json
 from bs4 import BeautifulSoup
 import csv
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 DESIRED_LEAGUES = {
     "NBA",
@@ -90,6 +94,7 @@ def get_basketball_odds():
     }
 
     matches_data = []
+    matches_to_insert = []
     page = 0
 
     while True:
@@ -185,29 +190,62 @@ def get_basketball_odds():
 
                                 if odds_12:
                                     matches_data.append(odds_12)
-                                matches_data.extend(odds_total)
-                                matches_data.extend(odds_handicap)
+                                    matches_to_insert.append((
+                                        odds_12["team1"],
+                                        odds_12["team2"],
+                                        2,  # Meridian
+                                        2,  # Basketball
+                                        1,  # 12 (Winner)
+                                        0,  # No margin
+                                        float(odds_12["odd1"]),
+                                        float(odds_12["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
+
+                                for total in odds_total:
+                                    matches_data.append(total)
+                                    matches_to_insert.append((
+                                        total["team1"],
+                                        total["team2"],
+                                        2,  # Meridian
+                                        2,  # Basketball
+                                        10,  # Total Points
+                                        float(total["marketType"]),  # Points line as margin
+                                        float(total["odd1"]),
+                                        float(total["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
+
+                                for handicap in odds_handicap:
+                                    matches_data.append(handicap)
+                                    matches_to_insert.append((
+                                        handicap["team1"],
+                                        handicap["team2"],
+                                        2,  # Meridian
+                                        2,  # Basketball
+                                        9,  # Handicap
+                                        float(handicap["marketType"][1:]),  # Handicap line as margin
+                                        float(handicap["odd1"]),
+                                        float(handicap["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
 
             page += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"Error occurred: {e}")
             break
 
-    with open(
-        "meridian_basketball_matches.csv", "w", newline="", encoding="utf-8"
-    ) as f:
-        writer = csv.writer(f)
-        for match in matches_data:
-            writer.writerow(
-                [
-                    match["team1"],
-                    match["team2"],
-                    match["dateTime"],  # Add datetime
-                    match["marketType"],
-                    match["odd1"],
-                    match["odd2"],
-                ]
-            )
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
 
     return matches_data
 

@@ -1,6 +1,10 @@
 import requests
 import json
 import csv
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database_utils import get_db_connection, batch_insert_matches
 
 url1 = "https://srboffer.admiralbet.rs/api/offer/BetTypeSelections?sportId=4&pageId=35"
 url2 = "https://srboffer.admiralbet.rs/api/offer/getWebEventsSelections"
@@ -83,6 +87,9 @@ competitions = get_hockey_leagues()
 matches = []  # List to store ALL matches
 
 try:
+    conn = get_db_connection()
+    matches_to_insert = []  # List to store match data
+
     # First get the bet types to find the hockey final result bet type ID
     response1 = requests.get(url1, headers=headers)
 
@@ -119,64 +126,42 @@ try:
                         # Process each match
                         for match in data2:
                             match_name = match.get("name", "")
-                            match_datetime = match.get("dateTime", "")  # Get match datetime
+                            match_datetime = match.get("dateTime", "")
 
                             if " - " in match_name:
                                 team1, team2 = match_name.split(" - ")
-
-                                # Get first valid word for each team
-
-                                # Create game label
 
                                 # Look for final result odds
                                 for bet in match.get("bets", []):
                                     if bet.get("betTypeId") == result_bet_type:
                                         outcomes = bet.get("betOutcomes", [])
                                         if len(outcomes) >= 3:
-                                            odd1 = outcomes[0].get("odd")
-                                            oddX = outcomes[1].get("odd")
-                                            odd2 = outcomes[2].get("odd")
+                                            odd1 = outcomes[0].get("odd", "0.00")
+                                            oddX = outcomes[1].get("odd", "0.00")
+                                            odd2 = outcomes[2].get("odd", "0.00")
 
-                                            matches.append(
-                                                {
-                                                    "Team1": team1,
-                                                    "Team2": team2,
-                                                    "DateTime": match_datetime,  # Add datetime
-                                                    "Bet Type": "1X2",
-                                                    "Odds 1": odd1,
-                                                    "Odds X": oddX,
-                                                    "Odds 2": odd2,
-                                                }
-                                            )
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                2,              # bookmaker_id (Admiral)
+                                                4,              # sport_id (Hockey)
+                                                2,              # bet_type_id (1X2)
+                                                0,              # margin
+                                                float(odd1),
+                                                float(oddX),
+                                                float(odd2),
+                                                match_datetime
+                                            ))
 
                 except requests.exceptions.RequestException:
                     continue
 
-            # Save ALL matches to CSV
-            if matches:
-                with open(
-                    "admiral_hockey_matches.csv", "w", newline="", encoding="utf-8"
-                ) as f:
-                    writer = csv.DictWriter(
-                        f,
-                        fieldnames=[
-                            "Team1",
-                            "Team2",
-                            "DateTime",
-                            "Bet Type",
-                            "Odds 1",
-                            "Odds X",
-                            "Odds 2",
-                        ],
-                    )
-                    writer.writeheader()
-                    for match in matches:
-                        writer.writerow(match)
-                print(
-                    f"\nSuccessfully saved {len(matches)} matches to admiral_hockey_matches.csv"
-                )
+            # Single batch insert for all matches
+            if matches_to_insert:
+                batch_insert_matches(conn, matches_to_insert)
 
-except requests.exceptions.RequestException as e:
-    print("Initial request failed:", e)
-except json.JSONDecodeError as e:
-    print("JSON parsing failed:", e)
+except Exception as e:
+    print(f"Error in main execution: {str(e)}")
+finally:
+    if conn:
+        conn.close()

@@ -3,6 +3,10 @@ import json
 import csv
 import ssl
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -50,14 +54,13 @@ def get_hockey_leagues():
 
 
 def get_soccerbet_sports():
-    # Get leagues dynamically instead of hardcoded list
     leagues = get_hockey_leagues()
+    matches_data = []
+    matches_to_insert = []  # List for database insertion
 
     if not leagues:
         print("No leagues found or error occurred while fetching leagues")
         return
-
-    all_matches_data = []
 
     try:
         for league_id, league_name in leagues:
@@ -98,31 +101,41 @@ def get_soccerbet_sports():
                             away_team = match_data.get("away", "")
 
                             if home_team and away_team:
-                                match_data = [
+                                matches_data.append([
                                     home_team,
                                     away_team,
-                                    kick_off_time,  # Add datetime
+                                    kick_off_time,
                                     "1X2",
                                     home_win,
                                     draw,
                                     away_win,
-                                ]
-                                all_matches_data.append(match_data)
+                                ])
+                                matches_to_insert.append((
+                                    home_team,
+                                    away_team,
+                                    5,  # Soccerbet
+                                    4,  # Hockey
+                                    2,  # 1X2
+                                    0,  # No margin
+                                    float(home_win),
+                                    float(draw),
+                                    float(away_win),
+                                    kick_off_time
+                                ))
 
             except Exception as e:
                 print(f"Error getting matches from league {league_name}: {str(e)}")
                 continue
 
-        # Save to CSV
-        if all_matches_data:
-            with open(
-                "soccerbet_hockey_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
-                writer = csv.writer(f)
-                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "X", "Odds 2"])
-                writer.writerows(all_matches_data)
-        else:
-            print("No matches data to save")
+        # Replace CSV writing with database insertion
+        try:
+            conn = get_db_connection()
+            batch_insert_matches(conn, matches_to_insert)
+            conn.close()
+        except Exception as e:
+            print(f"Database error: {e}")
+
+        return matches_data
 
     except Exception as e:
         print(f"Error in main execution: {str(e)}")

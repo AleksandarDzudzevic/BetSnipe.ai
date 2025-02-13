@@ -5,6 +5,10 @@ import undetected_chromedriver as uc
 import ssl
 import csv
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -43,7 +47,8 @@ def get_soccerbet_api():
         ("2516063", "Australija 1"),  # A-League
     ]
 
-    all_matches_data = []
+    matches_data = []
+    matches_to_insert = []
 
     for league_id, league_name in leagues:
         url = f"https://www.soccerbet.rs/restapi/offer/sr/sport/S/league/{league_id}/mob?annex=0&desktopVersion=2.36.3.7&locale=sr"
@@ -150,7 +155,19 @@ def get_soccerbet_api():
                                 "odd2": over_odd,
                                 "odd3": "",
                             }
-                            all_matches_data.append(match_total)
+                            matches_data.append(match_total)
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                5,  # Soccerbet
+                                1,  # Football
+                                5,  # Total Goals
+                                float(total),  # Goals line as margin
+                                float(under_odd),
+                                float(over_odd),
+                                0,  # No third odd
+                                kick_off_time
+                            ))
 
                     # Process first half total goals
                     total_goals_first_map = {
@@ -184,7 +201,19 @@ def get_soccerbet_api():
                                 "odd2": over_odd,
                                 "odd3": "",
                             }
-                            all_matches_data.append(match_total)
+                            matches_data.append(match_total)
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                5,  # Soccerbet
+                                1,  # Football
+                                6,  # First Half Total
+                                float(total),  # Goals line as margin
+                                float(under_odd),
+                                float(over_odd),
+                                0,  # No third odd
+                                kick_off_time
+                            ))
 
                     # Process second half total goals
                     total_goals_second_map = {
@@ -218,26 +247,97 @@ def get_soccerbet_api():
                                 "odd2": over_odd,
                                 "odd3": "",
                             }
-                            all_matches_data.append(match_total)
+                            matches_data.append(match_total)
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                5,  # Soccerbet
+                                1,  # Football
+                                7,  # Second Half Total
+                                float(total),  # Goals line as margin
+                                float(under_odd),
+                                float(over_odd),
+                                0,  # No third odd
+                                kick_off_time
+                            ))
 
-                    all_matches_data.extend(
-                        [match_1x2, match_1x2_first, match_1x2_second, match_ggng]
-                    )
+                    # 1X2 odds
+                    if all(x != "N/A" for x in [match_1x2["odd1"], match_1x2["odd2"], match_1x2["odd3"]]):
+                        matches_data.append(match_1x2)
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            5,  # Soccerbet
+                            1,  # Football
+                            2,  # 1X2
+                            0,  # No margin
+                            float(match_1x2["odd1"]),
+                            float(match_1x2["odd2"]),
+                            float(match_1x2["odd3"]),
+                            kick_off_time
+                        ))
+
+                    # First Half 1X2
+                    if all(x != "N/A" for x in [match_1x2_first["odd1"], match_1x2_first["odd2"], match_1x2_first["odd3"]]):
+                        matches_data.append(match_1x2_first)
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            5,  # Soccerbet
+                            1,  # Football
+                            3,  # First Half 1X2
+                            0,  # No margin
+                            float(match_1x2_first["odd1"]),
+                            float(match_1x2_first["odd2"]),
+                            float(match_1x2_first["odd3"]),
+                            kick_off_time
+                        ))
+
+                    # Second Half 1X2
+                    if all(x != "N/A" for x in [match_1x2_second["odd1"], match_1x2_second["odd2"], match_1x2_second["odd3"]]):
+                        matches_data.append(match_1x2_second)
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            5,  # Soccerbet
+                            1,  # Football
+                            4,  # Second Half 1X2
+                            0,  # No margin
+                            float(match_1x2_second["odd1"]),
+                            float(match_1x2_second["odd2"]),
+                            float(match_1x2_second["odd3"]),
+                            kick_off_time
+                        ))
+
+                    # GGNG
+                    if match_ggng["odd1"] != "N/A" and match_ggng["odd2"] != "N/A":
+                        matches_data.append(match_ggng)
+                        matches_to_insert.append((
+                            home_team,
+                            away_team,
+                            5,  # Soccerbet
+                            1,  # Football
+                            8,  # GGNG
+                            0,  # No margin
+                            float(match_ggng["odd1"]),
+                            float(match_ggng["odd2"]),
+                            0,  # No third odd
+                            kick_off_time
+                        ))
 
         except Exception as e:
             print(f"Error processing league {league_name}: {str(e)}")
             continue
 
-    # Save to CSV
-    if all_matches_data:
-        with open(
-            "soccerbet_football_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=["team1", "team2", "dateTime", "market", "odd1", "odd2", "odd3"],
-            )
-            writer.writerows(all_matches_data)
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+
+    return matches_data
 
 
 if __name__ == "__main__":

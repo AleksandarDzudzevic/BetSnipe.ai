@@ -4,6 +4,10 @@ import csv
 from bs4 import BeautifulSoup
 from datetime import datetime
 import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 
 def get_auth_token():
@@ -55,6 +59,7 @@ def get_tennis_odds():
 
     url = "https://online.meridianbet.com/betshop/api/v1/standard/sport/56/leagues"
     matches_data = []
+    matches_to_insert = []  # List for database insertion
 
     headers = {
         "Accept": "application/json",
@@ -133,12 +138,24 @@ def get_tennis_odds():
                                     {
                                         "team1": player1,
                                         "team2": player2,
-                                        "dateTime": start_time,  # Add datetime
+                                        "dateTime": start_time,
                                         "market": "12",
                                         "odd1": selections[0].get("price", "N/A"),
                                         "odd2": selections[1].get("price", "N/A"),
                                     }
                                 )
+                                matches_to_insert.append((
+                                    player1,
+                                    player2,
+                                    2,  # Meridian
+                                    3,  # Tennis
+                                    1,  # Winner (12)
+                                    0,  # No margin
+                                    float(selections[0].get("price", 0)),
+                                    float(selections[1].get("price", 0)),
+                                    0,  # No third odd
+                                    start_time
+                                ))
                             elif (
                                 market_name == "Osvaja prvi set"
                                 and len(selections) >= 2
@@ -147,12 +164,24 @@ def get_tennis_odds():
                                     {
                                         "team1": player1,
                                         "team2": player2,
-                                        "dateTime": start_time,  # Add datetime
+                                        "dateTime": start_time,
                                         "market": "12set1",
                                         "odd1": selections[0].get("price", "N/A"),
                                         "odd2": selections[1].get("price", "N/A"),
                                     }
                                 )
+                                matches_to_insert.append((
+                                    player1,
+                                    player2,
+                                    2,  # Meridian
+                                    3,  # Tennis
+                                    11,  # First Set Winner
+                                    0,  # No margin
+                                    float(selections[0].get("price", 0)),
+                                    float(selections[1].get("price", 0)),
+                                    0,  # No third odd
+                                    start_time
+                                ))
 
             elif response.status_code == 429:
                 time.sleep(2)
@@ -161,23 +190,15 @@ def get_tennis_odds():
         except Exception as e:
             continue
 
-    # Save to CSV without quotes
-    if matches_data:
-        with open(
-            "meridian_tennis_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
-            for match in matches_data:
-                writer.writerow(
-                    [
-                        match["team1"],
-                        match["team2"],
-                        match["dateTime"],  # Add datetime
-                        match["market"],
-                        match["odd1"],
-                        match["odd2"],
-                    ]
-                )
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+
+    return matches_data
 
 
 if __name__ == "__main__":

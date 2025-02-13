@@ -3,6 +3,10 @@ import json
 import csv
 import ssl
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -51,14 +55,13 @@ def get_table_tennis_leagues():
 
 
 def get_soccerbet_sports():
-    # Get leagues dynamically instead of hardcoded list
     leagues = get_table_tennis_leagues()
+    matches_data = []
+    matches_to_insert = []
 
     if not leagues:
         print("No leagues found or error occurred while fetching leagues")
         return
-
-    all_matches_data = []
 
     try:
         for league_id, league_name in leagues:
@@ -83,35 +86,41 @@ def get_soccerbet_sports():
                         away_team = match["away"]
 
                         # Get winner odds
-                        match_data = [
-                            home_team,
-                            away_team,
-                            kick_off_time,  # Add datetime
-                            "12",  # Add Type column
-                            match["betMap"]
-                            .get("1", {})
-                            .get("NULL", {})
-                            .get("ov", "N/A"),
-                            match["betMap"]
-                            .get("3", {})
-                            .get("NULL", {})
-                            .get("ov", "N/A"),
-                            "",  # Empty Odds 3 column
-                        ]
-
-                        all_matches_data.append(match_data)
+                        if home_team and away_team:
+                            matches_data.append([
+                                home_team,
+                                away_team,
+                                kick_off_time,
+                                "12",
+                                match["betMap"].get("1", {}).get("NULL", {}).get("ov", "N/A"),
+                                match["betMap"].get("3", {}).get("NULL", {}).get("ov", "N/A"),
+                                "",
+                            ])
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                5,  # Soccerbet
+                                3,  # Table Tennis
+                                1,  # Winner
+                                0,  # No margin
+                                float(match["betMap"].get("1", {}).get("NULL", {}).get("ov", 0)),
+                                float(match["betMap"].get("3", {}).get("NULL", {}).get("ov", 0)),
+                                0,  # No third odd
+                                kick_off_time
+                            ))
 
             except Exception as e:
                 continue
 
-        # Save to CSV
-        if all_matches_data:
-            with open(
-                "soccerbet_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
-                writer = csv.writer(f)
-                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "Odds 2"])  # Add DateTime
-                writer.writerows(all_matches_data)
+        # Replace CSV writing with database insertion
+        try:
+            conn = get_db_connection()
+            batch_insert_matches(conn, matches_to_insert)
+            conn.close()
+        except Exception as e:
+            print(f"Database error: {e}")
+
+        return matches_data
 
     except Exception as e:
         print(f"Error in main execution: {str(e)}")

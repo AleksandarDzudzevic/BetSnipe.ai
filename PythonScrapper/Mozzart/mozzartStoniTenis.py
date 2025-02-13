@@ -6,16 +6,29 @@ import ssl
 import certifi
 import os
 import csv
-from mozzart_shared import BrowserManager
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, insert_match, batch_insert_matches
+from Mozzart.mozzart_shared import browser_manager
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 
+def get_browser():
+    options = uc.ChromeOptions()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    return uc.Chrome(options=options, version_main=132)
+
+
 def get_table_tennis_leagues():
     """Fetch current table tennis leagues from Mozzart"""
+    tab_handle = None
     try:
-        driver = BrowserManager.get_browser()
+        tab_handle = browser_manager.create_tab()
         script = """
         return fetch('https://www.mozzartbet.com/betting/get-competitions', {
             method: 'POST',
@@ -38,7 +51,7 @@ def get_table_tennis_leagues():
         }).then(response => response.text());
         """
 
-        response = driver.execute_script(script)
+        response = browser_manager.execute_script(script, tab_handle)
         leagues = []
 
         if response:
@@ -58,6 +71,9 @@ def get_table_tennis_leagues():
     except Exception as e:
         print(f"Error fetching leagues: {str(e)}")
         return []
+    finally:
+        if tab_handle:
+            browser_manager.close_tab(tab_handle)
 
 
 def convert_unix_to_iso(unix_ms):
@@ -69,33 +85,29 @@ def convert_unix_to_iso(unix_ms):
 
 
 def get_mozzart_sports():
+    conn = None
+    tab_handle = None
     try:
+        conn = get_db_connection()
+        matches_to_insert = []
         leagues = get_table_tennis_leagues()
 
         if not leagues:
-            print("No leagues found or error occurred while fetching leagues")
+            print("No leagues found")
             return
-
-        matches_data = []
-        processed_matches = set()
 
         for league_id, league_name in leagues:
             try:
-                driver = BrowserManager.get_browser()
+                tab_handle = browser_manager.create_tab()
                 script = f"""
                 return fetch('https://www.mozzartbet.com/betting/matches', {{
                     method: 'POST',
                     headers: {{
                         'Accept': 'application/json, text/plain, */*',
-                        'Accept-Language': 'en-US,en;q=0.5',
                         'Content-Type': 'application/json',
                         'Origin': 'https://www.mozzartbet.com',
-                        'Referer': 'https://www.mozzartbet.com/sr/kladjenje/competitions/48/{league_id}',
-                        'User-Agent': navigator.userAgent,
-                        'X-Requested-With': 'XMLHttpRequest',
                         'Medium': 'WEB'
                     }},
-                    credentials: 'include',
                     body: JSON.stringify({{
                         "date": "all_days",
                         "type": "all",
@@ -108,82 +120,67 @@ def get_mozzart_sports():
                 """
 
                 try:
-                    response = driver.execute_script(script)
+                    response = browser_manager.execute_script(script, tab_handle)
                     if not response:
-                        print(f"No response for league {league_name}")
                         continue
 
-                    try:
-                        data = json.loads(response)
-                        if not data.get("items"):
-                            print(f"No matches found in league {league_name}")
+                    data = json.loads(response)
+                    if not data.get("items"):
+                        continue
+
+                    for match in data["items"]:
+                        try:
+                            home_team = match["home"]["name"]
+                            away_team = match["visitor"]["name"]
+                            kick_off_time = convert_unix_to_iso(match.get("startTime", 0))
+
+                            match_odds = {"1": "0.00", "2": "0.00"}
+
+                            for odd in match.get("odds", []):
+                                if odd["game"]["name"] == "Konačan ishod":
+                                    if odd["subgame"]["name"] == "1":
+                                        match_odds["1"] = odd["value"]
+                                    elif odd["subgame"]["name"] == "2":
+                                        match_odds["2"] = odd["value"]
+
+                            # Store match data instead of immediate insert
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                1,              # bookmaker_id
+                                5,              # sport_id (Table Tennis)
+                                1,              # bet_type_id (12)
+                                0,              # margin
+                                float(match_odds["1"]),
+                                float(match_odds["2"]),
+                                0,              # odd3
+                                kick_off_time
+                            ))
+
+                        except Exception as e:
+                            print(f"Error processing match: {e}")
                             continue
 
-                        for match in data["items"]:
-                            try:
-                                home_team = match["home"]["name"]
-                                away_team = match["visitor"]["name"]
-                                kick_off_time = convert_unix_to_iso(match.get("startTime", 0))  # Get and convert kickoff time
-                                match_name = f"{home_team}, {away_team}"
-
-                                if match_name in processed_matches:
-                                    continue
-
-                                processed_matches.add(match_name)
-                                match_odds = {"1": "N/A", "2": "N/A"}
-
-                                for odd in match.get("odds", []):
-                                    if odd["game"]["name"] == "Konačan ishod":
-                                        if odd["subgame"]["name"] == "1":
-                                            match_odds["1"] = odd["value"]
-                                        elif odd["subgame"]["name"] == "2":
-                                            match_odds["2"] = odd["value"]
-
-                                matches_data.append(
-                                    [
-                                        home_team,
-                                        away_team,
-                                        kick_off_time,  # Add datetime
-                                        "12",
-                                        match_odds["1"],
-                                        match_odds["2"],
-                                        "",
-                                    ]
-                                )
-                            except Exception as e:
-                                print(f"Error processing match: {e}")
-                                continue
-
-                    except json.JSONDecodeError as e:
-                        print(
-                            f"Error parsing matches response for league {league_name}: {e}"
-                        )
-                        continue
-
-                except Exception as e:
-                    print(f"Error fetching matches for league {league_name}: {e}")
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing matches response for league {league_name}: {e}")
                     continue
 
             except Exception as e:
                 print(f"Error fetching matches for league {league_name}: {e}")
                 continue
+            finally:
+                if tab_handle:
+                    browser_manager.close_tab(tab_handle)
+                tab_handle = None
 
-        print(f"Total matches found: {len(matches_data)}")
-
-        if matches_data:
-            with open(
-                "mozzart_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
-                writer = csv.writer(f)
-                writer.writerow(["Team1", "Team2", "DateTime", "Bet Type", "Odds 1", "Odds 2"])  # Add DateTime
-                writer.writerows(matches_data)
-        else:
-            print("No matches data to write to CSV")
+        if matches_to_insert:
+            batch_insert_matches(conn, matches_to_insert)
 
     except Exception as e:
         print(f"Critical error: {str(e)}")
     finally:
-        BrowserManager.cleanup()
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":

@@ -4,6 +4,10 @@ import csv
 from bs4 import BeautifulSoup
 from datetime import datetime
 import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 DESIRED_TENNIS_REGIONS = {
     "Rusija Liga Pro",
@@ -66,6 +70,7 @@ def get_tennis_odds():
 
     url = "https://online.meridianbet.com/betshop/api/v1/standard/sport/89/leagues"
     matches_data = []
+    matches_to_insert = []  # List for database insertion
 
     headers = {
         "Accept": "application/json",
@@ -140,12 +145,24 @@ def get_tennis_odds():
                                         {
                                             "team1": player1,
                                             "team2": player2,
-                                            "dateTime": start_time,  # Add datetime
+                                            "dateTime": start_time,
                                             "market": "12",
                                             "odd1": selections[0].get("price", "N/A"),
                                             "odd2": selections[1].get("price", "N/A"),
                                         }
                                     )
+                                    matches_to_insert.append((
+                                        player1,
+                                        player2,
+                                        2,  # Meridian
+                                        5,  # Table Tennis
+                                        1,  # Winner (12)
+                                        0,  # No margin
+                                        float(selections[0].get("price", 0)),
+                                        float(selections[1].get("price", 0)),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
 
             elif response.status_code == 429:
                 time.sleep(2)
@@ -154,15 +171,15 @@ def get_tennis_odds():
         except Exception as e:
             continue
 
-    # Save to CSV without quotes
-    if matches_data:
-        with open(
-            "meridian_tabletennis_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["team1", "team2", "dateTime", "market", "odd1", "odd2"]  # Add datetime
-            )
-            writer.writerows(matches_data)
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
+
+    return matches_data
 
 
 if __name__ == "__main__":

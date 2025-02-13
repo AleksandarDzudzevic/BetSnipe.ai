@@ -2,6 +2,10 @@ import requests
 import json
 import csv
 import ssl
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -84,33 +88,35 @@ def get_tennis_leagues():
 
 
 def get_admiral_tennis():
-    # Get leagues dynamically
-    leagues = get_tennis_leagues()
-    all_matches_data = []
-
-    if not leagues:
-        print("No leagues found or error occurred while fetching leagues")
-        return
-
-    url1 = (
-        "https://srboffer.admiralbet.rs/api/offer/BetTypeSelections?sportId=3&pageId=35"
-    )
-    url2 = "https://srboffer.admiralbet.rs/api/offer/getWebEventsSelections"
-    url3 = "https://srboffer.admiralbet.rs/api/offer/betsAndGroups"
-
-    headers = {
-        "Accept": "application/utf8+json, application/json;q=0.9, text/plain;q=0.8, /;q=0.7",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Content-Type": "application/json",
-        "Host": "srboffer.admiralbet.rs",
-        "Language": "sr-Latn",
-        "Officeid": "138",
-        "Origin": "https://admiralbet.rs",
-        "Referer": "https://admiralbet.rs/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    }
-
     try:
+        conn = get_db_connection()
+        matches_to_insert = []  # List to store match data
+        
+        # Get leagues dynamically
+        leagues = get_tennis_leagues()
+
+        if not leagues:
+            print("No leagues found or error occurred while fetching leagues")
+            return
+
+        url1 = (
+            "https://srboffer.admiralbet.rs/api/offer/BetTypeSelections?sportId=3&pageId=35"
+        )
+        url2 = "https://srboffer.admiralbet.rs/api/offer/getWebEventsSelections"
+        url3 = "https://srboffer.admiralbet.rs/api/offer/betsAndGroups"
+
+        headers = {
+            "Accept": "application/utf8+json, application/json;q=0.9, text/plain;q=0.8, /;q=0.7",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Content-Type": "application/json",
+            "Host": "srboffer.admiralbet.rs",
+            "Language": "sr-Latn",
+            "Officeid": "138",
+            "Origin": "https://admiralbet.rs",
+            "Referer": "https://admiralbet.rs/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        }
+
         # Process each league
         for league in leagues:
             params = {
@@ -131,9 +137,11 @@ def get_admiral_tennis():
 
                     for match in matches:
                         match_name = match.get("name", "")
-                        match_datetime = match.get("dateTime", "")  # Get match datetime
+                        match_datetime = match.get("dateTime", "")
                         if " - " not in match_name:
                             continue
+
+                        team1, team2 = match_name.split(" - ")
 
                         # Get detailed bet information for each match
                         bets_url = f"{url3}/{3}/{league['regionId']}/{league['competitionId']}/{match.get('id')}"
@@ -148,43 +156,50 @@ def get_admiral_tennis():
                                 outcomes = bet.get("betOutcomes", [])
 
                                 if bet_type == "Pobednik" and len(outcomes) >= 2:
-                                    odd1 = outcomes[0].get("odd", "N/A")
-                                    odd2 = outcomes[1].get("odd", "N/A")
-                                    if odd1 != "N/A" and odd2 != "N/A":
-                                        all_matches_data.append(
-                                            [match_name, match_datetime, "12", odd1, odd2]  # Add datetime
-                                        )
+                                    odd1 = outcomes[0].get("odd", "0.00")
+                                    odd2 = outcomes[1].get("odd", "0.00")
+                                    matches_to_insert.append((
+                                        team1,
+                                        team2,
+                                        2,              # bookmaker_id (Admiral)
+                                        3,              # sport_id (Tennis)
+                                        1,              # bet_type_id (12)
+                                        0,              # margin
+                                        float(odd1),
+                                        float(odd2),
+                                        0,              # no odd3 for tennis
+                                        match_datetime
+                                    ))
 
-                                elif (
-                                    bet_type == "1.set - Pobednik"
-                                    and len(outcomes) >= 2
-                                ):
-                                    odd1 = outcomes[0].get("odd", "N/A")
-                                    odd2 = outcomes[1].get("odd", "N/A")
-                                    if odd1 != "N/A" and odd2 != "N/A":
-                                        all_matches_data.append(
-                                            [match_name, match_datetime, "12set1", odd1, odd2]  # Add datetime
-                                        )
+                                elif bet_type == "1.set - Pobednik" and len(outcomes) >= 2:
+                                    odd1 = outcomes[0].get("odd", "0.00")
+                                    odd2 = outcomes[1].get("odd", "0.00")
+                                    matches_to_insert.append((
+                                        team1,
+                                        team2,
+                                        2,              # bookmaker_id (Admiral)
+                                        3,              # sport_id (Tennis)
+                                        11,             # bet_type_id (12set1)
+                                        0,              # margin
+                                        float(odd1),
+                                        float(odd2),
+                                        0,              # no odd3 for tennis
+                                        match_datetime
+                                    ))
 
             except Exception as e:
                 print(f"Error processing league {league['name']}: {str(e)}")
                 continue
 
-        # Save to CSV
-        if all_matches_data:
-            with open(
-                "admiral_tennis_matches.csv", "w", newline="", encoding="utf-8"
-            ) as f:
-                for row in all_matches_data:
-                    match_name = row[0].replace(",", "")  # Remove all commas
-                    team1, team2 = match_name.split(" - ")  # Split on " - "
-                    f.write(f"{team1},{team2},{row[1]},{row[2]},{row[3]},{row[4]}\n")  # Include datetime
-            print("Data saved to admiral_tennis_matches.csv")
-        else:
-            print("No matches data to save")
+        # Single batch insert for all matches
+        if matches_to_insert:
+            batch_insert_matches(conn, matches_to_insert)
 
     except Exception as e:
         print(f"Error in main execution: {str(e)}")
+    finally:
+        if conn:
+            conn.close()
 
 
 if __name__ == "__main__":

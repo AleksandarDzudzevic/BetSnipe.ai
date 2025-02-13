@@ -1,6 +1,10 @@
 import requests
 import csv
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 
 def get_hockey_leagues():
@@ -54,14 +58,13 @@ def convert_unix_to_iso(unix_ms):
 
 
 def fetch_maxbet_hockey_matches():
-    # Get leagues dynamically instead of using hardcoded HOCKEY_LEAGUES
     hockey_leagues = get_hockey_leagues()
+    matches_data = []
+    matches_to_insert = []  # List for database insertion
 
     if not hockey_leagues:
         print("No leagues found or error occurred while fetching leagues")
         return []
-
-    matches_odds = []
 
     params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
     headers = {
@@ -99,16 +102,28 @@ def fetch_maxbet_hockey_matches():
                         away_win = odds.get("3", "")  # Away win (2)
 
                         if home_win and draw and away_win:
-                            matches_odds.append(
+                            matches_data.append(
                                 {
                                     "team1": home_team,
                                     "team2": away_team,
-                                    "dateTime": kick_off_time,  # Add datetime
+                                    "dateTime": kick_off_time,
                                     "odd1": home_win,
                                     "oddX": draw,
                                     "odd2": away_win,
                                 }
                             )
+                            matches_to_insert.append((
+                                home_team,
+                                away_team,
+                                3,  # Maxbet
+                                4,  # Hockey
+                                2,  # 1X2
+                                0,  # No margin
+                                float(home_win),
+                                float(draw),
+                                float(away_win),
+                                kick_off_time
+                            ))
 
             else:
                 print(
@@ -119,17 +134,15 @@ def fetch_maxbet_hockey_matches():
             print(f"Error fetching {league_name}: {str(e)}")
             continue
 
-    # Save to CSV
-    if matches_odds:
-        with open("maxbet_hockey_matches.csv", "w", newline="") as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["team1", "team2", "dateTime", "odd1", "oddX", "odd2"]  # Add dateTime
-            )
-            writer.writerows(matches_odds)
-    else:
-        print("No hockey odds data to save")
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
 
-    return matches_odds
+    return matches_data
 
 
 if __name__ == "__main__":

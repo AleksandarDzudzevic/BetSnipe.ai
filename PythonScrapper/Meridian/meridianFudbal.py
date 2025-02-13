@@ -1,8 +1,11 @@
 import requests
 import json
 from bs4 import BeautifulSoup
-import csv
 from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 DESIRED_LEAGUES = {
     ("Premier Liga", "Engleska"),
@@ -97,21 +100,22 @@ def get_soccer_odds():
     if not token:
         return []
 
-    url = "https://online.meridianbet.com/betshop/api/v1/standard/sport/58/leagues"
-    headers = {
-        "Accept": "application/json",
-        "Accept-Language": "sr",
-        "Authorization": f"Bearer {token}",
-        "Origin": "https://meridianbet.rs",
-        "Referer": "https://meridianbet.rs/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    }
-
     matches_data = []
+    matches_to_insert = []  # List for database insertion
     page = 0
 
     while True:
         try:
+            url = "https://online.meridianbet.com/betshop/api/v1/standard/sport/58/leagues"
+            headers = {
+                "Accept": "application/json",
+                "Accept-Language": "sr",
+                "Authorization": f"Bearer {token}",
+                "Origin": "https://meridianbet.rs",
+                "Referer": "https://meridianbet.rs/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            }
+
             response = requests.get(
                 url,
                 params={"page": str(page), "time": "ALL", "groupIndices": "0,0,0"},
@@ -224,7 +228,7 @@ def get_soccer_odds():
                                                     "odd2": ng,
                                                 }
 
-                                    elif market_name == "Ukupno":
+                                    elif market_name == "Ukupno Golova":
                                         for market in market_group.get("markets", []):
                                             over_under = market.get("overUnder")
                                             selections = market.get("selections", [])
@@ -280,58 +284,123 @@ def get_soccer_odds():
                                                 )
 
                                 if odds_1x2:
-                                    odds_1x2["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2)
+                                    matches_to_insert.append((
+                                        odds_1x2["team1"],
+                                        odds_1x2["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        2,  # 1X2
+                                        0,  # No margin
+                                        float(odds_1x2["odd1"]),
+                                        float(odds_1x2["oddX"]),
+                                        float(odds_1x2["odd2"]),
+                                        start_time
+                                    ))
+
                                 if odds_1x2f:
-                                    odds_1x2f["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2f)
+                                    matches_to_insert.append((
+                                        odds_1x2f["team1"],
+                                        odds_1x2f["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        3,  # First Half 1X2
+                                        0,  # No margin
+                                        float(odds_1x2f["odd1"]),
+                                        float(odds_1x2f["oddX"]),
+                                        float(odds_1x2f["odd2"]),
+                                        start_time
+                                    ))
+
                                 if odds_1x2s:
-                                    odds_1x2s["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_1x2s)
+                                    matches_to_insert.append((
+                                        odds_1x2s["team1"],
+                                        odds_1x2s["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        4,  # Second Half 1X2
+                                        0,  # No margin
+                                        float(odds_1x2s["odd1"]),
+                                        float(odds_1x2s["oddX"]),
+                                        float(odds_1x2s["odd2"]),
+                                        start_time
+                                    ))
+
                                 if odds_ggng:
-                                    odds_ggng["dateTime"] = start_time  # Add datetime
                                     matches_data.append(odds_ggng)
+                                    matches_to_insert.append((
+                                        odds_ggng["team1"],
+                                        odds_ggng["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        8,  # GGNG
+                                        0,  # No margin
+                                        float(odds_ggng["odd1"]),
+                                        float(odds_ggng["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
+
                                 for ou in odds_ou:
-                                    ou["dateTime"] = start_time  # Add datetime
                                     matches_data.append(ou)
+                                    matches_to_insert.append((
+                                        ou["team1"],
+                                        ou["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        5,  # Total Goals
+                                        float(ou["marketType"][2:]),  # Extract goals number
+                                        float(ou["odd1"]),
+                                        float(ou["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
+
                                 for fht in odds_fht:
-                                    fht["dateTime"] = start_time  # Add datetime
                                     matches_data.append(fht)
+                                    matches_to_insert.append((
+                                        fht["team1"],
+                                        fht["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        6,  # First Half Total
+                                        float(fht["marketType"][2:-1]),  # Extract goals number
+                                        float(fht["odd1"]),
+                                        float(fht["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
+
                                 for sht in odds_sht:
-                                    sht["dateTime"] = start_time  # Add datetime
                                     matches_data.append(sht)
+                                    matches_to_insert.append((
+                                        sht["team1"],
+                                        sht["team2"],
+                                        2,  # Meridian
+                                        1,  # Football
+                                        7,  # Second Half Total
+                                        float(sht["marketType"][2:-1]),  # Extract goals number
+                                        float(sht["odd1"]),
+                                        float(sht["odd2"]),
+                                        0,  # No third odd
+                                        start_time
+                                    ))
 
             page += 1
 
-        except Exception:
+        except Exception as e:
+            print(f"Error occurred: {e}")
             break
 
-    with open("meridian_football_matches.csv", "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        for match in matches_data:
-            if match["marketType"] in ["1X2", "1X2F", "1X2S"]:
-                writer.writerow(
-                    [
-                        match["team1"],
-                        match["team2"],
-                        match["dateTime"],  # Add datetime
-                        match["marketType"],
-                        match["odd1"],
-                        match["oddX"],
-                        match["odd2"],
-                    ]
-                )
-            else:  # GGNG and OU markets
-                writer.writerow(
-                    [
-                        match["team1"],
-                        match["team2"],
-                        match["dateTime"],  # Add datetime
-                        match["marketType"],
-                        match["odd1"],
-                        match["odd2"],
-                    ]
-                )
+    # Replace CSV writing with database insertion
+    try:
+        conn = get_db_connection()
+        batch_insert_matches(conn, matches_to_insert)
+        conn.close()
+    except Exception as e:
+        print(f"Database error: {e}")
 
     return matches_data
 

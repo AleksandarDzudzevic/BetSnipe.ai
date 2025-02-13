@@ -23,4 +23,16 @@ def insert_match(conn, team_home, team_away, bookmaker_id, sport_id, bet_type_id
         @margin=?, @odd1=?, @odd2=?, @odd3=?, @startTime=?
     """, (team_home, team_away, bookmaker_id, sport_id, bet_type_id, 
           margin, odd1, odd2, odd3, start_time))
+    conn.commit()
+
+def batch_insert_matches(conn, matches):
+    """
+    Batch insert multiple matches at once.
+    matches: list of tuples (team_home, team_away, bookmaker_id, sport_id, bet_type_id, margin, odd1, odd2, odd3, start_time)
+    """
+    cursor = conn.cursor()
+    cursor.executemany(
+        "INSERT INTO AllMatches (teamHome, teamAway, bookmaker_id, sport_id, betType_id, margin, odd1, odd2, odd3, startTime) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        matches
+    )
     conn.commit() 

@@ -2,6 +2,10 @@ import requests
 import json
 import csv
 import ssl
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -56,7 +60,8 @@ headers = {
 
 
 try:
-    matches = []  # List to store all matches
+    conn = get_db_connection()
+    matches_to_insert = []  # List to store match data
 
     for competition in competitions:
         params = {
@@ -79,11 +84,8 @@ try:
                 for match in data:
                     if match.get("name", "").count(" - ") == 1:
                         team1, team2 = match["name"].split(" - ")
-                        match_datetime = match.get("dateTime", "")  # Get match datetime
+                        match_datetime = match.get("dateTime", "")
 
-                        # Process team name
-
-                        # Get detailed odds
                         odds_url = f"{url_odds}/1/{competition['regionId']}/{competition['competitionId']}/{match['id']}"
                         odds_response = requests.get(odds_url, headers=headers)
 
@@ -92,104 +94,85 @@ try:
                             if isinstance(odds_data, dict) and "bets" in odds_data:
                                 bets = odds_data["bets"]
 
-                                # Process each bet type
                                 for bet in bets:
                                     bet_type_id = bet.get("betTypeId")
 
                                     # 1X2 Full Time
                                     if bet_type_id == 135:
-                                        outcomes = sorted(
-                                            bet["betOutcomes"],
-                                            key=lambda x: x["orderNo"],
-                                        )
+                                        outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
                                         if len(outcomes) >= 3:
-                                            matches.append(
-                                                {
-                                                    "Team1": team1,
-                                                    "Team2": team2,
-                                                    "DateTime": match_datetime,  # Add datetime
-                                                    "BetType": "1X2",
-                                                    "Odd1": outcomes[0]["odd"],
-                                                    "Odd2": outcomes[1]["odd"],
-                                                    "Odd3": outcomes[2]["odd"],
-                                                }
-                                            )
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                2,  # Admiral
+                                                1,  # Football
+                                                2,  # 1X2
+                                                0,
+                                                float(outcomes[0]["odd"]),
+                                                float(outcomes[1]["odd"]),
+                                                float(outcomes[2]["odd"]),
+                                                match_datetime
+                                            ))
 
                                     # 1X2 First Half
                                     elif bet_type_id == 148:
-                                        outcomes = sorted(
-                                            bet["betOutcomes"],
-                                            key=lambda x: x["orderNo"],
-                                        )
+                                        outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
                                         if len(outcomes) >= 3:
-                                            matches.append(
-                                                {
-                                                    "Team1": team1,
-                                                    "Team2": team2,
-                                                    "DateTime": match_datetime,  # Add datetime
-                                                    "BetType": "1X2F",
-                                                    "Odd1": outcomes[0]["odd"],
-                                                    "Odd2": outcomes[1]["odd"],
-                                                    "Odd3": outcomes[2]["odd"],
-                                                }
-                                            )
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                2,
+                                                1,
+                                                3,   # 1X2F
+                                                0,
+                                                float(outcomes[0]["odd"]),
+                                                float(outcomes[1]["odd"]),
+                                                float(outcomes[2]["odd"]),
+                                                match_datetime
+                                            ))
 
                                     # 1X2 Second Half
                                     elif bet_type_id == 149:
-                                        outcomes = sorted(
-                                            bet["betOutcomes"],
-                                            key=lambda x: x["orderNo"],
-                                        )
+                                        outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
                                         if len(outcomes) >= 3:
-                                            matches.append(
-                                                {
-                                                    "Team1": team1,
-                                                    "Team2": team2,
-                                                    "DateTime": match_datetime,  # Add datetime
-                                                    "BetType": "1X2S",
-                                                    "Odd1": outcomes[0]["odd"],
-                                                    "Odd2": outcomes[1]["odd"],
-                                                    "Odd3": outcomes[2]["odd"],
-                                                }
-                                            )
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                2,
+                                                1,
+                                                4,   # 1X2S
+                                                0,
+                                                float(outcomes[0]["odd"]),
+                                                float(outcomes[1]["odd"]),
+                                                float(outcomes[2]["odd"]),
+                                                match_datetime
+                                            ))
 
-                                    # GGNG (Both Teams to Score)
+                                    # GGNG
                                     elif bet_type_id == 151:
-                                        outcomes = sorted(
-                                            bet["betOutcomes"],
-                                            key=lambda x: x["orderNo"],
-                                        )
+                                        outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
                                         if len(outcomes) >= 2:
-                                            matches.append(
-                                                {
-                                                    "Team1": team1,
-                                                    "Team2": team2,
-                                                    "DateTime": match_datetime,  # Add datetime
-                                                    "BetType": "GGNG",
-                                                    "Odd1": outcomes[0]["odd"],
-                                                    "Odd2": outcomes[1]["odd"],
-                                                    "Odd3": "",
-                                                }
-                                            )
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                2,
+                                                1,
+                                                8,   # GGNG
+                                                0,
+                                                float(outcomes[0]["odd"]),
+                                                float(outcomes[1]["odd"]),
+                                                0,
+                                                match_datetime
+                                            ))
 
                                     # Total Goals
-                                    elif bet_type_id in [
-                                        137,
-                                        143,
-                                        144,
-                                    ]:  # Full time, First half, Second half
-                                        suffix = ""
-                                        if bet_type_id == 143:
-                                            suffix = "F"
-                                        elif bet_type_id == 144:
-                                            suffix = "S"
-
+                                    elif bet_type_id in [137, 143, 144]:  # Full time, First half, Second half
                                         totals = {}
                                         for outcome in bet["betOutcomes"]:
                                             total = outcome["sBV"]
                                             if total not in totals:
                                                 totals[total] = {}
-
+                                            
                                             if outcome["name"].lower().startswith("vi"):
                                                 totals[total]["over"] = outcome["odd"]
                                             else:
@@ -197,32 +180,35 @@ try:
 
                                         for total, odds in totals.items():
                                             if "over" in odds and "under" in odds:
-                                                matches.append(
-                                                    {
-                                                        "Team1": team1,
-                                                        "Team2": team2,
-                                                        "DateTime": match_datetime,  # Add datetime
-                                                        "BetType": f"TG{total}{suffix}",
-                                                        "Odd1": odds["under"],
-                                                        "Odd2": odds["over"],
-                                                        "Odd3": "",
-                                                    }
-                                                )
+                                                bet_type = 5  # TG
+                                                if bet_type_id == 143:
+                                                    bet_type = 6  # TGF
+                                                elif bet_type_id == 144:
+                                                    bet_type = 7  # TGS
+
+                                                matches_to_insert.append((
+                                                    team1,
+                                                    team2,
+                                                    2,
+                                                    1,
+                                                    bet_type,
+                                                    float(total),
+                                                    float(odds["under"]),
+                                                    float(odds["over"]),
+                                                    0,
+                                                    match_datetime
+                                                ))
 
         except Exception as e:
             print(f"Error processing competition {competition['name']}: {e}")
             continue
 
-    # Save to CSV
-    if matches:
-        with open(
-            "admiral_football_matches.csv", "w", newline="", encoding="utf-8"
-        ) as f:
-            writer = csv.DictWriter(
-                f, fieldnames=["Team1", "Team2", "DateTime", "BetType", "Odd1", "Odd2", "Odd3"]
-            )
-            writer.writeheader()
-            writer.writerows(matches)
+    # Single batch insert for all matches
+    if matches_to_insert:
+        batch_insert_matches(conn, matches_to_insert)
 
 except Exception as e:
     print(f"Error in main execution: {e}")
+finally:
+    if conn:
+        conn.close()
