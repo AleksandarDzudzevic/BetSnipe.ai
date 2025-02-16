@@ -34,8 +34,23 @@ def get_all_scripts():
         base_path / "Maxbet/maxbetKosarka.py",
         base_path / "Maxbet/maxbetHokej.py",
         # 1xBet scripts
-        base_path / "1xBet/1xBetFudbal.py",
-        base_path / "1xBet/1xBetKosarka.py",
+        #base_path / "1xBet/1xBetFudbal.py",
+        #base_path / "1xBet/1xBetKosarka.py",
+        #base_path / "1xBet/1xBetHokej.py",
+        #base_path / "1xBet/1xBetStoniTenis.py",
+        #base_path / "1xBet/1xBetTenis.py",
+        # Superbet scripts
+        base_path / "Superbet/superbetFudbal.py",
+        base_path / "Superbet/superbetKosarka.py",
+        base_path / "Superbet/superbetHokej.py",
+        base_path / "Superbet/superbetStoniTenis.py",
+        base_path / "Superbet/superbetTenis.py",
+        # Mozzart scripts
+        base_path / "Mozzart/mozzartFudbal.py",
+        base_path / "Mozzart/mozzartKosarka.py",
+        base_path / "Mozzart/mozzartTenis.py",
+        base_path / "Mozzart/mozzartHokej.py",
+        base_path / "Mozzart/mozzartStoniTenis.py",
     ]
     return [s for s in scripts if s.exists()]
 
