@@ -1,18 +1,51 @@
-import aiohttp
+import cloudscraper
 import asyncio
 import json
 from datetime import datetime
 import sys
 from pathlib import Path
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
-async def fetch_tennis_leagues(session):
+# Modify the scraper configuration
+scraper = cloudscraper.create_scraper(
+    browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'mobile': False
+    },
+    delay=1,  # Reduced from 2 to 1
+    interpreter='nodejs'  # Often faster than default
+)
+
+# Add connection pooling and reuse
+scraper.headers.update({
+    'Connection': 'keep-alive',
+    'Keep-Alive': 'timeout=60',
+})
+
+# Optimize the fetch function
+async def fetch_with_cloudscraper(url, params=None):
+    """Helper function to make async requests using cloudscraper"""
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=10) as executor:  # Limit concurrent requests
+        try:
+            response = await loop.run_in_executor(
+                executor,
+                lambda: scraper.get(url, params=params, timeout=20)  # Reduced timeout
+            )
+            return response.json()
+        except Exception as e:
+            print(f"Error fetching {url}: {e}")
+            return None
+
+async def fetch_tennis_leagues():
     url = "https://1xbet.rs/service-api/LineFeed/GetChampsZip"
     params = {
-        "sport": "4",
+        "sport": "4",  # Tennis sport ID
         "lng": "en",
         "country": "168",
         "partner": "321",
@@ -20,22 +53,21 @@ async def fetch_tennis_leagues(session):
         "groupChamps": "true"
     }
     
-    try:
-        async with session.get(url, params=params) as response:
-            data = await response.json()
-            league_ids = []
-            
-            # Extract league IDs from all categories
-            for category in data.get('Value', []):
-                for subcategory in category.get('SC', []):
-                    league_ids.append(str(subcategory.get('LI')))
-            
-            return league_ids
-    except Exception as e:
-        print(f"Error fetching tennis leagues: {e}")
+    data = await fetch_with_cloudscraper(url, params)
+    if not data:
         return []
+        
+    league_ids = []
+    for category in data.get('Value', []):
+        if 'LI' in category:
+            league_ids.append(str(category.get('LI')))
+        if 'SC' in category:
+            for subcategory in category.get('SC', []):
+                league_ids.append(str(subcategory.get('LI')))
+    
+    return league_ids
 
-async def fetch_league_matches(session, league):
+async def fetch_league_matches(league):
     url = "https://1xbet.rs/service-api/LineFeed/Get1x2_VZip"
     params = {
         "sports": "4",  # Tennis sport ID
@@ -48,15 +80,12 @@ async def fetch_league_matches(session, league):
         "virtualSports": "true"
     }
     
-    try:
-        async with session.get(url, params=params) as response:
-            data = await response.json()
-            return [item['N'] for item in data.get('Value', []) if 'N' in item]
-    except Exception as e:
-        print(f"Error fetching league {league} matches: {e}")
-        return []
+    data = await fetch_with_cloudscraper(url, params)
+    if data:
+        return [item['N'] for item in data.get('Value', []) if 'N' in item]
+    return []
 
-async def fetch_match_details(session, match_id):
+async def fetch_match_details(match_id):
     match_url = "https://1xbet.rs/service-api/LineFeed/GetGameZip"
     match_params = {
         "id": str(match_id),
@@ -70,66 +99,68 @@ async def fetch_match_details(session, match_id):
         "marketType": "1"
     }
     
-    try:
-        async with session.get(match_url, params=match_params) as response:
-            return await response.json()
-    except Exception as e:
-        print(f"Error fetching match {match_id} details: {e}")
-        return None
+    return await fetch_with_cloudscraper(match_url, match_params)
 
 async def fetch_1xbet_tennis_data_async():
     matches_to_insert = []
     conn = get_db_connection()
     
     try:
-        async with aiohttp.ClientSession() as session:
-            # First, fetch all tennis leagues
-            leagues = await fetch_tennis_leagues(session)
-            print(f"Found {len(leagues)} tennis leagues")
-            
-            # Fetch all match IDs concurrently
-            tasks = [fetch_league_matches(session, league) for league in leagues]
-            match_ids_lists = await asyncio.gather(*tasks)
-            match_ids = [id for sublist in match_ids_lists for id in sublist]
-            print(f"Found {len(match_ids)} tennis matches")
-            
-            # Fetch match details concurrently
-            tasks = [fetch_match_details(session, match_id) for match_id in match_ids]
-            match_details = await asyncio.gather(*tasks)
-            
-            # Process match details
-            for match_data in match_details:
-                if not match_data:
+        # First, fetch all tennis leagues
+        leagues = await fetch_tennis_leagues()
+        print(f"Found {len(leagues)} tennis leagues")
+        
+        # Fetch all match IDs concurrently
+        tasks = [fetch_league_matches(league) for league in leagues]
+        match_ids_lists = await asyncio.gather(*tasks)
+        match_ids = [id for sublist in match_ids_lists for id in sublist]
+        print(f"Found {len(match_ids)} tennis matches")
+        
+        # Fetch match details concurrently
+        tasks = [fetch_match_details(match_id) for match_id in match_ids]
+        match_details = await asyncio.gather(*tasks)
+        
+        # Process match details
+        for match_data in match_details:
+            if not match_data:
+                continue
+                
+            try:
+                value = match_data.get('Value', {})
+                home_player = value.get('O1')
+                away_player = value.get('O2')
+                start_timestamp = value.get('S')
+                
+                if not home_player or not away_player or not start_timestamp:
                     continue
                     
-                try:
-                    value = match_data.get('Value', {})
-                    home_player = value.get('O1')
-                    away_player = value.get('O2')
-                    start_timestamp = value.get('S')
-                    
-                    if not home_player or not away_player or not start_timestamp:
-                        continue
-                        
-                    start_time = datetime.fromtimestamp(start_timestamp)
-                    game_events = value.get('GE', [])
-                    
-                    for event in game_events:
-                        # Winner/Loser market (1/2)
-                        if event.get('G') == 1 and event.get('GS') == 1:
-                            odds = event.get('E', [])
-                            if len(odds) >= 2:  # Tennis has only 2 outcomes (no draw)
-                                odd1 = odds[0][0].get('C') if odds[0] else None
-                                odd2 = odds[1][0].get('C') if odds[1] else None
-                                
-                                if odd1 and odd2:
-                                    matches_to_insert.append((
-                                        home_player, away_player, 7, 1, 1,  # 7 for tennis, 1 for market type
-                                        0, odd1, odd2, 0, start_time
-                                    ))
+                start_time = datetime.fromtimestamp(start_timestamp)
+                game_events = value.get('GE', [])
                 
-                except Exception as e:
-                    print(f"Error processing match data: {e}")
+                for event in game_events:
+                    # Winner market (1/2)
+                    if event.get('G') == 1 and event.get('GS') == 1:
+                        odds = event.get('E', [])
+                        if len(odds) >= 2:  # Tennis has only 2 outcomes (no draw)
+                            odd1 = odds[0][0].get('C') if odds[0] else None
+                            odd2 = odds[1][0].get('C') if odds[1] else None
+                            
+                            if odd1 and odd2:
+                                matches_to_insert.append((
+                                    home_player, 
+                                    away_player, 
+                                    6,  # 1xBet ID
+                                    3,  # Tennis sport ID
+                                    1,  # Winner market type
+                                    0,  # No margin
+                                    float(odd1), 
+                                    float(odd2), 
+                                    0,  # No third odd
+                                    start_time
+                                ))
+                
+            except Exception as e:
+                print(f"Error processing match data: {e}")
     
     except Exception as e:
         print(f"Error in async operations: {e}")

@@ -1,15 +1,47 @@
-import aiohttp
+import cloudscraper
 import asyncio
 import json
 from datetime import datetime
 import sys
 from pathlib import Path
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
-async def fetch_league_matches(session, league):
+# Modify the scraper configuration
+scraper = cloudscraper.create_scraper(
+    browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'mobile': False
+    },
+    delay=1,  # Reduced from 2 to 1
+    interpreter='nodejs'  # Often faster than default
+)
+
+# Add connection pooling and reuse
+scraper.headers.update({
+    'Connection': 'keep-alive',
+    'Keep-Alive': 'timeout=60',
+})
+
+async def fetch_with_cloudscraper(url, params=None):
+    """Helper function to make async requests using cloudscraper"""
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=10) as executor:  # Limit concurrent requests
+        try:
+            response = await loop.run_in_executor(
+                executor,
+                lambda: scraper.get(url, params=params, timeout=20)  # Reduced timeout
+            )
+            return response.json()
+        except Exception as e:
+            print(f"Error fetching {url}: {e}")
+            return None
+
+async def fetch_league_matches(league):
     url = "https://1xbet.rs/service-api/LineFeed/Get1x2_VZip"
     params = {
         "sports": "1",
@@ -22,11 +54,12 @@ async def fetch_league_matches(session, league):
         "virtualSports": "true"
     }
     
-    async with session.get(url, params=params) as response:
-        data = await response.json()
+    data = await fetch_with_cloudscraper(url, params)
+    if data:
         return [item['N'] for item in data.get('Value', []) if 'N' in item]
+    return []
 
-async def fetch_match_details(session, match_id):
+async def fetch_match_details(match_id):
     match_url = "https://1xbet.rs/service-api/LineFeed/GetGameZip"
     match_params = {
         "id": str(match_id),
@@ -40,8 +73,7 @@ async def fetch_match_details(session, match_id):
         "marketType": "1"
     }
     
-    async with session.get(match_url, params=match_params) as response:
-        return await response.json()
+    return await fetch_with_cloudscraper(match_url, match_params)
 
 async def fetch_1xbet_data_async():
     leagues = [
@@ -85,143 +117,144 @@ async def fetch_1xbet_data_async():
     conn = get_db_connection()
     
     try:
-        async with aiohttp.ClientSession() as session:
-            # Fetch all match IDs concurrently
-            tasks = [fetch_league_matches(session, league) for league in leagues]
-            match_ids_lists = await asyncio.gather(*tasks)
-            match_ids = [id for sublist in match_ids_lists for id in sublist]
-            
-            # Fetch match details concurrently
-            tasks = [fetch_match_details(session, match_id) for match_id in match_ids]
-            match_details = await asyncio.gather(*tasks)
-            
-            # Process match details
-            for match_data in match_details:
-                try:
-                    value = match_data.get('Value', {})
-                    home_team = value.get('O1')
-                    away_team = value.get('O2')
-                    start_timestamp = value.get('S')
-                    
-                    if not home_team or not away_team or "Home" in home_team or "Away" in away_team:
-                        continue
-                    
-                    if not start_timestamp:
-                        continue
-                        
-                    start_time = datetime.fromtimestamp(start_timestamp)
-                    game_events = value.get('GE', [])
-                    
-                    for event in game_events:
-                        # Full time 1X2 market
-                        if event.get('G') == 1 and event.get('GS') == 1:
-                            odds = event.get('E', [])
-                            if odds:
-                                odd1 = odds[0][0].get('C') if odds[0] else None
-                                odd2 = odds[1][0].get('C') if odds[1] else None
-                                odd3 = odds[2][0].get('C') if odds[2] else None
-                                
-                                matches_to_insert.append((
-                                    home_team, away_team, 6, 1, 2,
-                                    0, odd1, odd2, odd3, start_time
-                                ))
-                        
-                        # Both Teams To Score market (GGNG)
-                        if event.get('G') == 19 and event.get('GS') == 21:
-                            odds = event.get('E', [])
-                            if odds:
-                                yes_odd = odds[0][0].get('C') if odds[0] else None
-                                no_odd = odds[1][0].get('C') if odds[1] else None
-                                
-                                matches_to_insert.append((
-                                    home_team, away_team, 6, 1, 8,
-                                    0, yes_odd, no_odd, 0, start_time
-                                ))
-                        
-                        # First Half 1X2 market
-                        if event.get('G') == 3007 and event.get('GS') == 1075:
-                            odds = event.get('E', [])
-                            if odds:
-                                odd1 = odds[0][0].get('C') if odds[0] else None
-                                odd2 = odds[1][0].get('C') if odds[1] else None
-                                odd3 = odds[2][0].get('C') if odds[2] else None
-                                
-                                matches_to_insert.append((
-                                    home_team, away_team, 6, 1, 3,
-                                    0, odd1, odd2, odd3, start_time
-                                ))
-                        
-                        # Total Goals market (Full match)
-                        if event.get('G') == 17 and event.get('GS') == 4:
-                            odds = event.get('E', [])
-                            if len(odds) >= 2:
-                                over_odds = odds[0]
-                                under_odds = odds[1]
-                                
-                                for i in range(len(over_odds)):
-                                    over_bet = over_odds[i]
-                                    if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
-                                        margin = over_bet.get('P')
-                                        over_odd = over_bet.get('C')
-                                        
-                                        for under_bet in under_odds:
-                                            if under_bet.get('P') == margin:
-                                                under_odd = under_bet.get('C')
-                                                
-                                                matches_to_insert.append((
-                                                    home_team, away_team, 6, 1, 5,
-                                                    margin, under_odd, over_odd, 0, start_time
-                                                ))
-                                                break
-                        
-                        # First Half Total Goals
-                        if event.get('G') == 15 and event.get('GS') == 5:
-                            odds = event.get('E', [])
-                            if len(odds) >= 2:
-                                over_odds = odds[0]
-                                under_odds = odds[1]
-                                
-                                for i in range(len(over_odds)):
-                                    over_bet = over_odds[i]
-                                    if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
-                                        margin = over_bet.get('P')
-                                        over_odd = over_bet.get('C')
-                                        
-                                        for under_bet in under_odds:
-                                            if under_bet.get('P') == margin:
-                                                under_odd = under_bet.get('C')
-                                                
-                                                matches_to_insert.append((
-                                                    home_team, away_team, 6, 1, 6,
-                                                    margin, under_odd, over_odd, 0, start_time
-                                                ))
-                                                break
-                        
-                        # Second Half Total Goals
-                        if event.get('G') == 62 and event.get('GS') == 6:
-                            odds = event.get('E', [])
-                            if len(odds) >= 2:
-                                over_odds = odds[0]
-                                under_odds = odds[1]
-                                
-                                for i in range(len(over_odds)):
-                                    over_bet = over_odds[i]
-                                    if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
-                                        margin = over_bet.get('P')
-                                        over_odd = over_bet.get('C')
-                                        
-                                        for under_bet in under_odds:
-                                            if under_bet.get('P') == margin:
-                                                under_odd = under_bet.get('C')
-                                                
-                                                matches_to_insert.append((
-                                                    home_team, away_team, 6, 1, 7,
-                                                    margin, under_odd, over_odd, 0, start_time
-                                                ))
-                                                break
+        # Fetch all match IDs concurrently
+        tasks = [fetch_league_matches(league) for league in leagues]
+        match_ids_lists = await asyncio.gather(*tasks)
+        match_ids = [id for sublist in match_ids_lists for id in sublist if id]
+        
+        # Fetch match details concurrently
+        tasks = [fetch_match_details(match_id) for match_id in match_ids]
+        match_details = await asyncio.gather(*tasks)
+        
+        # Process match details
+        for match_data in match_details:
+            if not match_data:
+                continue
+            try:
+                value = match_data.get('Value', {})
+                home_team = value.get('O1')
+                away_team = value.get('O2')
+                start_timestamp = value.get('S')
                 
-                except Exception as e:
-                    print(f"Error processing match data: {e}")
+                if not home_team or not away_team or "Home" in home_team or "Away" in away_team:
+                    continue
+                
+                if not start_timestamp:
+                    continue
+                    
+                start_time = datetime.fromtimestamp(start_timestamp)
+                game_events = value.get('GE', [])
+                
+                for event in game_events:
+                    # Full time 1X2 market
+                    if event.get('G') == 1 and event.get('GS') == 1:
+                        odds = event.get('E', [])
+                        if odds:
+                            odd1 = odds[0][0].get('C') if odds[0] else None
+                            odd2 = odds[1][0].get('C') if odds[1] else None
+                            odd3 = odds[2][0].get('C') if odds[2] else None
+                            
+                            matches_to_insert.append((
+                                home_team, away_team, 6, 1, 2,
+                                0, odd1, odd2, odd3, start_time
+                            ))
+                    
+                    # Both Teams To Score market (GGNG)
+                    if event.get('G') == 19 and event.get('GS') == 21:
+                        odds = event.get('E', [])
+                        if odds:
+                            yes_odd = odds[0][0].get('C') if odds[0] else None
+                            no_odd = odds[1][0].get('C') if odds[1] else None
+                            
+                            matches_to_insert.append((
+                                home_team, away_team, 6, 1, 8,
+                                0, yes_odd, no_odd, 0, start_time
+                            ))
+                    
+                    # First Half 1X2 market
+                    if event.get('G') == 3007 and event.get('GS') == 1075:
+                        odds = event.get('E', [])
+                        if odds:
+                            odd1 = odds[0][0].get('C') if odds[0] else None
+                            odd2 = odds[1][0].get('C') if odds[1] else None
+                            odd3 = odds[2][0].get('C') if odds[2] else None
+                            
+                            matches_to_insert.append((
+                                home_team, away_team, 6, 1, 3,
+                                0, odd1, odd2, odd3, start_time
+                            ))
+                    
+                    # Total Goals market (Full match)
+                    if event.get('G') == 17 and event.get('GS') == 4:
+                        odds = event.get('E', [])
+                        if len(odds) >= 2:
+                            over_odds = odds[0]
+                            under_odds = odds[1]
+                            
+                            for i in range(len(over_odds)):
+                                over_bet = over_odds[i]
+                                if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
+                                    margin = over_bet.get('P')
+                                    over_odd = over_bet.get('C')
+                                    
+                                    for under_bet in under_odds:
+                                        if under_bet.get('P') == margin:
+                                            under_odd = under_bet.get('C')
+                                            
+                                            matches_to_insert.append((
+                                                home_team, away_team, 6, 1, 5,
+                                                margin, under_odd, over_odd, 0, start_time
+                                            ))
+                                            break
+                    
+                    # First Half Total Goals
+                    if event.get('G') == 15 and event.get('GS') == 5:
+                        odds = event.get('E', [])
+                        if len(odds) >= 2:
+                            over_odds = odds[0]
+                            under_odds = odds[1]
+                            
+                            for i in range(len(over_odds)):
+                                over_bet = over_odds[i]
+                                if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
+                                    margin = over_bet.get('P')
+                                    over_odd = over_bet.get('C')
+                                    
+                                    for under_bet in under_odds:
+                                        if under_bet.get('P') == margin:
+                                            under_odd = under_bet.get('C')
+                                            
+                                            matches_to_insert.append((
+                                                home_team, away_team, 6, 1, 6,
+                                                margin, under_odd, over_odd, 0, start_time
+                                            ))
+                                            break
+                    
+                    # Second Half Total Goals
+                    if event.get('G') == 62 and event.get('GS') == 6:
+                        odds = event.get('E', [])
+                        if len(odds) >= 2:
+                            over_odds = odds[0]
+                            under_odds = odds[1]
+                            
+                            for i in range(len(over_odds)):
+                                over_bet = over_odds[i]
+                                if over_bet.get('P') and str(over_bet.get('P')).endswith('.5'):
+                                    margin = over_bet.get('P')
+                                    over_odd = over_bet.get('C')
+                                    
+                                    for under_bet in under_odds:
+                                        if under_bet.get('P') == margin:
+                                            under_odd = under_bet.get('C')
+                                            
+                                            matches_to_insert.append((
+                                                home_team, away_team, 6, 1, 7,
+                                                margin, under_odd, over_odd, 0, start_time
+                                            ))
+                                            break
+                
+            except Exception as e:
+                print(f"Error processing match data: {e}")
     
     except Exception as e:
         print(f"Error in async operations: {e}")

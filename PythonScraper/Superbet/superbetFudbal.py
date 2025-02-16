@@ -4,6 +4,10 @@ import json
 from datetime import datetime, timedelta
 import csv
 import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from database_utils import get_db_connection, batch_insert_matches
 
 
 def fetch_single_competition(competition_id):
@@ -132,7 +136,9 @@ def fetch_event_odds(event_id):
         match_date = match_data.get("matchDate", "")
 
         teams = match_name.split("·")
-        match_name = ",".join(team.strip() for team in teams)
+        team1, team2 = [team.strip() for team in teams]
+
+        matches_to_insert = []
 
         # Initialize odds dictionaries for all markets
         markets = {
@@ -184,33 +190,106 @@ def fetch_event_odds(event_id):
                     elif "Više" in odd.get("name", ""):
                         markets["TGS"][margin]["over"] = price
 
-        # Prepare the return data
-        result = {
-            "match": match_name,
-            "market_1x2": "1X2",
-            "odds_1": markets["1X2"]["1"],
-            "odds_x": markets["1X2"]["X"],
-            "odds_2": markets["1X2"]["2"],
-            "market_1x2f": "1X2F",
-            "odds_1f": markets["1X2F"]["1"],
-            "odds_xf": markets["1X2F"]["X"],
-            "odds_2f": markets["1X2F"]["2"],
-            "market_1x2s": "1X2S",
-            "odds_1s": markets["1X2S"]["1"],
-            "odds_xs": markets["1X2S"]["X"],
-            "odds_2s": markets["1X2S"]["2"],
-            "market_ggng": "GGNG",
-            "odds_gg": markets["GGNG"]["GG"],
-            "odds_ng": markets["GGNG"]["NG"],
-            "total_goals": markets["TG"],
-            "total_goals_first": markets["TGF"],
-            "total_goals_second": markets["TGS"],
-            "time": match_date,
-        }
-        
+        # Add matches to insert list for each market type
         if all(markets["1X2"].values()):
-            return result
-        return None
+            matches_to_insert.append((
+                team1, team2,
+                7,  # Superbet
+                1,  # Football
+                2,  # 1X2
+                0,  # No margin
+                float(markets["1X2"]["1"]),
+                float(markets["1X2"]["X"]),
+                float(markets["1X2"]["2"]),
+                match_date
+            ))
+
+        if all(markets["1X2F"].values()):
+            matches_to_insert.append((
+                team1, team2,
+                7,  # Superbet
+                1,  # Football
+                3,  # First Half 1X2
+                0,  # No margin
+                float(markets["1X2F"]["1"]),
+                float(markets["1X2F"]["X"]),
+                float(markets["1X2F"]["2"]),
+                match_date
+            ))
+
+        if all(markets["1X2S"].values()):
+            matches_to_insert.append((
+                team1, team2,
+                7,  # Superbet
+                1,  # Football
+                4,  # Second Half 1X2
+                0,  # No margin
+                float(markets["1X2S"]["1"]),
+                float(markets["1X2S"]["X"]),
+                float(markets["1X2S"]["2"]),
+                match_date
+            ))
+
+        if all(markets["GGNG"].values()):
+            matches_to_insert.append((
+                team1, team2,
+                7,  # Superbet
+                1,  # Football
+                8,  # GGNG
+                0,  # No margin
+                float(markets["GGNG"]["GG"]),
+                float(markets["GGNG"]["NG"]),
+                0,  # No third odd
+                match_date
+            ))
+
+        # Add Total Goals markets
+        for margin, odds in markets["TG"].items():
+            if all(odds.values()):
+                matches_to_insert.append((
+                    team1, team2,
+                    7,  # Superbet
+                    1,  # Football
+                    5,  # Total Goals
+                    float(margin),
+                    float(odds["under"]),
+                    float(odds["over"]),
+                    0,  # No third odd
+                    match_date
+                ))
+
+        # Add First Half Total Goals
+        for margin, odds in markets["TGF"].items():
+            if all(odds.values()):
+                matches_to_insert.append((
+                    team1, team2,
+                    7,  # Superbet
+                    1,  # Football
+                    6,  # First Half Total
+                    float(margin),
+                    float(odds["under"]),
+                    float(odds["over"]),
+                    0,  # No third odd
+                    match_date
+                ))
+
+        # Add Second Half Total Goals
+        for margin, odds in markets["TGS"].items():
+            if all(odds.values()):
+                matches_to_insert.append((
+                    team1, team2,
+                    
+                    7,  # Superbet
+                    1,  # Football
+                    7,  # Second Half Total
+                    float(margin),
+                    float(odds["under"]),
+                    float(odds["over"]),
+                    0,  # No third odd
+                    match_date
+                ))
+
+        return matches_to_insert
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching odds for event {event_id}: {e}")
@@ -299,52 +378,55 @@ def update_csv_file(matches_data):
 
 if __name__ == "__main__":
     start_total = time.time()
+    conn = get_db_connection()
+    all_matches_to_insert = []
 
-    # First fetch Axilis tournament IDs
-    axilis_ids = fetch_axilis_tournament_ids()
-    print(f"Found {len(axilis_ids)} tournament IDs")
+    try:
+        # First fetch Axilis tournament IDs
+        axilis_ids = fetch_axilis_tournament_ids()
+        print(f"Found {len(axilis_ids)} tournament IDs")
 
-    if axilis_ids:
-        # Then use those IDs to fetch event IDs
-        print("Fetching event IDs...")
-        start_time = time.time()
-        event_ids = fetch_event_ids(axilis_ids)
-        print(
-            f"Found {len(event_ids)} events in {time.time() - start_time:.2f} seconds"
-        )
-
-        if event_ids:
-            # Fetch odds for each event in parallel
-            print("Fetching odds for all events...")
+        if axilis_ids:
+            # Then use those IDs to fetch event IDs
+            print("Fetching event IDs...")
             start_time = time.time()
-            matches_data = []
+            event_ids = fetch_event_ids(axilis_ids)
+            print(f"Found {len(event_ids)} events in {time.time() - start_time:.2f} seconds")
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                future_to_event = {
-                    executor.submit(fetch_single_event, event_id): event_id
-                    for event_id in event_ids
-                }
-
-                for future in concurrent.futures.as_completed(future_to_event):
-                    event_id = future_to_event[future]
-                    try:
-                        match_odds = future.result()
-                        if match_odds:
-                            matches_data.append(match_odds)
-                    except Exception as e:
-                        print(f"Error processing event {event_id}: {e}")
-
-            print(
-                f"Fetched odds for {len(matches_data)} matches in {time.time() - start_time:.2f} seconds"
-            )
-
-            # Update the CSV file with the new data
-            if matches_data:
-                print("Writing to CSV...")
+            if event_ids:
+                # Fetch odds for each event in parallel
+                print("Fetching odds for all events...")
                 start_time = time.time()
-                update_csv_file(matches_data)
-                print(f"CSV written in {time.time() - start_time:.2f} seconds")
-            else:
-                print("No valid matches data found")
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                    future_to_event = {
+                        executor.submit(fetch_single_event, event_id): event_id
+                        for event_id in event_ids
+                    }
+
+                    for future in concurrent.futures.as_completed(future_to_event):
+                        event_id = future_to_event[future]
+                        try:
+                            matches = future.result()
+                            if matches:
+                                all_matches_to_insert.extend(matches)
+                        except Exception as e:
+                            print(f"Error processing event {event_id}: {e}")
+
+                print(f"Fetched odds for {len(all_matches_to_insert)} matches in {time.time() - start_time:.2f} seconds")
+
+                # Insert into database
+                if all_matches_to_insert:
+                    print("Inserting into database...")
+                    start_time = time.time()
+                    batch_insert_matches(conn, all_matches_to_insert)
+                    print(f"Database insertion completed in {time.time() - start_time:.2f} seconds")
+                else:
+                    print("No valid matches data found")
+
+    except Exception as e:
+        print(f"Error in main execution: {e}")
+    finally:
+        conn.close()
 
     print(f"Total execution time: {time.time() - start_total:.2f} seconds")
