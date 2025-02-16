@@ -6,13 +6,25 @@ import pandas as pd
 load_dotenv()
 
 def get_db_connection():
-    conn = pyodbc.connect(
-        'DRIVER={SQL Server};'
-        'SERVER=195.178.52.110;'
-        'DATABASE=ArbitrageBetting;'
-        'UID=admin;'
-        f'PWD={os.getenv("DB_PASSWORD")};'
-    )
+    try:
+        # For Windows
+        conn = pyodbc.connect(
+            'DRIVER={SQL Server};'
+            'SERVER=195.178.52.110;'
+            'DATABASE=ArbitrageBetting;'
+            'UID=admin;'
+            f'PWD={os.getenv("DB_PASSWORD")};'
+        )
+    except:
+        # For Mac OS
+        conn = pyodbc.connect(
+            'DRIVER={ODBC Driver 18 for SQL Server};'  # Note the different driver name
+            'SERVER=195.178.52.110;'
+            'DATABASE=ArbitrageBetting;'
+            'UID=admin;'
+            f'PWD={os.getenv("DB_PASSWORD")};'
+            'TrustServerCertificate=yes;'  # Added for SSL/TLS
+        )
     return conn
 
 def insert_match(conn, team_home, team_away, bookmaker_id, sport_id, bet_type_id, 
