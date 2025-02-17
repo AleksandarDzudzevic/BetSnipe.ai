@@ -56,6 +56,14 @@ def fetch_event_odds(event_id):
         team1, team2 = [team.strip() for team in teams]
 
         matches_to_insert = []
+        current_match = {
+            'team1': team1,
+            'team2': team2,
+            'match_date': match_date,
+            'home_odd': 0,
+            'away_odd': 0,
+            'margin': 0
+        }
 
         for odd in match_data.get("odds", []):
             market_name = odd.get("marketName")
@@ -66,77 +74,75 @@ def fetch_event_odds(event_id):
             # Match Winner
             if market_name == "Pobednik (uklj. produžetke)" and code in ["1", "2"]:
                 if code == "1":
-                    home_odd = price
+                    current_match['home_odd'] = float(price)
                 elif code == "2":
-                    away_odd = price
+                    current_match['away_odd'] = float(price)
+                    # Only append when we have both odds
+                    if current_match['home_odd'] != 0:
+                        matches_to_insert.append((
+                            current_match['team1'],
+                            current_match['team2'],
+                            7,  # Superbet
+                            2,  # Basketball
+                            1,  # Winner market
+                            0,  # No margin
+                            current_match['home_odd'],
+                            current_match['away_odd'],
+                            0,  # No third odd
+                            current_match['match_date']
+                        ))
+
+            # Total Points
+            elif market_name == "Ukupno poena (uklj. produžetke)":
+                current_total = {
+                    'margin': float(margin) if margin else 0,
+                    'over_odd': 0,
+                    'under_odd': 0
+                }
+                if "+" in code:
+                    current_total['over_odd'] = float(price)
+                elif "-" in code:
+                    current_total['under_odd'] = float(price)
+                
+                # Only append when we have both odds
+                if current_total['over_odd'] != 0 and current_total['under_odd'] != 0:
                     matches_to_insert.append((
                         team1, team2,
                         7,  # Superbet
                         2,  # Basketball
-                        1,  # Winner market
-                        0,  # No margin
-                        float(home_odd),
-                        float(away_odd),
+                        5,  # Total Points
+                        current_total['margin'],
+                        current_total['under_odd'],
+                        current_total['over_odd'],
                         0,  # No third odd
                         match_date
                     ))
 
-            # Total Points
-            elif market_name == "Ukupno poena (uklj. produžetke)":
-                if margin:
-                    if "+" in code:
-                        over_odd = price
-                        matches_to_insert.append((
-                            team1, team2,
-                            7,  # Superbet
-                            2,  # Basketball
-                            5,  # Total Points
-                            float(margin),
-                            0,  # Under (placeholder)
-                            float(over_odd),
-                            0,  # No third odd
-                            match_date
-                        ))
-                    elif "-" in code:
-                        under_odd = price
-                        matches_to_insert.append((
-                            team1, team2,
-                            7,  # Superbet
-                            2,  # Basketball
-                            5,  # Total Points
-                            float(margin),
-                            float(under_odd),
-                            0,  # Over (placeholder)
-                            0,  # No third odd
-                            match_date
-                        ))
-
             # Handicap
             elif market_name == "Hendikep poena (uklj. produžetke)":
                 if margin:
+                    margin_key = float(margin)
+                    if 'handicap_odds' not in locals():
+                        handicap_odds = {}
+                    
+                    if margin_key not in handicap_odds:
+                        handicap_odds[margin_key] = {'home_odd': 0, 'away_odd': 0}
+                    
                     if code == "1":
-                        home_odd = price
-                        matches_to_insert.append((
-                            team1, team2,
-                            7,  # Superbet
-                            2,  # Basketball
-                            9,  # Handicap
-                            float(margin),
-                            float(home_odd),
-                            0,  # Away odd (placeholder)
-                            0,  # No third odd
-                            match_date
-                        ))
+                        handicap_odds[margin_key]['home_odd'] = float(price)
                     elif code == "2":
-                        away_odd = price
+                        handicap_odds[margin_key]['away_odd'] = float(price)
+                        
+                    # Only append when we have both odds for this margin
+                    if handicap_odds[margin_key]['home_odd'] != 0 and handicap_odds[margin_key]['away_odd'] != 0:
                         matches_to_insert.append((
                             team1, team2,
                             7,  # Superbet
                             2,  # Basketball
                             9,  # Handicap
-                            float(margin),
-                            0,  # Home odd (placeholder)
-                            float(away_odd),
+                            margin_key,
+                            handicap_odds[margin_key]['home_odd'],
+                            handicap_odds[margin_key]['away_odd'],
                             0,  # No third odd
                             match_date
                         ))

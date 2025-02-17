@@ -108,8 +108,8 @@ async def fetch_maxbet_tennis_matches():
                             3,  # Tennis
                             1,  # Winner
                             0,  # No margin
-                            float(home_win),
                             float(away_win),
+                            float(home_win),
                             0,  # No third odd
                             kick_off_time
                         ))
@@ -126,8 +126,8 @@ async def fetch_maxbet_tennis_matches():
                             3,  # Tennis
                             11,  # First Set Winner
                             0,  # No margin
-                            float(first_set_home),
                             float(first_set_away),
+                            float(first_set_home),
                             0,  # No third odd
                             kick_off_time
                         ))

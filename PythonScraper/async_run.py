@@ -28,7 +28,7 @@ def get_all_scripts():
         base_path / "Meridian/meridianKosarka.py",
         base_path / "Meridian/meridianHokej.py",
         # Maxbet scripts
-        base_path / "Maxbet/maxbetTenis.py",
+       # base_path / "Maxbet/maxbetTenis.py",
         base_path / "Maxbet/maxbetStoniTenis.py",
         base_path / "Maxbet/maxbetFudbal.py",
         base_path / "Maxbet/maxbetKosarka.py",
