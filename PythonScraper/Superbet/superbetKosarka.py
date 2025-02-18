@@ -160,9 +160,6 @@ def main():
     all_matches_to_insert = []
 
     try:
-        # Fetch matches data
-        print("Fetching matches data...")
-        start_time = time.time()
         event_ids = fetch_event_ids()
         
         if event_ids:
@@ -181,14 +178,9 @@ def main():
                     except Exception as e:
                         print(f"Error processing event {event_id}: {e}")
 
-            print(f"Found {len(all_matches_to_insert)} matches in {time.time() - start_time:.2f} seconds")
-
             # Insert into database
             if all_matches_to_insert:
-                print("Inserting into database...")
-                start_time = time.time()
                 batch_insert_matches(conn, all_matches_to_insert)
-                print(f"Database insertion completed in {time.time() - start_time:.2f} seconds")
             else:
                 print("No valid matches data found")
 
@@ -196,8 +188,6 @@ def main():
         print(f"Error in main execution: {e}")
     finally:
         conn.close()
-
-    print(f"Total execution time: {time.time() - start_total:.2f} seconds")
 
 
 if __name__ == "__main__":

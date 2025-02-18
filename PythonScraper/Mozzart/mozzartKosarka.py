@@ -225,25 +225,62 @@ async def process_league(session, league_id, league_name, matches_to_insert, pro
 
     await asyncio.gather(*[process_match(match_id) for match_id in match_ids])
 
+async def get_basketball_leagues(session):
+    """Fetch current basketball leagues from Mozzart"""
+    try:
+        url = 'https://www.mozzartbet.com/betting/get-competitions'
+        payload = {
+            "sportId": 2,  # 2 for basketball (instead of 5 for tennis)
+            "date": "all_days",
+            "type": "prematch"
+        }
+        
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US,en;q=0.7',
+            'Content-Type': 'application/json',
+            'Origin': 'https://www.mozzartbet.com',
+            'Referer': 'https://www.mozzartbet.com/sr/kladjenje',
+            'Sec-Ch-Ua': '"Not(A:Brand";v="99", "Brave";v="133", "Chromium";v="133"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'Medium': 'WEB'
+        }
+        
+        async with session.post(url, json=payload, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                leagues = []
+                for competition in data.get("competitions", []):
+                    league_id = competition.get("id")
+                    league_name = competition.get("name")
+                    if league_id and league_name:
+                        leagues.append((league_id, league_name))
+                return leagues
+        return []
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return []
+
 async def scrape_all_matches():
     try:
         conn = get_db_connection()
         matches_to_insert = []
         processed_matches = set()
 
-        leagues = [
-            (23, "NBA"),
-            (26, "Evroliga"),
-            (1147, "Evrokup"),
-            (1699, "ABA Liga"),
-            (1615, "Nemacka Liga"),
-            (1680, "Grcka Liga"),
-            (1656, "Italijanska Liga"),
-            (2374, "Argentinska Liga"),
-            (1729, "Australijska Liga"),
-        ]
-
         async with aiohttp.ClientSession() as session:
+            # Get basketball leagues
+            leagues = await get_basketball_leagues(session)
+            
+            if not leagues:
+                print("No leagues found")
+                return
+
             # Process leagues concurrently
             await asyncio.gather(*[
                 process_league(session, league_id, league_name, matches_to_insert, processed_matches)

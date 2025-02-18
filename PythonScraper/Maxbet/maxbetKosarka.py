@@ -9,12 +9,10 @@ import time
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
-BASKETBALL_LEAGUES = {"nba": "144532", "euroleague": "131600", "eurocup": "131596"}
-
 headers = {
-    "Accept": "application/json, text/plain, */*",
+    "Accept": "*/*",
     "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Origin": "https://www.maxbet.rs",
     "Referer": "https://www.maxbet.rs/betting",
 }
@@ -36,10 +34,31 @@ async def fetch_league_matches(session, league_id, params):
     async with session.get(url, params=params, headers=headers) as response:
         return await response.json()
 
+async def fetch_basketball_leagues(session):
+    """Fetch current basketball leagues from MaxBet"""
+    url = "https://www.maxbet.rs/restapi/offer/sr/categories/sport/B/l"
+    params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
+    
+    try:
+        async with session.get(url, params=params, headers=headers) as response:
+            data = await response.json()
+            leagues = {}
+            
+            for category in data.get('categories', []):
+                league_id = category.get('id')
+                league_name = category.get('name')
+                if league_id and league_name:
+                    leagues[league_name.lower().replace(" ", "_")] = league_id
+            
+            return leagues
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return {}
+
 async def fetch_maxbet_matches():
     matches_to_insert = []
     conn = get_db_connection()
-    params = {"annex": "3", "desktopVersion": "1.2.1.9", "locale": "sr"}
+    params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
     
     # Updated handicap mapping
     handicap_mapping = {
@@ -64,8 +83,15 @@ async def fetch_maxbet_matches():
     
     try:
         async with aiohttp.ClientSession() as session:
+            # First get the leagues
+            basketball_leagues = await fetch_basketball_leagues(session)
+            
+            if not basketball_leagues:
+                print("No leagues found")
+                return
+            
             league_tasks = []
-            for league_name, league_id in BASKETBALL_LEAGUES.items():
+            for league_name, league_id in basketball_leagues.items():
                 league_tasks.append(fetch_league_matches(session, league_id, params))
             
             leagues_data = await asyncio.gather(*league_tasks)
@@ -150,7 +176,7 @@ async def fetch_maxbet_matches():
                     pass
     
     except Exception as e:
-        pass
+        print(f"Error in async operations: {e}")
     
     try:
         batch_insert_matches(conn, matches_to_insert)

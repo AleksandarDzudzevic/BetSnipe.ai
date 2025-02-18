@@ -9,19 +9,6 @@ import time
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
-DESIRED_LEAGUES = {
-    "NBA",
-    "NCAA",
-    "Evroliga",
-    "Evrokup",
-    "ABA Liga",  # ABA League
-    "ACB Liga",  # Spain
-    "BBL Liga",  # Germany
-    "LNB Pro A",  # France
-    "A1 Liga",  # Greece
-    "Lega A",  # Italy
-}
-
 
 def get_auth_token():
     try:
@@ -132,125 +119,123 @@ def get_basketball_odds():
 
                     found_matches = False
                     for league in leagues:
-                        league_name = league.get("leagueName", "")
-                        if any(desired in league_name for desired in DESIRED_LEAGUES):
-                            events = league.get("events", [])
-                            for event in events:
-                                found_matches = True
-                                event_id = event.get("header", {}).get("eventId")
-                                rivals = event.get("header", {}).get("rivals", [])
-                                start_time = convert_unix_to_iso(event.get("header", {}).get("startTime", 0))  # Get and convert start time
+                        events = league.get("events", [])
+                        for event in events:
+                            found_matches = True
+                            event_id = event.get("header", {}).get("eventId")
+                            rivals = event.get("header", {}).get("rivals", [])
+                            start_time = convert_unix_to_iso(event.get("header", {}).get("startTime", 0))  # Get and convert start time
 
-                                if event_id and len(rivals) >= 2:
-                                    market_data = get_markets_for_event(event_id, token)
-                                    if market_data:
-                                        team1, team2 = rivals[0], rivals[1]
-                                        odds_12 = None
-                                        odds_total = []  # For different total lines
-                                        odds_handicap = []  # For different handicap lines
+                            if event_id and len(rivals) >= 2:
+                                market_data = get_markets_for_event(event_id, token)
+                                if market_data:
+                                    team1, team2 = rivals[0], rivals[1]
+                                    odds_12 = None
+                                    odds_total = []  # For different total lines
+                                    odds_handicap = []  # For different handicap lines
 
-                                        for market_group in market_data:
-                                            market_name = market_group.get("marketName")
-                                            if market_name == "Pobednik (uklj.OT )":
-                                                for market in market_group.get("markets", []):
-                                                    selections = market.get("selections", [])
-                                                    if len(selections) >= 2:
-                                                        odds_12 = {
+                                    for market_group in market_data:
+                                        market_name = market_group.get("marketName")
+                                        if market_name == "Pobednik (uklj.OT )":
+                                            for market in market_group.get("markets", []):
+                                                selections = market.get("selections", [])
+                                                if len(selections) >= 2:
+                                                    odds_12 = {
+                                                        "team1": team1,
+                                                        "team2": team2,
+                                                        "dateTime": start_time,  # Add datetime
+                                                        "marketType": "12",
+                                                        "odd1": selections[0].get("price"),
+                                                        "odd2": selections[1].get("price"),
+                                                    }
+
+                                        elif market_name == "Ukupno (uklj.OT) ":
+                                            for market in market_group.get("markets", []):
+                                                over_under = market.get("overUnder")
+                                                selections = market.get("selections", [])
+                                                if over_under and len(selections) >= 2:
+                                                    odds_total.append(
+                                                        {
                                                             "team1": team1,
                                                             "team2": team2,
                                                             "dateTime": start_time,  # Add datetime
-                                                            "marketType": "12",
-                                                            "odd1": selections[0].get("price"),
-                                                            "odd2": selections[1].get("price"),
+                                                            "marketType": f"{over_under}",
+                                                            "odd1": selections[1].get(
+                                                                "price"
+                                                            ),  # Over
+                                                            "odd2": selections[0].get(
+                                                                "price"
+                                                            ),  # Under
                                                         }
+                                                    )
 
-                                            elif market_name == "Ukupno (uklj.OT) ":
-                                                for market in market_group.get("markets", []):
-                                                    over_under = market.get("overUnder")
-                                                    selections = market.get("selections", [])
-                                                    if over_under and len(selections) >= 2:
-                                                        odds_total.append(
-                                                            {
-                                                                "team1": team1,
-                                                                "team2": team2,
-                                                                "dateTime": start_time,  # Add datetime
-                                                                "marketType": f"{over_under}",
-                                                                "odd1": selections[1].get(
-                                                                    "price"
-                                                                ),  # Over
-                                                                "odd2": selections[0].get(
-                                                                    "price"
-                                                                ),  # Under
-                                                            }
-                                                        )
+                                        elif market_name == "Hendikep (uklj. OT)":
+                                            for market in market_group.get("markets", []):
+                                                handicap = market.get("handicap")
+                                                selections = market.get("selections", [])
+                                                if (
+                                                    handicap is not None
+                                                    and len(selections) >= 2
+                                                ):
+                                                    odds_handicap.append(
+                                                        {
+                                                            "team1": team1,
+                                                            "team2": team2,
+                                                            "dateTime": start_time,  # Add datetime
+                                                            "marketType": f"H{handicap}",
+                                                            "odd1": selections[0].get(
+                                                                "price"
+                                                            ),  # Home
+                                                            "odd2": selections[1].get(
+                                                                "price"
+                                                            ),  # Away
+                                                        }
+                                                    )
 
-                                            elif market_name == "Hendikep (uklj. OT)":
-                                                for market in market_group.get("markets", []):
-                                                    handicap = market.get("handicap")
-                                                    selections = market.get("selections", [])
-                                                    if (
-                                                        handicap is not None
-                                                        and len(selections) >= 2
-                                                    ):
-                                                        odds_handicap.append(
-                                                            {
-                                                                "team1": team1,
-                                                                "team2": team2,
-                                                                "dateTime": start_time,  # Add datetime
-                                                                "marketType": f"H{handicap}",
-                                                                "odd1": selections[0].get(
-                                                                    "price"
-                                                                ),  # Home
-                                                                "odd2": selections[1].get(
-                                                                    "price"
-                                                                ),  # Away
-                                                            }
-                                                        )
+                                    if odds_12:
+                                        matches_data.append(odds_12)
+                                        matches_to_insert.append((
+                                            odds_12["team1"],
+                                            odds_12["team2"],
+                                            2,  # Meridian
+                                            2,  # Basketball
+                                            1,  # 12 (Winner)
+                                            0,  # No margin
+                                            float(odds_12["odd1"]),
+                                            float(odds_12["odd2"]),
+                                            0,  # No third odd
+                                            start_time
+                                        ))
 
-                                        if odds_12:
-                                            matches_data.append(odds_12)
-                                            matches_to_insert.append((
-                                                odds_12["team1"],
-                                                odds_12["team2"],
-                                                2,  # Meridian
-                                                2,  # Basketball
-                                                1,  # 12 (Winner)
-                                                0,  # No margin
-                                                float(odds_12["odd1"]),
-                                                float(odds_12["odd2"]),
-                                                0,  # No third odd
-                                                start_time
-                                            ))
+                                    for total in odds_total:
+                                        matches_data.append(total)
+                                        matches_to_insert.append((
+                                            total["team1"],
+                                            total["team2"],
+                                            2,  # Meridian
+                                            2,  # Basketball
+                                            10,  # Total Points
+                                            float(total["marketType"]),  # Points line as margin
+                                            float(total["odd1"]),
+                                            float(total["odd2"]),
+                                            0,  # No third odd
+                                            start_time
+                                        ))
 
-                                        for total in odds_total:
-                                            matches_data.append(total)
-                                            matches_to_insert.append((
-                                                total["team1"],
-                                                total["team2"],
-                                                2,  # Meridian
-                                                2,  # Basketball
-                                                10,  # Total Points
-                                                float(total["marketType"]),  # Points line as margin
-                                                float(total["odd1"]),
-                                                float(total["odd2"]),
-                                                0,  # No third odd
-                                                start_time
-                                            ))
-
-                                        for handicap in odds_handicap:
-                                            matches_data.append(handicap)
-                                            matches_to_insert.append((
-                                                handicap["team1"],
-                                                handicap["team2"],
-                                                2,  # Meridian
-                                                2,  # Basketball
-                                                9,  # Handicap
-                                                float(handicap["marketType"][1:]),  # Handicap line as margin
-                                                float(handicap["odd1"]),
-                                                float(handicap["odd2"]),
-                                                0,  # No third odd
-                                                start_time
-                                            ))
+                                    for handicap in odds_handicap:
+                                        matches_data.append(handicap)
+                                        matches_to_insert.append((
+                                            handicap["team1"],
+                                            handicap["team2"],
+                                            2,  # Meridian
+                                            2,  # Basketball
+                                            9,  # Handicap
+                                            float(handicap["marketType"][1:]),  # Handicap line as margin
+                                            float(handicap["odd1"]),
+                                            float(handicap["odd2"]),
+                                            0,  # No third odd
+                                            start_time
+                                        ))
 
                     if not found_matches:
                         should_continue = False

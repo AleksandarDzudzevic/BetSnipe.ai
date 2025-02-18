@@ -11,18 +11,6 @@ from database_utils import get_db_connection, batch_insert_matches
 url2 = "https://srboffer.admiralbet.rs/api/offer/getWebEventsSelections"
 url_odds = "https://srboffer.admiralbet.rs/api/offer/betsAndGroups"
 
-# Define all possible basketball competitions
-competitions = [
-    {"name": "ABA Liga", "competitionId": "114", "regionId": "123"},
-    {"name": "NBA", "competitionId": "12", "regionId": "122"},
-    {"name": "Nemacka Liga", "competitionId": "11", "regionId": "128"},
-    {"name": "Francuska Liga", "competitionId": "25", "regionId": "127"},
-    {"name": "Evroliga", "competitionId": "3060", "regionId": "123"},
-    {"name": "Evrokup", "competitionId": "135", "regionId": "123"},
-    {"name": "Italijanska Liga", "competitionId": "14", "regionId": "124"},
-    {"name": "Spanska Liga", "competitionId": "22", "regionId": "126"},
-]
-
 headers = {
     "Accept": "application/utf8+json, application/json;q=0.9, text/plain;q=0.8, /;q=0.7",
     "Accept-Encoding": "gzip, deflate",
@@ -59,18 +47,50 @@ async def fetch_matches(session, url2, competition, params):
     async with session.get(url2, params=params, headers=headers) as response:
         return await response.json()
 
+async def fetch_basketball_leagues(session):
+    """Fetch current basketball leagues from Admiral"""
+    url = "https://srboffer.admiralbet.rs/api/offer/webTree/null/true/true/true/2025-02-10T20:48:46.651/2030-02-10T20:48:16.000/false"
+    params = {"eventMappingTypes": ["1", "2", "3", "4", "5"]}
+    
+    try:
+        async with session.get(url, params=params, headers=headers) as response:
+            data = await response.json()
+            leagues = []
+            
+            # Find basketball in the sports list
+            for sport in data:
+                if sport.get("id") == 2:  # Basketball
+                    for region in sport.get("regions", []):
+                        for competition in region.get("competitions", []):
+                            leagues.append({
+                                "regionId": competition.get("regionId"),
+                                "competitionId": competition.get("competitionId"),
+                                "name": competition.get("competitionName"),
+                            })
+            return leagues
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return []
+
 async def fetch_admiral_basketball():
+    matches_to_insert = []
     conn = get_db_connection()
     
     try:
         async with aiohttp.ClientSession() as session:
+            # First get the leagues
+            competitions = await fetch_basketball_leagues(session)
+            
+            if not competitions:
+                print("No leagues found")
+                return
+            
             # Fetch matches for all competitions concurrently
-            matches_to_insert = []
             fetch_tasks = []
             for competition in competitions:
                 params = {
                     "pageId": "35",
-                    "sportId": "2",  # 2 is for basketball
+                    "sportId": "2",  # Basketball
                     "regionId": competition["regionId"],
                     "competitionId": competition["competitionId"],
                     "isLive": "false",
@@ -82,114 +102,106 @@ async def fetch_admiral_basketball():
             
             matches_data = await asyncio.gather(*fetch_tasks)
             
-            # Process matches and fetch odds concurrently
-            odds_tasks = []
+            # Process each match one at a time
             for comp_idx, matches in enumerate(matches_data):
                 competition = competitions[comp_idx]
                 for match in matches:
-                    if match.get("id") and match.get("name", "").count(" - ") == 1:
-                        odds_tasks.append(fetch_match_odds(session, url_odds, competition, match))
-            
-            odds_data = await asyncio.gather(*odds_tasks)
-            
-            # Process all the data
-            match_idx = 0
-            for comp_idx, matches in enumerate(matches_data):
-                competition = competitions[comp_idx]
-                for match in matches:
-                    if match.get("id") and match.get("name", "").count(" - ") == 1:
-                        try:
-                            team1, team2 = match["name"].split(" - ")
-                            match_datetime = match.get("dateTime", "")
+                    match_name = match.get("name", "")
+                    if " - " not in match_name:
+                        continue
+                        
+                    try:
+                        team1, team2 = match_name.split(" - ")
+                        match_datetime = match.get("dateTime", "")
+                        if match_datetime.endswith('Z'):
+                            match_datetime = match_datetime[:-1]
+                        
+                        # Fetch odds for this match
+                        odds_result = await fetch_match_odds(session, url_odds, competition, match)
+                        
+                        # Process bets
+                        if isinstance(odds_result, dict) and "bets" in odds_result:
+                            bets = odds_result["bets"]
                             
-                            # Ensure proper datetime format
-                            if match_datetime.endswith('Z'):
-                                match_datetime = match_datetime[:-1]
-                            
-                            odds_result = odds_data[match_idx]
-                            match_idx += 1
-                            
-                            if isinstance(odds_result, dict) and "bets" in odds_result:
-                                bets = odds_result["bets"]
+                            for bet in bets:
+                                bet_type_id = bet.get("betTypeId")
                                 
-                                for bet in bets:
-                                    bet_type_id = bet.get("betTypeId")
-                                    
-                                    # 1. Winner (12)
-                                    if bet_type_id == BET_TYPES["full_time_1x2"]:
-                                        outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
-                                        if len(outcomes) >= 2:
+                                # 1. Winner (12)
+                                if bet_type_id == BET_TYPES["full_time_1x2"]:
+                                    outcomes = sorted(bet["betOutcomes"], key=lambda x: x["orderNo"])
+                                    if len(outcomes) >= 2:
+                                        matches_to_insert.append((
+                                            team1,
+                                            team2,
+                                            4,              # bookmaker_id (Admiral)
+                                            2,              # sport_id (Basketball)
+                                            1,              # bet_type_id (12)
+                                            0,              # margin
+                                            float(outcomes[0]["odd"]),
+                                            float(outcomes[1]["odd"]),
+                                            0,              # no odd3 for basketball
+                                            match_datetime
+                                        ))
+
+                                # 2. Total Points
+                                elif bet_type_id == BET_TYPES["total_points"]:
+                                    totals = {}
+                                    for outcome in bet["betOutcomes"]:
+                                        total = outcome.get("sBV")
+                                        if total:
+                                            if total not in totals:
+                                                totals[total] = {}
+                                            if outcome["name"].lower() == "vise":
+                                                totals[total]["over"] = outcome["odd"]
+                                            elif outcome["name"].lower() == "manje":
+                                                totals[total]["under"] = outcome["odd"]
+
+                                    for total, odds in totals.items():
+                                        if "over" in odds and "under" in odds:
                                             matches_to_insert.append((
                                                 team1,
                                                 team2,
-                                                4,              # bookmaker_id (Admiral)
-                                                2,              # sport_id (Basketball)
-                                                1,              # bet_type_id (12)
-                                                0,              # margin
-                                                float(outcomes[0]["odd"]),
-                                                float(outcomes[1]["odd"]),
-                                                0,              # no odd3 for basketball
+                                                4,              # bookmaker_id
+                                                2,              # sport_id
+                                                10,             # bet_type_id (Total Points)
+                                                float(total),   # margin is the total
+                                                float(odds["under"]),
+                                                float(odds["over"]),
+                                                0,
                                                 match_datetime
                                             ))
 
-                                    # 2. Total Points
-                                    elif bet_type_id == BET_TYPES["total_points"]:
-                                        totals = {}
-                                        for outcome in bet["betOutcomes"]:
-                                            total = outcome.get("sBV")
-                                            if total:
-                                                if total not in totals:
-                                                    totals[total] = {}
-                                                if outcome["name"].lower() == "vise":
-                                                    totals[total]["over"] = outcome["odd"]
-                                                elif outcome["name"].lower() == "manje":
-                                                    totals[total]["under"] = outcome["odd"]
+                                # 3. Handicap
+                                elif bet_type_id == BET_TYPES["handicap"]:
+                                    handicaps = {}
+                                    for outcome in bet["betOutcomes"]:
+                                        handicap = outcome.get("sBV")
+                                        if handicap:
+                                            if handicap not in handicaps:
+                                                handicaps[handicap] = {}
+                                            if outcome["name"] == "1":
+                                                handicaps[handicap]["team1"] = outcome["odd"]
+                                            elif outcome["name"] == "2":
+                                                handicaps[handicap]["team2"] = outcome["odd"]
 
-                                        for total, odds in totals.items():
-                                            if "over" in odds and "under" in odds:
-                                                matches_to_insert.append((
-                                                    team1,
-                                                    team2,
-                                                    4,              # bookmaker_id
-                                                    2,              # sport_id
-                                                    10,             # bet_type_id (Total Points)
-                                                    float(total),   # margin is the total
-                                                    float(odds["under"]),
-                                                    float(odds["over"]),
-                                                    0,
-                                                    match_datetime
-                                                ))
+                                    for handicap, odds in handicaps.items():
+                                        if "team1" in odds and "team2" in odds:
+                                            matches_to_insert.append((
+                                                team1,
+                                                team2,
+                                                4,              # bookmaker_id
+                                                2,              # sport_id
+                                                9,              # bet_type_id (Handicap)
+                                                float(handicap),
+                                                float(odds["team1"]),
+                                                float(odds["team2"]),
+                                                0,
+                                                match_datetime
+                                            ))
 
-                                    # 3. Handicap
-                                    elif bet_type_id == BET_TYPES["handicap"]:
-                                        handicaps = {}
-                                        for outcome in bet["betOutcomes"]:
-                                            handicap = outcome.get("sBV")
-                                            if handicap:
-                                                if handicap not in handicaps:
-                                                    handicaps[handicap] = {}
-                                                if outcome["name"] == "1":
-                                                    handicaps[handicap]["team1"] = outcome["odd"]
-                                                elif outcome["name"] == "2":
-                                                    handicaps[handicap]["team2"] = outcome["odd"]
-
-                                        for handicap, odds in handicaps.items():
-                                            if "team1" in odds and "team2" in odds:
-                                                matches_to_insert.append((
-                                                    team1,
-                                                    team2,
-                                                    4,              # bookmaker_id
-                                                    2,              # sport_id
-                                                    9,              # bet_type_id (Handicap)
-                                                    float(handicap),
-                                                    float(odds["team1"]),
-                                                    float(odds["team2"]),
-                                                    0,
-                                                    match_datetime
-                                                ))
-
-                        except Exception as e:
-                            continue
+                    except Exception as e:
+                        print(f"Error processing match: {e}")
+                        continue
     
     except Exception as e:
         print(f"Error in admiralKosarka: {e}")
@@ -199,7 +211,7 @@ async def fetch_admiral_basketball():
     try:
         batch_insert_matches(conn, matches_to_insert)
     except Exception as e:
-        pass
+        print(f"Error inserting matches into database: {e}")
     finally:
         conn.close()
 

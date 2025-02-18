@@ -175,7 +175,7 @@ async def process_match_data(match_data, matches_to_insert, processed_matches):
         home_team,
         away_team,
         1,              # bookmaker_id
-        3,              # sport_id (Hockey)
+        4,              # sport_id (Hockey)
         2,              # bet_type_id (1X2)
         0,              # margin
         float(winner_odds["1"]),

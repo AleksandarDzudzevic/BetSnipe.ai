@@ -106,15 +106,9 @@ def main():
     all_matches_to_insert = []
 
     try:
-        print("Fetching event IDs...")
-        start_time = time.time()
         event_ids = fetch_event_ids()
-        print(f"Found {len(event_ids)} events in {time.time() - start_time:.2f} seconds")
 
         if event_ids:
-            print("Fetching odds for all events...")
-            start_time = time.time()
-
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
                 future_to_event = {
                     executor.submit(fetch_single_event, event_id): event_id
@@ -130,13 +124,8 @@ def main():
                     except Exception as e:
                         print(f"Error processing event {event_id}: {e}")
 
-            print(f"Fetched odds for {len(all_matches_to_insert)} matches in {time.time() - start_time:.2f} seconds")
-
             if all_matches_to_insert:
-                print("Inserting into database...")
-                start_time = time.time()
                 batch_insert_matches(conn, all_matches_to_insert)
-                print(f"Database insertion completed in {time.time() - start_time:.2f} seconds")
             else:
                 print("No valid matches data found")
 
@@ -144,8 +133,6 @@ def main():
         print(f"Error in main execution: {e}")
     finally:
         conn.close()
-
-    print(f"Total execution time: {time.time() - start_total:.2f} seconds")
 
 
 if __name__ == "__main__":
