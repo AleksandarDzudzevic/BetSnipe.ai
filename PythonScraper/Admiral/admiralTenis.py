@@ -152,11 +152,21 @@ async def fetch_admiral_tennis():
     
     # Batch insert all matches
     try:
-        batch_insert_matches(conn, matches_to_insert)
+        conn = get_db_connection()
+        conn.autocommit = False
+        try:
+            batch_insert_matches(conn, matches_to_insert)
+            conn.commit()
+        except Exception as insert_error:
+            conn.rollback()
+            print(f"Insert error details: {type(insert_error).__name__}: {str(insert_error)}")
+            raise
+        finally:
+            conn.close()
+            
     except Exception as e:
-        print(f"Error inserting matches into database: {e}")
-    finally:
-        conn.close()
+        print(f"Database connection/operation error: {type(e).__name__}: {str(e)}")
+        raise
 
 if __name__ == "__main__":
     asyncio.run(fetch_admiral_tennis())

@@ -39,68 +39,80 @@ def insert_match(conn, team_home, team_away, bookmaker_id, sport_id, bet_type_id
     conn.commit()
 
 def batch_insert_matches(conn, matches):
+    if not matches:  # Early return if no matches
+        print("No matches to insert")
+        return
+
     cursor = conn.cursor()
     cursor.fast_executemany = True
 
-    # Convert matches list to Pandas DataFrame
-    df = pd.DataFrame(matches, columns=[
-        'teamHome', 'teamAway', 'bookmaker_id', 'sport_id', 'betType_id',
-        'margin', 'odd1', 'odd2', 'odd3', 'startTime'
-    ])
+    try:
+        # Convert matches list to Pandas DataFrame
+        df = pd.DataFrame(matches, columns=[
+            'teamHome', 'teamAway', 'bookmaker_id', 'sport_id', 'betType_id',
+            'margin', 'odd1', 'odd2', 'odd3', 'startTime'
+        ])
 
-    # Convert numpy types to Python native types
-    df['teamHome'] = df['teamHome'].astype(str).str.slice(0, 255)
-    df['teamAway'] = df['teamAway'].astype(str).str.slice(0, 255)
-    df['bookmaker_id'] = df['bookmaker_id'].astype(int)
-    df['sport_id'] = df['sport_id'].astype(int)
-    df['betType_id'] = df['betType_id'].astype(int)
-    df['margin'] = df['margin'].astype(float).round(2)
-    df['odd1'] = df['odd1'].astype(float).round(2)
-    df['odd2'] = df['odd2'].astype(float).round(2)
-    df['odd3'] = df['odd3'].astype(float).round(2)
-    df['startTime'] = pd.to_datetime(df['startTime'])
+        # Convert numpy types to Python native types
+        df['teamHome'] = df['teamHome'].astype(str).str.slice(0, 255)
+        df['teamAway'] = df['teamAway'].astype(str).str.slice(0, 255)
+        df['bookmaker_id'] = df['bookmaker_id'].astype(int)
+        df['sport_id'] = df['sport_id'].astype(int)
+        df['betType_id'] = df['betType_id'].astype(int)
+        df['margin'] = df['margin'].astype(float).round(2)
+        df['odd1'] = df['odd1'].astype(float).round(2)
+        df['odd2'] = df['odd2'].astype(float).round(2)
+        df['odd3'] = df['odd3'].astype(float).round(2)
+        df['startTime'] = pd.to_datetime(df['startTime'])
 
-    # Create temp table
-    cursor.execute("""
-        IF OBJECT_ID('tempdb..#TempMatchTable') IS NOT NULL 
-            DROP TABLE #TempMatchTable;
-            
-        CREATE TABLE #TempMatchTable (
-            teamHome varchar(255),
-            teamAway varchar(255),
-            bookmaker_id int,
-            sport_id int,
-            betType_id int,
-            margin decimal(5,2),
-            odd1 decimal(8,2),
-            odd2 decimal(8,2),
-            odd3 decimal(8,2),
-            startTime datetime
-        )
-    """)
+        print(f"Processing {len(df)} matches")  # Debug print
 
-    records = df.values.tolist()
-    batch_size = 5000
-    for i in range(0, len(records), batch_size):
-        batch = records[i:i + batch_size]
+        # Create temp table
+        cursor.execute("""
+            IF OBJECT_ID('tempdb..#TempMatchTable') IS NOT NULL 
+                DROP TABLE #TempMatchTable;
+                
+            CREATE TABLE #TempMatchTable (
+                teamHome varchar(255),
+                teamAway varchar(255),
+                bookmaker_id int,
+                sport_id int,
+                betType_id int,
+                margin decimal(5,2),
+                odd1 decimal(8,2),
+                odd2 decimal(8,2),
+                odd3 decimal(8,2),
+                startTime datetime
+            )
+        """)
+
+        # Insert records into temp table
+        records = df.values.tolist()
         cursor.executemany("""
             INSERT INTO #TempMatchTable 
             VALUES (?,?,?,?,?,?,?,?,?,?)
-        """, batch)
-        conn.commit()
+        """, records)
+        print("Inserted into temp table")  # Debug print
 
-    try:
+        # Execute stored procedure
         cursor.execute("""
             DECLARE @MatchList AS MatchTableType;
             INSERT INTO @MatchList 
             SELECT * FROM #TempMatchTable;
             EXEC InsertAllMatches @MatchList = @MatchList;
         """)
-        conn.commit()
+        conn.commit()  # Commit the transaction
+        print("Stored procedure executed successfully")  # Debug print
+
     except Exception as e:
-        print(f"Error in stored procedure: {e}")
+        conn.rollback()  # Rollback on error
+        print(f"Error in batch_insert_matches: {type(e).__name__}: {str(e)}")
+        raise
     finally:
-        cursor.execute("DROP TABLE IF EXISTS #TempMatchTable")
-        conn.commit()
+        try:
+            cursor.execute("DROP TABLE IF EXISTS #TempMatchTable")
+            conn.commit()
+        except:
+            pass
         cursor.close()
 

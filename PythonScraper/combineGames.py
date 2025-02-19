@@ -215,20 +215,10 @@ def find_arbitrage_opportunities(matches_list, similarity_threshold=85):
             groups_found += 1
             is_three_way = bet_type1 in [2, 3, 4]  # 1X2 markets
             
-            print(f"\nFound group {groups_found}:")
-            print(f"Teams: {team1_1} vs {team2_1}")
-            print(f"Sport ID: {sport_id1}")
-            print(f"Bet type ID: {bet_type1}")
-            print(f"Margin: {margin1}")
-            print(f"Number of matches: {len(current_group['matches'])}")
-            
             best_odds = [0, 0, 0] if is_three_way else [0, 0]
             best_bookies = [None, None, None] if is_three_way else [None, None]
 
-            print("Odds in group:")
             for match in current_group["matches"]:
-                print(f"Bookmaker {match[3]}: {match[7]}, {match[8]}, {match[9] if is_three_way else ''}")
-                
                 if is_three_way:
                     odds = [match[7], match[8], match[9]]
                 else:
@@ -239,12 +229,8 @@ def find_arbitrage_opportunities(matches_list, similarity_threshold=85):
                         best_odds[idx] = odd
                         best_bookies[idx] = match[3]
 
-            print(f"Best odds found: {best_odds}")
-            print(f"From bookmakers: {best_bookies}")
-
             if is_three_way and all(odd > 0 for odd in best_odds):
                 arb_exists, stake1, stake2, stake3, profit = calculate_three_way_arbitrage(*best_odds)
-                print(f"3-way arbitrage check: exists={arb_exists}, profit={profit if arb_exists else 0}%")
                 if arb_exists and profit > 0:
                     arbitrage_opportunities.append({
                         "type": "3-way",
@@ -258,11 +244,10 @@ def find_arbitrage_opportunities(matches_list, similarity_threshold=85):
                         "sport_id": sport_id1,
                         "margin": margin1
                     })
-            elif not is_three_way and all(odd > 0 for odd in best_odds[:2]):  # Only check first two odds for 2-way
+            elif not is_three_way and all(odd > 0 for odd in best_odds[:2]):
                 arb_exists, stake1, stake2, profit = calculate_two_way_arbitrage(*best_odds[:2])
-                print(f"2-way arbitrage check: exists={arb_exists}, profit={profit if arb_exists else 0}%")
                 if arb_exists and profit > 0:
-                    arbitrage_opportunities.append({
+                    arbitrage_opportunities.write({
                         "type": "2-way",
                         "teams": (match1[1], match1[2]),
                         "time": start_time1,
@@ -275,9 +260,7 @@ def find_arbitrage_opportunities(matches_list, similarity_threshold=85):
                         "margin": margin1
                     })
 
-    print(f"\nTotal groups found: {groups_found}")
     print(f"Found {len(arbitrage_opportunities)} arbitrage opportunities")
-    
     return arbitrage_opportunities
 
 def get_reference_data():
@@ -306,7 +289,17 @@ def main():
             print("\n" + "="*50)
             print(f"Starting new scan at {datetime.now()}")
             
-            # First run async_run
+            # First run DeleteExpiredMatches stored procedure
+            print("Deleting all matches...")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM AllMatches")
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            print(f"Deleted {deleted_count} matches")
+
+            # Then run async_run
             print("Running async scraping...")
             asyncio.run(run_full_scrape())
             print("Scraping completed")
@@ -319,80 +312,30 @@ def main():
             # Find arbitrage opportunities
             opportunities = find_arbitrage_opportunities(matches)
             
-            # Read existing opportunities to avoid duplicates
-            existing_opportunities = set()
-            try:
-                with open('arbitrage_opportunities.txt', 'r', encoding='utf-8') as f:
-                    current_opp = {}
-                    for line in f:
-                        if line.startswith("Teams:"):
-                            current_opp['teams'] = line.strip().replace("Teams: ", "")
-                        elif line.startswith("Time:"):
-                            current_opp['time'] = line.strip().replace("Time: ", "")
-                        elif line.startswith("Sport:"):
-                            current_opp['sport'] = line.strip().replace("Sport: ", "").split(" (ID:")[0]
-                        elif line.startswith("Bet Type:"):
-                            current_opp['bet_type'] = line.strip().replace("Bet Type: ", "").split(" (ID:")[0]
-                        elif line.startswith("Margin:"):
-                            current_opp['margin'] = float(line.strip().replace("Margin: ", ""))
-                        elif line.startswith("Best odds:"):
-                            current_opp['odds_started'] = True
-                            current_opp['odds'] = []
-                        elif line.startswith("Outcome ") and 'odds_started' in current_opp:
-                            odd = float(line.split(": ")[1].split(" ")[0])
-                            current_opp['odds'].append(odd)
-                        elif line.startswith("--"):
-                            if 'odds_started' in current_opp:
-                                key = (
-                                    current_opp['teams'],
-                                    current_opp['time'],
-                                    current_opp['sport'],
-                                    current_opp['bet_type'],
-                                    current_opp['margin'],
-                                    tuple(current_opp['odds'])
-                                )
-                                existing_opportunities.add(key)
-                            current_opp = {}
-            except FileNotFoundError:
-                pass  # File doesn't exist yet
-
-            # Filter out duplicate opportunities
-            new_opportunities = []
-            for opp in opportunities:
-                key = (
-                    f"{opp['teams'][0]} vs {opp['teams'][1]}",
-                    opp['time'].strftime("%Y-%m-%d %H:%M:%S"),
-                    sports.get(opp['sport_id'], 'Unknown'),
-                    bet_types.get(opp['bet_type'], 'Unknown'),
-                    float(opp['margin']),
-                    tuple(odd for odd, _ in opp['odds'])
-                )
-                if key not in existing_opportunities:
-                    new_opportunities.append(opp)
-                    existing_opportunities.add(key)
-
-            # Append only new opportunities to file
-            if new_opportunities:
-                with open('arbitrage_opportunities.txt', 'a', encoding='utf-8') as f:
-                    f.write(f"\n\nScan Time: {datetime.now()}\n")
-                    f.write("="*50 + "\n")
-                    
-                    for opp in new_opportunities:
-                        f.write(f"\nArbitrage Opportunity ({opp['type']}):\n")
-                        f.write(f"Teams: {opp['teams'][0]} vs {opp['teams'][1]}\n")
-                        f.write(f"Time: {opp['time']}\n")
-                        f.write(f"Sport: {sports.get(opp['sport_id'], 'Unknown')} (ID: {opp['sport_id']})\n")
-                        f.write(f"Bet Type: {bet_types.get(opp['bet_type'], 'Unknown')} (ID: {opp['bet_type']})\n")
-                        f.write(f"Margin: {opp['margin']}\n")
-                        f.write("Best odds:\n")
-                        for i, (odd, bookie) in enumerate(opp['odds'], 1):
-                            f.write(f"Outcome {i}: {odd:.2f} ({bookmakers.get(bookie, f'Bookmaker {bookie}')} ID: {bookie})\n")
-                        f.write(f"Recommended stakes: {[f'{stake:.2f}%' for stake in opp['stakes']]}\n")
-                        f.write(f"Potential profit: {opp['profit']:.2f}%\n")
-                        f.write("-" * 50 + "\n")
+            # Create a new file with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f'arbitrage_opportunities_{timestamp}.txt'
+            
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write(f"Scan Time: {datetime.now()}\n")
+                f.write("="*50 + "\n")
+                
+                for opp in opportunities:
+                    f.write(f"\nArbitrage Opportunity ({opp['type']}):\n")
+                    f.write(f"Teams: {opp['teams'][0]} vs {opp['teams'][1]}\n")
+                    f.write(f"Time: {opp['time']}\n")
+                    f.write(f"Sport: {sports.get(opp['sport_id'], 'Unknown')} (ID: {opp['sport_id']})\n")
+                    f.write(f"Bet Type: {bet_types.get(opp['bet_type'], 'Unknown')} (ID: {opp['bet_type']})\n")
+                    f.write(f"Margin: {opp['margin']}\n")
+                    f.write("Best odds:\n")
+                    for i, (odd, bookie) in enumerate(opp['odds'], 1):
+                        f.write(f"Outcome {i}: {odd:.2f} ({bookmakers.get(bookie, f'Bookmaker {bookie}')} ID: {bookie})\n")
+                    f.write(f"Recommended stakes: {[f'{stake:.2f}%' for stake in opp['stakes']]}\n")
+                    f.write(f"Potential profit: {opp['profit']:.2f}%\n")
+                    f.write("-" * 50 + "\n")
 
             print(f"Found {len(opportunities)} arbitrage opportunities")
-            print(f"Wrote {len(new_opportunities)} new opportunities to file")
+            print(f"Wrote opportunities to {filename}")
             print("Waiting 60 seconds before next scan...")
             time.sleep(2)  # Wait 60 seconds before next iteration
             

@@ -216,8 +216,8 @@ def get_basketball_odds():
                                             2,  # Basketball
                                             10,  # Total Points
                                             float(total["marketType"]),  # Points line as margin
-                                            float(total["odd1"]),
                                             float(total["odd2"]),
+                                            float(total["odd1"]),
                                             0,  # No third odd
                                             start_time
                                         ))
@@ -270,7 +270,6 @@ def get_basketball_odds():
             conn = get_db_connection()
             batch_insert_matches(conn, matches_to_insert)
             conn.close()
-            print(f"Successfully inserted {len(matches_to_insert)} basketball matches")
         except Exception as e:
             print(f"Database error: {e}")
 

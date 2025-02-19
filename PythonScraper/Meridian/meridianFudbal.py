@@ -9,30 +9,6 @@ from database_utils import get_db_connection, batch_insert_matches
 import aiohttp
 import asyncio
 
-DESIRED_LEAGUES = {
-    ("Premier Liga", "Engleska"),
-    ("Championship", "Engleska"),
-    ("La Liga", "Španija"),
-    ("La Liga 2", "Španija"),
-    ("Bundesliga", "Nemačka"),
-    ("2. Bundesliga", "Nemačka"),
-    ("Serija A", "Italija"),
-    ("Serija B", "Italija"),
-    ("Liga 1", "Francuska"),
-    ("Liga 2", "Francuska"),
-    ("Liga Profesional", "Argentina"),
-    ("A-Liga", "Australija"),
-    ("Paulista Serija A", "Brazil"),
-    ("Prva Liga Eredivisie", "Holandija"),
-    ("Prva Divizija A", "Belgija"),
-    ("Prva Divizija", "Saudijska Arabija"),
-    ("Superliga", "Grčka"),
-    ("Super Liga", "Turska"),
-    "UEFA Liga Šampiona",
-    "UEFA Liga Evrope",
-    "UEFA Liga Konferencija",
-}
-
 
 def convert_unix_to_iso(unix_ms):
     """Convert Unix timestamp in milliseconds to ISO format datetime string"""
@@ -147,20 +123,12 @@ async def get_soccer_odds():
                     # Create tasks for fetching market data for all events
                     market_tasks = []
                     for league in leagues:
-                        league_name = league.get("leagueName")
-                        region_name = league.get("regionName", "")
-                        is_desired = (
-                            league_name in ["UEFA Liga Šampiona", "UEFA Liga Evrope", "UEFA Liga Konferencija"]
-                            or (league_name, region_name) in DESIRED_LEAGUES
-                        )
-
-                        if is_desired:
-                            events = league.get("events", [])
-                            for event in events:
-                                event_id = event.get("header", {}).get("eventId")
-                                if event_id:
-                                    task = asyncio.create_task(get_markets_for_event(session, event_id, token))
-                                    market_tasks.append((event, task))
+                        events = league.get("events", [])
+                        for event in events:
+                            event_id = event.get("header", {}).get("eventId")
+                            if event_id:
+                                task = asyncio.create_task(get_markets_for_event(session, event_id, token))
+                                market_tasks.append((event, task))
 
                     # Process all tasks
                     for event, task in market_tasks:

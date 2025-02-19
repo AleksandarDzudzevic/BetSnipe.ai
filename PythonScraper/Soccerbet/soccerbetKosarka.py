@@ -190,10 +190,21 @@ async def get_soccerbet_api():
             # Database insertion
             try:
                 conn = get_db_connection()
-                batch_insert_matches(conn, matches_to_insert)
-                conn.close()
+                # Try to insert with explicit transaction handling
+                conn.autocommit = False
+                try:
+                    batch_insert_matches(conn, matches_to_insert)
+                    conn.commit()
+                except Exception as insert_error:
+                    conn.rollback()
+                    print(f"Insert error details: {type(insert_error).__name__}: {str(insert_error)}")
+                    raise
+                finally:
+                    conn.close()
+                    
             except Exception as e:
-                print(f"Database error: {e}")
+                print(f"Database connection/operation error: {type(e).__name__}: {str(e)}")
+                raise
 
     except Exception as e:
         print(f"Error in async operations: {e}")

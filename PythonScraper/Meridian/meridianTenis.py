@@ -224,14 +224,14 @@ def get_tennis_odds():
     if matches_to_insert:  # Only try to insert if we have data
         try:
             conn = get_db_connection()
+            cursor = conn.cursor()
             batch_insert_matches(conn, matches_to_insert)
-            conn.close()
-            print(f"Successfully inserted {len(matches_to_insert)} tennis matches")
         except Exception as e:
             print(f"Database error: {e}")
+        finally:
+            cursor.close()
+            conn.close()
 
     return matches_data
-
-
 if __name__ == "__main__":
     get_tennis_odds()

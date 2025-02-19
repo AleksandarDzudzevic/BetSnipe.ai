@@ -207,7 +207,6 @@ def get_tennis_odds():
             conn = get_db_connection()
             batch_insert_matches(conn, matches_to_insert)
             conn.close()
-            print(f"Successfully inserted {len(matches_to_insert)} table tennis matches")
         except Exception as e:
             print(f"Database error: {e}")
 

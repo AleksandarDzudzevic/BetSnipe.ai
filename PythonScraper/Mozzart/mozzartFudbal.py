@@ -8,7 +8,7 @@ import aiohttp
 from cloudscraper import create_scraper as CF_Solver
 
 sys.path.append(str(Path(__file__).parent.parent))
-from database_utils import get_db_connection, insert_match, batch_insert_matches
+from database_utils import get_db_connection, batch_insert_matches
 
 # Initialize CF_Solver
 cf = CF_Solver()
@@ -329,46 +329,61 @@ async def process_match_data(match_data, matches_to_insert):
         kick_off_time
     ))
 
+async def get_football_leagues(session):
+    """Fetch current football leagues from Mozzart"""
+    try:
+        url = 'https://www.mozzartbet.com/betting/get-competitions'
+        payload = {
+            "sportId": 1,  # 1 for football (instead of 5 for tennis or 2 for basketball)
+            "date": "all_days",
+            "type": "prematch"
+        }
+        
+        headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'en-US,en;q=0.7',
+            'Content-Type': 'application/json',
+            'Origin': 'https://www.mozzartbet.com',
+            'Referer': 'https://www.mozzartbet.com/sr/kladjenje',
+            'Sec-Ch-Ua': '"Not(A:Brand";v="99", "Brave";v="133", "Chromium";v="133"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'Medium': 'WEB'
+        }
+        
+        async with session.post(url, json=payload, headers=headers) as response:
+            if response.status == 200:
+                data = await response.json()
+                leagues = []
+                for competition in data.get("competitions", []):
+                    league_id = competition.get("id")
+                    league_name = competition.get("name")
+                    if league_id and league_name:
+                        leagues.append((league_id, league_name))
+                return leagues
+        return []
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return []
+
 async def scrape_all_matches():
     try:
         conn = get_db_connection()
         matches_to_insert = []
 
-        leagues = [
-            # European Competitions
-            (60, "Liga Šampiona"),  # matches Maxbet's "champions_league"
-            (1080, "Liga Evrope"),  # matches Maxbet's "europa_league"
-            (13748, "Liga Konferencije"),  # matches Maxbet's "conference_league"
-            # England
-            (20, "Engleska 1"),  # matches Maxbet's "premier_league"
-            (32, "Druga Engleska Liga"),  # matches Maxbet's "england_2"
-            # Spain
-            (22, "Španija 1"),  # matches Maxbet's "la_liga"
-            (45, "Španija 2"),  # matches Maxbet's "la_liga_2"
-            # Italy
-            (19, "Italija 1"),  # matches Maxbet's "serie_a"
-            (42, "Italija 2"),  # matches Maxbet's "serie_b"
-            # Germany
-            (21, "Nemačka 1"),  # matches Maxbet's "bundesliga"
-            (39, "Nemačka 2"),  # matches Maxbet's "bundesliga_2"
-            # France
-            (13, "Francuska 1"),  # matches Maxbet's "ligue_1"
-            (14, "Francuska 2"),  # matches Maxbet's "ligue_2"
-            # Other Major Leagues
-            (34, "Holandija 1"),  # matches Maxbet's "netherlands_1"
-            (15, "Belgija 1"),  # matches Maxbet's "belgium_1"
-            (46, "Turska 1"),  # matches Maxbet's "turkey_1"
-            (53, "Grčka 1"),  # matches Maxbet's "greece_1"
-            # Middle East
-            (878, "Saudijska Arabija 1"),  # matches Maxbet's "saudi_1"
-            # South America
-            (797, "Argentina 1"),  # matches Maxbet's "argentina_1"
-            (3648, "Brazil 1"),  # matches Maxbet's "brazil_1"
-            # Australia
-            (634, "Australija 1"),  # matches Maxbet's "australia_1"
-        ]
-
         async with aiohttp.ClientSession() as session:
+            # Get football leagues
+            leagues = await get_football_leagues(session)
+            
+            if not leagues:
+                print("No leagues found")
+                return
+
             # Process leagues concurrently
             await asyncio.gather(*[
                 process_league(session, league_id, league_name, matches_to_insert)

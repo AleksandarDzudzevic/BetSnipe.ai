@@ -16,31 +16,6 @@ url1 = "https://srboffer.admiralbet.rs/api/offer/BetTypeSelections?sportId=1&pag
 url2 = "https://srboffer.admiralbet.rs/api/offer/getWebEventsSelections"
 url_odds = "https://srboffer.admiralbet.rs/api/offer/betsAndGroups"
 
-# Define all possible soccer competitions
-competitions = [
-    {"name": "Premier League", "competitionId": "1", "regionId": "1"},
-    {"name": "Druga Engleska Liga", "competitionId": "2", "regionId": "1"},
-    {"name": "La Liga", "competitionId": "3103", "regionId": "24"},
-    {"name": "La Liga 2", "competitionId": "604", "regionId": "24"},
-    {"name": "Bundesliga", "competitionId": "614", "regionId": "22"},
-    {"name": "Bundesliga B", "competitionId": "612", "regionId": "22"},
-    {"name": "Serie A", "competitionId": "597", "regionId": "23"},
-    {"name": "Serie B", "competitionId": "600", "regionId": "23"},
-    {"name": "Ligue 1", "competitionId": "564", "regionId": "4"},
-    {"name": "Ligue 2", "competitionId": "581", "regionId": "4"},
-    {"name": "Champions League", "competitionId": "764", "regionId": "104"},
-    {"name": "Europa League", "competitionId": "1333", "regionId": "104"},
-    {"name": "Argentiska Liga", "competitionId": "649", "regionId": "32"},
-    {"name": "Liga Konferencije", "competitionId": "20951", "regionId": "104"},
-    {"name": "Holandija Liga", "competitionId": "608", "regionId": "27"},
-    {"name": "Brazilska Liga", "competitionId": "788", "regionId": "10"},
-    {"name": "Australijska Liga", "competitionId": "670", "regionId": "26"},
-    {"name": "Belgijska Liga", "competitionId": "606", "regionId": "25"},
-    {"name": "Saudi Liga", "competitionId": "858", "regionId": "81"},
-    {"name": "Grcka Liga", "competitionId": "666", "regionId": "38"},
-    {"name": "Turska Liga", "competitionId": "641", "regionId": "30"},
-]
-
 headers = {
     "Accept": "application/utf8+json, application/json;q=0.9, text/plain;q=0.8, /;q=0.7",
     "Accept-Encoding": "gzip, deflate",
@@ -70,18 +45,50 @@ async def fetch_matches(session, url2, competition, params):
     async with session.get(url2, params=params, headers=headers) as response:
         return await response.json()
 
+async def fetch_football_leagues(session):
+    """Fetch current football leagues from Admiral"""
+    url = "https://srboffer.admiralbet.rs/api/offer/webTree/null/true/true/true/2025-02-10T20:48:46.651/2030-02-10T20:48:16.000/false"
+    params = {"eventMappingTypes": ["1", "2", "3", "4", "5"]}
+    
+    try:
+        async with session.get(url, params=params, headers=headers) as response:
+            data = await response.json()
+            leagues = []
+            
+            # Find football in the sports list
+            for sport in data:
+                if sport.get("id") == 1:  # Football
+                    for region in sport.get("regions", []):
+                        for competition in region.get("competitions", []):
+                            leagues.append({
+                                "regionId": competition.get("regionId"),
+                                "competitionId": competition.get("competitionId"),
+                                "name": competition.get("competitionName"),
+                            })
+            return leagues
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return []
+
 async def fetch_admiral_football():
     matches_to_insert = []
     conn = get_db_connection()
     
     try:
         async with aiohttp.ClientSession() as session:
+            # First get the leagues
+            competitions = await fetch_football_leagues(session)
+            
+            if not competitions:
+                print("No leagues found")
+                return
+            
             # Fetch matches for all competitions concurrently
             fetch_tasks = []
             for competition in competitions:
                 params = {
                     "pageId": "35",
-                    "sportId": "1",
+                    "sportId": "1",  # Football
                     "regionId": competition["regionId"],
                     "competitionId": competition["competitionId"],
                     "isLive": "false",
@@ -236,6 +243,7 @@ async def fetch_admiral_football():
     # Batch insert all matches
     try:
         batch_insert_matches(conn, matches_to_insert)
+        print(f"Number of matches to insert: {len(matches_to_insert)}")
     except Exception as e:
         print(f"Error inserting matches into database: {e}")
     finally:

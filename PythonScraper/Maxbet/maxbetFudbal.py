@@ -9,34 +9,10 @@ import time
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
-SOCCER_LEAGUES = {
-    "champions_league": "136866",
-    "europa_league": "136867",
-    "conference_league": "180457",
-    "premier_league": "152506",
-    "england_2": "119606",
-    "bundesliga": "117683",
-    "bundesliga_2": "132231",
-    "ligue_1": "117827",
-    "ligue_2": "117861",
-    "serie_a": "117689",
-    "serie_b": "117690",
-    "la_liga": "117709",
-    "la_liga_2": "117710",
-    "argentina_1": "143555",
-    "australia_1": "132134",
-    "brazil_1": "135401",
-    "netherlands_1": "117808",
-    "belgium_1": "152568",
-    "saudi_1": "161743",
-    "greece_1": "132131",
-    "turkey_1": "119607",
-}
-
 headers = {
-    "Accept": "application/json, text/plain, */*",
+    "Accept": "*/*",
     "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Origin": "https://www.maxbet.rs",
     "Referer": "https://www.maxbet.rs/betting",
 }
@@ -58,15 +34,44 @@ async def fetch_league_matches(session, league_id, params):
     async with session.get(url, params=params, headers=headers) as response:
         return await response.json()
 
+async def fetch_football_leagues(session):
+    """Fetch current football leagues from MaxBet"""
+    url = "https://www.maxbet.rs/restapi/offer/sr/categories/sport/S/l"
+    params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
+    
+    try:
+        async with session.get(url, params=params, headers=headers) as response:
+            data = await response.json()
+            leagues = {}
+            
+            for category in data.get('categories', []):
+                league_id = category.get('id')
+                league_name = category.get('name')
+                if league_id and league_name:
+                    leagues[league_name.lower().replace(" ", "_")] = league_id
+            
+            return leagues
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return {}
+
 async def fetch_maxbet_matches():
     matches_to_insert = []
     conn = get_db_connection()
+    cursor = conn.cursor()
     params = {"annex": "3", "desktopVersion": "1.2.1.10", "locale": "sr"}
     
     try:
         async with aiohttp.ClientSession() as session:
+            # First get the leagues
+            football_leagues = await fetch_football_leagues(session)
+            
+            if not football_leagues:
+                print("No leagues found")
+                return
+            
             league_tasks = []
-            for league_name, league_id in SOCCER_LEAGUES.items():
+            for league_name, league_id in football_leagues.items():
                 league_tasks.append(fetch_league_matches(session, league_id, params))
             
             leagues_data = await asyncio.gather(*league_tasks)
@@ -75,6 +80,9 @@ async def fetch_maxbet_matches():
             for league_data in leagues_data:
                 if "esMatches" in league_data:
                     for match in league_data["esMatches"]:
+                        # Skip matches from Max Bonus Tip Fudbal league
+                        if match.get("leagueName") == "Max Bonus Tip Fudbal ":
+                            continue
                         match_ids.append(match["id"])
             
             match_tasks = []
@@ -237,6 +245,7 @@ async def fetch_maxbet_matches():
     except Exception as e:
         print(f"Error inserting matches into database: {e}")
     finally:
+        cursor.close()
         conn.close()
 
 if __name__ == "__main__":

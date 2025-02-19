@@ -2,31 +2,11 @@ import concurrent.futures
 import requests
 import json
 from datetime import datetime, timedelta
-import csv
 import time
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
-
-
-def fetch_single_competition(competition_id):
-    url = "https://scorealarm-stats.freetls.fastly.net/soccer/competition/details/rssuperbetsport/sr-Latn-RS"
-    params = {"competition_id": competition_id}
-
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
-
-        axilis_ids = []
-        for mapping in data.get("tournament_mappings", []):
-            if mapping.get("axilis") and len(mapping.get("axilis", [])) > 0:
-                axilis_id = mapping.get("axilis", [])[0].split(":")[-1]
-                axilis_ids.append(axilis_id)
-        return axilis_ids
-    except:
-        return []
 
 
 def fetch_single_event(event_id):
@@ -37,56 +17,8 @@ def fetch_single_event(event_id):
         return None
 
 
-def fetch_axilis_tournament_ids():
-    start_time = time.time()
-
-    competition_ids = [
-        "br:competition:7",  # Champions League
-        "br:competition:17",  # Premier League
-        "br:competition:18",  # Championship
-        "br:competition:8",  # La Liga
-        "br:competition:54",  # La Liga 2
-        "br:competition:35",  # Bundesliga
-        "br:competition:44",  # Bundesliga 2
-        "br:competition:23",  # Serie A
-        "br:competition:53",  # Serie B
-        "br:competition:34",  # Ligue 1
-        "br:competition:182",  # Ligue 2
-        "br:competition:679",  # Europa League
-        "br:competition:155",  # Argentine League
-        "br:competition:34480",  # Conference League
-        "br:competition:37",  # Eredivisie
-        "br:competition:325",  # Brazilian League
-        "br:competition:136",  # Australian League
-        "br:competition:38",  # Belgian League
-        "br:competition:185",  # Greek League
-        "br:competition:955",  # Saudi League
-        "br:competition:52",  # Turkish League
-    ]
-
-    all_axilis_ids = []
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_competition = {
-            executor.submit(fetch_single_competition, competition_id): competition_id
-            for competition_id in competition_ids
-        }
-
-        for future in concurrent.futures.as_completed(future_to_competition):
-            competition_id = future_to_competition[future]
-            try:
-                axilis_ids = future.result()
-                all_axilis_ids.extend(axilis_ids)
-            except Exception as e:
-                print(f"Error fetching competition {competition_id}: {e}")
-    return list(dict.fromkeys(all_axilis_ids))
-
-
-def fetch_event_ids(tournament_ids):
+def fetch_event_ids():
     url = "https://production-superbet-offer-rs.freetls.fastly.net/sb-rs/api/v2/sr-Latn-RS/events/by-date"
-
-    # Join tournament IDs with commas
-    tournament_ids_str = ",".join(tournament_ids)
 
     # Get current date in the required format
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -95,8 +27,8 @@ def fetch_event_ids(tournament_ids):
     params = {
         "currentStatus": "active",
         "offerState": "prematch",
-        "tournamentIds": tournament_ids_str,
         "startDate": current_date,
+        "sportId": "5",  # Soccer ID is 5
     }
 
     try:
@@ -108,8 +40,10 @@ def fetch_event_ids(tournament_ids):
         event_ids = []
         if "data" in data:
             for match in data["data"]:
-                if "eventId" in match:  # or 'offerId', they're the same
+                # Changed to check for sportId == 5
+                if "eventId" in match and match.get("sportId") == 5:
                     event_ids.append(match["eventId"])
+        
         return event_ids
 
     except requests.exceptions.RequestException as e:
@@ -126,6 +60,7 @@ def fetch_event_odds(event_id):
         data = response.json()
 
         if "data" not in data or not data["data"]:
+            print(f"No data found for event {event_id}")  # Debug print
             return None
 
         match_data = data["data"][0]
@@ -133,9 +68,13 @@ def fetch_event_odds(event_id):
         match_date = match_data.get("matchDate", "")
 
         teams = match_name.split("·")
+        if len(teams) != 2:
+            return None
+            
         team1, team2 = [team.strip() for team in teams]
-
+        
         matches_to_insert = []
+        odds_count = len(match_data.get("odds", []))  # Debug print
 
         # Initialize odds dictionaries for all markets
         markets = {
@@ -275,7 +214,6 @@ def fetch_event_odds(event_id):
             if all(odds.values()):
                 matches_to_insert.append((
                     team1, team2,
-                    
                     7,  # Superbet
                     1,  # Football
                     7,  # Second Half Total
@@ -285,7 +223,7 @@ def fetch_event_odds(event_id):
                     0,  # No third odd
                     match_date
                 ))
-
+            
         return matches_to_insert
 
     except requests.exceptions.RequestException as e:
@@ -293,126 +231,40 @@ def fetch_event_odds(event_id):
         return None
 
 
-def update_csv_file(matches_data):
-    fieldnames = [
-        "Home", "Away", "Market", "Odds 1", "Odds X", "Odds 2", "time"
-    ]
-
-    try:
-        with open("superbet_football_matches.csv", "w", newline="", encoding="utf-8") as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(fieldnames)
-            for match in matches_data:
-                home, away = match["match"].split(",")
-                
-                # Write full time 1X2 odds
-                writer.writerow([
-                    home, away,
-                    match["market_1x2"],
-                    match["odds_1"], match["odds_x"], match["odds_2"],
-                    match["time"]
-                ])
-                
-                # Write first half 1X2 odds if available
-                if all(v is not None for v in [match["odds_1f"], match["odds_xf"], match["odds_2f"]]):
-                    writer.writerow([
-                        home, away,
-                        match["market_1x2f"],
-                        match["odds_1f"], match["odds_xf"], match["odds_2f"],
-                        match["time"]
-                    ])
-                
-                # Write second half 1X2 odds if available
-                if all(v is not None for v in [match["odds_1s"], match["odds_xs"], match["odds_2s"]]):
-                    writer.writerow([
-                        home, away,
-                        match["market_1x2s"],
-                        match["odds_1s"], match["odds_xs"], match["odds_2s"],
-                        match["time"]
-                    ])
-                
-                # Write GGNG odds if available
-                if all(v is not None for v in [match["odds_gg"], match["odds_ng"]]):
-                    writer.writerow([
-                        home, away,
-                        match["market_ggng"],
-                        match["odds_gg"], match["odds_ng"], None,
-                        match["time"]
-                    ])
-                
-                # Write Total Goals odds
-                for margin, odds in match["total_goals"].items():
-                    if all(v is not None for v in [odds["under"], odds["over"]]):
-                        writer.writerow([
-                            home, away,
-                            f"TG{margin}",
-                            odds["under"], odds["over"], None,
-                            match["time"]
-                        ])
-                
-                # Write First Half Total Goals odds
-                for margin, odds in match["total_goals_first"].items():
-                    if all(v is not None for v in [odds["under"], odds["over"]]):
-                        writer.writerow([
-                            home, away,
-                            f"TG{margin}F",
-                            odds["under"], odds["over"], None,
-                            match["time"]
-                        ])
-                
-                # Write Second Half Total Goals odds
-                for margin, odds in match["total_goals_second"].items():
-                    if all(v is not None for v in [odds["under"], odds["over"]]):
-                        writer.writerow([
-                            home, away,
-                            f"TG{margin}S",
-                            odds["under"], odds["over"], None,
-                            match["time"]
-                        ])
-    except IOError as e:
-        print(f"Error writing to CSV file: {e}")
-
-
 if __name__ == "__main__":
     start_total = time.time()
-    conn = get_db_connection()
     all_matches_to_insert = []
 
     try:
-        # First fetch Axilis tournament IDs
-        axilis_ids = fetch_axilis_tournament_ids()
+        event_ids = fetch_event_ids()
+        
+        if event_ids:
 
-        if axilis_ids:
-            start_time = time.time()
-            event_ids = fetch_event_ids(axilis_ids)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                future_to_event = {
+                    executor.submit(fetch_single_event, event_id): event_id
+                    for event_id in event_ids
+                }
 
-            if event_ids:
-                # Fetch odds for each event in parallel
-                start_time = time.time()
-
-                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                    future_to_event = {
-                        executor.submit(fetch_single_event, event_id): event_id
-                        for event_id in event_ids
-                    }
-
-                    for future in concurrent.futures.as_completed(future_to_event):
-                        event_id = future_to_event[future]
-                        try:
-                            matches = future.result()
-                            if matches:
-                                all_matches_to_insert.extend(matches)
-                        except Exception as e:
-                            print(f"Error processing event {event_id}: {e}")
-
-                # Insert into database
-                if all_matches_to_insert:
-                    start_time = time.time()
-                    batch_insert_matches(conn, all_matches_to_insert)
-                else:
-                    print("No valid matches data found")
+                for future in concurrent.futures.as_completed(future_to_event):
+                    event_id = future_to_event[future]
+                    try:
+                        matches = future.result()
+                        if matches:
+                            all_matches_to_insert.extend(matches)
+                    except Exception as e:
+                        print(f"Error processing event {event_id}: {e}")
+            
+            # Insert into database
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                batch_insert_matches(conn, all_matches_to_insert)
+            except Exception as e:
+                print(f"Database error: {e}")
+            finally:
+                cursor.close()
+                conn.close()
 
     except Exception as e:
         print(f"Error in main execution: {e}")
-    finally:
-        conn.close()

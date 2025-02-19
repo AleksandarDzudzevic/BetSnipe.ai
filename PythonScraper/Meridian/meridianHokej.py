@@ -159,7 +159,6 @@ def get_hockey_odds():
             conn = get_db_connection()
             batch_insert_matches(conn, matches_to_insert)
             conn.close()
-            print(f"Successfully inserted {len(matches_to_insert)} hockey matches")
         except Exception as e:
             print(f"Database error: {e}")
 
