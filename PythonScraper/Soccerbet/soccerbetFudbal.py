@@ -58,7 +58,6 @@ async def get_soccerbet_api():
             for league_id, league_name in leagues:
                 url = f"https://www.soccerbet.rs/restapi/offer/sr/sport/S/league-group/{league_id}/mob"
                 params = {"annex": "0", "desktopVersion": "2.36.3.7", "locale": "sr"}
-
                 try:
                     async with session.get(url, params=params) as response:
                         data = await response.json()

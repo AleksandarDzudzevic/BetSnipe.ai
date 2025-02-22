@@ -118,9 +118,18 @@ async def process_league(session, league_id, league_name, matches_to_insert):
     await asyncio.gather(*[process_match(match_id) for match_id in match_ids])
 
 async def process_match_data(match_data, matches_to_insert):
+    if not match_data or not match_data.get("match"):
+        return
+        
     match = match_data["match"]
+    if not match.get("home") or not match.get("visitor"):
+        return
+        
     home_team = match["home"].get("name")
     away_team = match["visitor"].get("name")
+    
+    if not home_team or not away_team:
+        return
 
     kick_off_time = convert_unix_to_iso(match.get("startTime", 0))
 

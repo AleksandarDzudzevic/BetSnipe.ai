@@ -113,6 +113,10 @@ async def fetch_maxbet_matches():
             # Process matches
             for match_data in matches_data:
                 try:
+                    # Skip matches from "Max Bonus Tip Košarka" league
+                    if match_data.get("leagueName") == "Max Bonus Tip Košarka":
+                        continue
+
                     home_team = match_data.get("home", "")
                     away_team = match_data.get("away", "")
                     kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))

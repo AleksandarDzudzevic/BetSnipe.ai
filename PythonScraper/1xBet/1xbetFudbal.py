@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor
-
+import random
 sys.path.append(str(Path(__file__).parent.parent))
 from database_utils import get_db_connection, batch_insert_matches
 
@@ -29,6 +29,7 @@ scraper.headers.update({
 
 async def fetch_with_cloudscraper(url, params=None):
     """Helper function to make async requests using cloudscraper"""
+    await asyncio.sleep(random.uniform(1, 3))
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor(max_workers=10) as executor:  # Limit concurrent requests
         try:

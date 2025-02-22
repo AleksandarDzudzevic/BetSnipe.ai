@@ -13,30 +13,30 @@ from database_utils import get_db_connection, batch_insert_matches
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Keep existing leagues list
-leagues = [
-    # European Competitions
-    ("2313711", "Liga Šampiona"),  # Champions League
-    ("2313710", "Liga Evrope"),  # Europa League
-    ("2321687", "Liga Konferencije"),  # Conference League
-    ("2313707", "Premijer Liga"),  # Premier League
-    ("2313706", "Druga Engleska Liga"),  # Championship
-    ("2313715", "La Liga"),  # La Liga
-    ("2313721", "La Liga 2"),  # La Liga 2
-    ("2313717", "Serie A"),  # Serie A
-    ("2313856", "Serie B"),  # Serie B
-    ("2313709", "Bundesliga"),  # Bundesliga
-    ("2313854", "Bundesliga 2"),  # Bundesliga 2
-    ("2313703", "Ligue 1"),  # Ligue 1
-    ("2313884", "Ligue 2"),  # Ligue 2
-    #("2516055", "Holandija 1"),  # Eredivisie
-    ("2313730", "Belgija 1"),  # Belgian Pro League
-    ("2313865", "Turska 1"),  # Super Lig
-    ("2313855", "Grčka 1"),  # Greek Super League
-    ("2314160", "Saudijska Liga"),  # Saudi Pro League
-    ("2322076", "Argentiska Liga"),  # Argentina Primera Division
-    ("2316503", "Brazil 1"),  # Brasileirao
-    ("2314697", "Australija 1"),  # A-League
-]
+async def get_football_leagues(session):
+    """Fetch current football leagues from Soccerbet"""
+    url = "https://www.merkurxtip.rs/restapi/offer/sr/categories/ext/sport/S/g"
+    params = {"annex": "0", "desktopVersion": "2.36.3.9", "locale": "sr"}
+    headers = {
+        "Accept": "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    }
+
+    try:
+        async with session.get(url, params=params, headers=headers) as response:
+            data = await response.json()
+            leagues = []
+            for category in data.get("categories", []):
+                league_id = category.get("id")
+                league_name = category.get("name")
+                if league_id and league_name:
+                    leagues.append((league_id, league_name))
+            return leagues
+    except Exception as e:
+        print(f"Error fetching leagues: {str(e)}")
+        return []
 
 def convert_unix_to_iso(unix_ms):
     """Convert Unix timestamp in milliseconds to ISO format datetime string"""
@@ -50,9 +50,12 @@ async def get_merkur_api():
     matches_to_insert = []
 
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession() as session:# First get all leagues
+            leagues = await get_football_leagues(session)
+            if not leagues:
+                return
             for league_id, league_name in leagues:
-                url = f"https://www.merkurxtip.rs/restapi/offer/sr/sport/S/league/{league_id}/mob"
+                url = f"https://www.merkurxtip.rs/restapi/offer/sr/sport/S/league-group/{league_id}/mob"
                 params = {"annex": "0", "desktopVersion": "1.3.2.6", "locale": "sr"}
 
                 try:
@@ -89,8 +92,8 @@ async def get_merkur_api():
                                         "dateTime": kick_off_time,
                                         "market": "1X2",
                                         "odd1": odds.get("1", "N/A"),
-                                        "odd2": odds.get("3", "N/A"),
-                                        "odd3": odds.get("2", "N/A"),
+                                        "odd2": odds.get("2", "N/A"),
+                                        "odd3": odds.get("3", "N/A"),
                                     }
 
                                     # First Half 1X2
@@ -100,8 +103,8 @@ async def get_merkur_api():
                                         "dateTime": kick_off_time,
                                         "market": "1X2F",
                                         "odd1": odds.get("4", "N/A"),
-                                        "odd2": odds.get("6", "N/A"),
-                                        "odd3": odds.get("5", "N/A"),
+                                        "odd2": odds.get("5", "N/A"),
+                                        "odd3": odds.get("6", "N/A"),
                                     }
 
                                     # Second Half 1X2
@@ -111,8 +114,8 @@ async def get_merkur_api():
                                         "dateTime": kick_off_time,
                                         "market": "1X2S",
                                         "odd1": odds.get("235", "N/A"),
-                                        "odd2": odds.get("237", "N/A"),
-                                        "odd3": odds.get("236", "N/A"),
+                                        "odd2": odds.get("236", "N/A"),
+                                        "odd3": odds.get("237", "N/A"),
                                     }
 
                                     # GGNG

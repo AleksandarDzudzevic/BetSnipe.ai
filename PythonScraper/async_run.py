@@ -52,6 +52,12 @@ def get_all_scripts():
         base_path / "Mozzart/mozzartTenis.py",
         base_path / "Mozzart/mozzartHokej.py",
         base_path / "Mozzart/mozzartStoniTenis.py",
+        # Merkur scripts
+        #base_path / "Merkur/merkurTenis.py",
+        base_path / "Merkur/merkurFudbal.py",
+        base_path / "Merkur/merkurKosarka.py",
+        #base_path / "Merkur/merkurHokej.py",
+        #base_path / "Merkur/merkurStoniTenis.py",
     ]
     return [s for s in scripts if s.exists()]
 
