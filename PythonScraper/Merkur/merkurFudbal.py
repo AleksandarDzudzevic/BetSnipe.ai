@@ -302,7 +302,7 @@ async def get_merkur_api():
                                 await asyncio.sleep(0.05)  # Small delay between batches
 
                 except Exception as e:
-                    print(f"Error processing league {league_name}: {str(e)}")
+                    print(e)
                     continue
 
             try:

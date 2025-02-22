@@ -17,9 +17,9 @@ def convert_unix_to_iso(unix_ms):
     except:
         return ""
 
-async def get_tennis_groups(session):
-    """Get list of tennis groups (ATP, WTA, etc.)."""
-    url = "https://www.merkurxtip.rs/restapi/offer/sr/categories/sport/T/g"
+async def get_hockey_groups(session):
+    """Get list of hockey groups (NHL, etc.)."""
+    url = "https://www.merkurxtip.rs/restapi/offer/sr/categories/sport/H/g"
     params = {"annex": "0", "desktopVersion": "1.3.2.6", "locale": "sr"}
     headers = {
         "Accept": "*/*",
@@ -42,12 +42,12 @@ async def get_tennis_groups(session):
             
             return groups
     except Exception as e:
-        print(f"Error getting tennis groups: {e}")
+        print(f"Error getting hockey groups: {e}")
         return []
 
 async def get_group_leagues(session, group_id):
     """Get leagues/tournaments for a specific group."""
-    url = f"https://www.merkurxtip.rs/restapi/offer/sr/categories/sport/T/group/{group_id}/l"
+    url = f"https://www.merkurxtip.rs/restapi/offer/sr/categories/sport/H/group/{group_id}/l"
     params = {"annex": "0", "desktopVersion": "1.3.2.6", "locale": "sr"}
     headers = {
         "Accept": "*/*",
@@ -79,7 +79,7 @@ async def get_merkur_api():
 
     try:
         async with aiohttp.ClientSession() as session:
-            groups = await get_tennis_groups(session)
+            groups = await get_hockey_groups(session)
             print(f"Found {len(groups)} groups")
             
             for group_id, group_name in groups:
@@ -87,7 +87,7 @@ async def get_merkur_api():
                 print(f"Found {len(leagues)} leagues in {group_name}")
                 
                 for league_id, league_name in leagues:
-                    url = f"https://www.merkurxtip.rs/restapi/offer/sr/sport/T/league/{league_id}/mob"
+                    url = f"https://www.merkurxtip.rs/restapi/offer/sr/sport/H/league/{league_id}/mob"
                     params = {"annex": "0", "desktopVersion": "1.3.2.6", "locale": "sr"}
 
                     try:
@@ -95,7 +95,6 @@ async def get_merkur_api():
                             data = await response.json()
 
                             if "esMatches" in data and data["esMatches"]:
-                                # Process matches in batches
                                 batch_size = 10
                                 matches = data["esMatches"]
                                 
@@ -112,67 +111,41 @@ async def get_merkur_api():
                                     match_data_tasks = [resp.json() for resp in match_responses]
                                     match_details = await asyncio.gather(*match_data_tasks)
 
-                                    # Process each match in the batch
                                     for match, match_data in zip(batch, match_details):
                                         home_team = match_data.get("home", "")
                                         away_team = match_data.get("away", "")
                                         kick_off_time = convert_unix_to_iso(match_data.get("kickOffTime", 0))
                                         odds = match_data.get("odds", {})
 
-                                        if home_team and away_team:
-                                            # Match Winner odds
-                                            if "1" in odds and "3" in odds:
-                                                matches_data.append([
-                                                    home_team,
-                                                    away_team,
-                                                    kick_off_time,
-                                                    "12",
-                                                    odds["1"],
-                                                    odds["3"],
-                                                ])
-                                                matches_to_insert.append((
-                                                    home_team,
-                                                    away_team,
-                                                    8,  # Merkur
-                                                    3,  # Tennis
-                                                    1,  # Winner
-                                                    0,  # No margin
-                                                    float(odds["1"]),
-                                                    float(odds["3"]),
-                                                    0,  # No draw in tennis
-                                                    kick_off_time
-                                                ))
+                                        if home_team and away_team and "1" in odds and "2" in odds and "3" in odds:
+                                            matches_data.append([
+                                                home_team,
+                                                away_team,
+                                                kick_off_time,
+                                                "1X2",
+                                                odds["1"],
+                                                odds["2"],
+                                                odds["3"]
+                                            ])
+                                            matches_to_insert.append((
+                                                home_team,
+                                                away_team,
+                                                8,  # Merkur
+                                                4,  # Hockey
+                                                1,  # 1X2
+                                                0,  # No margin
+                                                float(odds["1"]),
+                                                float(odds["3"]),
+                                                float(odds["2"]),
+                                                kick_off_time
+                                            ))
 
-                                            # First Set Winner odds
-                                            if "50510" in odds and "50511" in odds:
-                                                matches_data.append([
-                                                    home_team,
-                                                    away_team,
-                                                    kick_off_time,
-                                                    "1stSet",
-                                                    odds["50510"],
-                                                    odds["50511"],
-                                                ])
-                                                matches_to_insert.append((
-                                                    home_team,
-                                                    away_team,
-                                                    8,  # Merkur
-                                                    3,  # Tennis
-                                                    11,  # First Set Winner
-                                                    0,  # No margin
-                                                    float(odds["50510"]),
-                                                    float(odds["50511"]),
-                                                    0,  # No draw in tennis
-                                                    kick_off_time
-                                                ))
-
-                                await asyncio.sleep(0.05)  # Small delay between batches
+                                await asyncio.sleep(0.05)
 
                     except Exception as e:
                         print(f"Error processing league {league_name}: {e}")
                         continue
 
-            # Database insertion
             try:
                 conn = get_db_connection()
                 conn.autocommit = False

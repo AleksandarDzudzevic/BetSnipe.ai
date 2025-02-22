@@ -94,7 +94,7 @@ async def get_merkur_api():
                                         matches_to_insert.append((
                                             home_team,
                                             away_team,
-                                            5,  # Merkur
+                                            8,  # Merkur
                                             2,  # Basketball
                                             1,  # Winner
                                             0,  # No margin
@@ -119,7 +119,7 @@ async def get_merkur_api():
                                         matches_to_insert.append((
                                             home_team,
                                             away_team,
-                                            5,  # Merkur
+                                            8,  # Merkur
                                             2,  # Basketball
                                             9,  # Handicap
                                             handicap,
@@ -144,7 +144,7 @@ async def get_merkur_api():
                                         matches_to_insert.append((
                                             home_team,
                                             away_team,
-                                            5,  # Merkur
+                                            8,  # Merkur
                                             2,  # Basketball
                                             10,  # Total Points
                                             total,
