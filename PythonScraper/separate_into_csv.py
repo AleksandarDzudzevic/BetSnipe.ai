@@ -21,7 +21,7 @@ def get_bookmaker_name(bookmaker_id):
         3: "maxbet",
         4: "admiral",
         5: "soccerbet",
-       # 6: "1xbet",  # if this exists in your data
+        #6: "1xbet",  # if this exists in your data
         7: "superbet",
         8: "merkur",
     }

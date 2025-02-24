@@ -240,7 +240,6 @@ async def fetch_admiral_football():
     except Exception as e:
         print(f"Error in async operations: {e}")
     
-    # Batch insert all matches
     try:
         batch_insert_matches(conn, matches_to_insert)
         print(f"Number of matches to insert: {len(matches_to_insert)}")

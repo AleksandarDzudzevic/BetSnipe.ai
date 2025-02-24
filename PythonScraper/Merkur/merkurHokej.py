@@ -80,11 +80,9 @@ async def get_merkur_api():
     try:
         async with aiohttp.ClientSession() as session:
             groups = await get_hockey_groups(session)
-            print(f"Found {len(groups)} groups")
             
             for group_id, group_name in groups:
                 leagues = await get_group_leagues(session, group_id)
-                print(f"Found {len(leagues)} leagues in {group_name}")
                 
                 for league_id, league_name in leagues:
                     url = f"https://www.merkurxtip.rs/restapi/offer/sr/sport/H/league/{league_id}/mob"

@@ -5,6 +5,9 @@ from datetime import datetime
 import time
 from rapidfuzz import fuzz
 import numpy as np
+from arbitrage_storage import store_arbitrage
+from telegram_utils import send_to_telegram
+import asyncio
 
 
 def get_sport_name(sport_id):
@@ -25,7 +28,7 @@ def get_bookmaker_name(bookmaker_id):
         3: "maxbet",
         4: "admiral",
         5: "soccerbet",
-        6: "1xbet",
+        #6: "1xbet",
         7: "superbet",
         8: "merkur",
     }
@@ -84,6 +87,28 @@ def load_sport_matches(sport_name):
     if matches_data:
         return pd.concat(matches_data, ignore_index=True)
     return None
+
+
+async def process_arbitrage(arbitrage_data):
+    """Process single arbitrage opportunity"""
+    # Extract required data
+    teams = f"{arbitrage_data['teams'][0]} vs {arbitrage_data['teams'][1]}"
+    match_time = arbitrage_data['time']
+    sport_id = arbitrage_data['sport_id']
+    bet_type = arbitrage_data['bet_type']
+    margin = arbitrage_data['margin']
+    best_odds = [odd for odd, _ in arbitrage_data['odds']]
+    profit = arbitrage_data['profit']
+    
+    # Only process if profit is above 1.5%
+    if profit > 1.5:
+        # Try to store arbitrage
+        if store_arbitrage(teams, match_time, sport_id, bet_type, margin, best_odds, profit):
+            # If successfully stored (meaning it's new), send to Telegram
+            await send_to_telegram(arbitrage_data)
+            print(f"New arbitrage found and sent: {teams} with {profit:.2f}% profit")
+    else:
+        print(f"Skipping low profit arbitrage: {teams} with {profit:.2f}% profit")
 
 
 def find_arbitrage_opportunities(sport_name, similarity_threshold=75, time_window=7200):
@@ -246,81 +271,29 @@ def find_arbitrage_opportunities(sport_name, similarity_threshold=75, time_windo
 
             processed_indices.update(matched_indices)
 
+    # Process each opportunity
+    for arb in arbitrage_opportunities:
+        asyncio.run(process_arbitrage(arb))
+
     return arbitrage_opportunities
 
 
-def write_opportunities_to_file(opportunities, filename="arb_opp.txt"):
-    """Write arbitrage opportunities to file"""
-    with open(filename, "w", encoding="utf-8") as f:
-        current_time = datetime.now()
-        f.write(f"\nScan Time: {current_time}\n")
-        f.write("=" * 50 + "\n")
-
-        for opp in opportunities:
-            f.write(f"\nArbitrage Opportunity ({opp['type']}):\n")
-            f.write(f"Teams: {opp['teams'][0]} vs {opp['teams'][1]}\n")
-            f.write(f"Time: {opp['time']}\n")
-            f.write(
-                f"Sport: {get_sport_name(opp['sport_id'])} (ID: {opp['sport_id']})\n"
-            )
-            f.write(f"Bet Type: {opp['bet_type']}\n")
-            f.write(f"Margin: {opp['margin']}\n")
-            f.write("Best odds:\n")
-
-            for i, (odd, bookie) in enumerate(opp["odds"], 1):
-                f.write(
-                    f"Outcome {i}: {odd:.2f} ({get_bookmaker_name(bookie)} ID: {bookie})\n"
-                )
-
-            f.write(
-                f"Recommended stakes: {[f'{stake:.2f}%' for stake in opp['stakes']]}\n"
-            )
-            f.write(f"Potential profit: {opp['profit']:.2f}%\n")
-
-            f.write("\nAll available odds for this match:\n")
-            for match in opp["matches"]:
-                bookie_name = get_bookmaker_name(match["bookmaker_id"])
-                odds = [
-                    match["odd1"],
-                    match["odd2"],
-                    match["odd3"] if "odd3" in match else None,
-                ]
-                odds_str = [f"{odd:.2f}" if odd else "N/A" for odd in odds]
-                f.write(f"{bookie_name} (ID: {match['bookmaker_id']}): {odds_str}\n")
-
-            f.write("-" * 50 + "\n")
-
-
 def main():
-    while True:
-        try:
-            start_time = time.time()
-            all_opportunities = []
+    start_time = time.time()
+    all_opportunities = []
+    # Process each sport separately
+    for sport_id in range(1, 6):
+        sport_name = get_sport_name(sport_id)
+        print(f"\nProcessing {sport_name} matches...")
+        opportunities = find_arbitrage_opportunities(sport_name)
+        all_opportunities.extend(opportunities)
+        print(
+            f"Found {len(opportunities)} arbitrage opportunities in {sport_name}"
+        )
 
-            # Process each sport separately
-            for sport_id in range(1, 6):
-                sport_name = get_sport_name(sport_id)
-                print(f"\nProcessing {sport_name} matches...")
-                opportunities = find_arbitrage_opportunities(sport_name)
-                all_opportunities.extend(opportunities)
-                print(
-                    f"Found {len(opportunities)} arbitrage opportunities in {sport_name}"
-                )
-
-            # Write all opportunities to file
-            write_opportunities_to_file(all_opportunities)
-
-            elapsed_time = time.time() - start_time
-            print(f"\nTotal opportunities found: {len(all_opportunities)}")
-            print(f"Time taken: {elapsed_time:.2f} seconds")
-
-            print("Waiting 60 seconds before next scan...")
-            time.sleep(60)
-
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            print("Waiting 60 seconds before retry...")
-            time.sleep(60)
+    elapsed_time = time.time() - start_time
+    print(f"\nTotal opportunities found: {len(all_opportunities)}")
+    print(f"Time taken: {elapsed_time:.2f} seconds")
 
 
 if __name__ == "__main__":

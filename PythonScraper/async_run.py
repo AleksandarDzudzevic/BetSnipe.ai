@@ -11,13 +11,13 @@ def get_all_scripts():
     base_path = Path(__file__).parent
     scripts = [
         # Admiral scripts
-        base_path / "Admiral/admiralTenis.py",
+       # base_path / "Admiral/admiralTenis.py",
         base_path / "Admiral/admiralStoniTenis.py",
         base_path / "Admiral/admiralFudbal.py",
         base_path / "Admiral/admiralKosarka.py",
         base_path / "Admiral/admiralHokej.py",
         # Soccerbet scripts
-        base_path / "Soccerbet/soccerbetTenis.py",
+       # base_path / "Soccerbet/soccerbetTenis.py",
         base_path / "Soccerbet/soccerbetStoniTenis.py",
         base_path / "Soccerbet/soccerbetFudbal.py",
         base_path / "Soccerbet/soccerbetKosarka.py",
@@ -27,36 +27,30 @@ def get_all_scripts():
         base_path / "Meridian/meridianFudbal.py",
         base_path / "Meridian/meridianKosarka.py",
         base_path / "Meridian/meridianHokej.py",
-        base_path / "Meridian/meridianTenis.py",
+       # base_path / "Meridian/meridianTenis.py",
         # Maxbet scripts
         base_path / "Maxbet/maxbetStoniTenis.py",
         base_path / "Maxbet/maxbetFudbal.py",
         base_path / "Maxbet/maxbetKosarka.py",
         base_path / "Maxbet/maxbetHokej.py",
         #base_path / "Maxbet/maxbetTenis.py",
-        # 1xBet scripts
-        #base_path / "1xBet/1xBetFudbal.py",
-        #base_path / "1xBet/1xBetKosarka.py",
-        #base_path / "1xBet/1xBetHokej.py",
-        #base_path / "1xBet/1xBetStoniTenis.py",
-        #base_path / "1xBet/1xBetTenis.py",
         # Superbet scripts
         base_path / "Superbet/superbetFudbal.py",
         base_path / "Superbet/superbetKosarka.py",
         base_path / "Superbet/superbetHokej.py",
         base_path / "Superbet/superbetStoniTenis.py",
-        base_path / "Superbet/superbetTenis.py",
+       # base_path / "Superbet/superbetTenis.py",
         # Mozzart scripts
         base_path / "Mozzart/mozzartFudbal.py",
         base_path / "Mozzart/mozzartKosarka.py",
-        base_path / "Mozzart/mozzartTenis.py",
+       # base_path / "Mozzart/mozzartTenis.py",
         base_path / "Mozzart/mozzartHokej.py",
         base_path / "Mozzart/mozzartStoniTenis.py",
         # Merkur scripts
-        #base_path / "Merkur/merkurTenis.py",
+       # base_path / "Merkur/merkurTenis.py",
         base_path / "Merkur/merkurFudbal.py",
         base_path / "Merkur/merkurKosarka.py",
-        #base_path / "Merkur/merkurHokej.py",
+        base_path / "Merkur/merkurHokej.py",
         #base_path / "Merkur/merkurStoniTenis.py",
     ]
     return [s for s in scripts if s.exists()]
