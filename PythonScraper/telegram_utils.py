@@ -2,6 +2,7 @@ from telegram.ext import Application
 import asyncio
 import os
 from dotenv import load_dotenv
+from database_utils import get_db_connection
 
 load_dotenv()
 
@@ -39,54 +40,147 @@ BET_TYPES = {
     11: "12set1"
 }
 
-async def send_to_telegram(arbitrage_data):
-    """Send arbitrage opportunity to Telegram group"""
-    app = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
-    
-    # Get proper names from IDs
-    sport_name = SPORTS.get(arbitrage_data['sport_id'], f"Sport ID: {arbitrage_data['sport_id']}")
-    bet_type_name = BET_TYPES.get(arbitrage_data['bet_type'], f"Bet Type: {arbitrage_data['bet_type']}")
-    
-    # Format message
-    message = (
-        f"🎯 New Arbitrage Opportunity! ({arbitrage_data['type']})\n\n"
-        f"{sport_name}\n"
-        f"🏟️ Teams: {arbitrage_data['teams'][0]} vs {arbitrage_data['teams'][1]}\n"
-        f"⏰ Time: {arbitrage_data['time']}\n"
-        f"🎲 Bet Type: {bet_type_name}\n"
-        f"📊 Margin: {arbitrage_data['margin']}\n\n"
-        f"💰 Best odds:\n"
-    )
-    
-    # Add best odds with emojis
-    for i, (odd, bookie_id) in enumerate(arbitrage_data['odds'], 1):
-        emoji = "1️⃣" if i == 1 else "2️⃣" if i == 2 else "3️⃣"
-        bookie_name = BOOKMAKERS.get(bookie_id, f"Bookmaker ID: {bookie_id}")
-        message += f"{emoji} Outcome {i}: {odd} ({bookie_name})\n"
-    
-    # Add stakes
-    message += f"\n💸 Recommended stakes:\n"
-    stakes = [f"   Stake {i+1}: {stake:.2f}%" for i, stake in enumerate(arbitrage_data['stakes'])]
-    message += "\n".join(stakes)
-    
-    # Add profit
-    message += f"\n📈 Potential profit: {arbitrage_data['profit']:.2f}%\n"
-    
-    # Add all available odds
-    message += f"\n📋 All available odds:\n"
-    for match in arbitrage_data['matches']:
-        bookie_name = BOOKMAKERS.get(match['bookmaker_id'], f"Bookmaker {match['bookmaker_id']}")
-        odds = []
-        if 'odd1' in match: odds.append(str(match['odd1']))
-        if 'odd2' in match: odds.append(str(match['odd2']))
-        if 'odd3' in match and match['odd3'] != 'N/A': odds.append(str(match['odd3']))
-        message += f"   {bookie_name}: {' - '.join(odds)}\n"
-    
-    try:
-        await app.bot.send_message(
-            chat_id=int(os.getenv('TELEGRAM_CHAT_ID')),
-            text=message
+class TelegramHandler:
+    def __init__(self):
+        self.message_ids = {}
+        self.bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        self.chat_id = int(os.getenv('TELEGRAM_CHAT_ID'))
+        self.load_message_ids()  # Load message IDs on startup
+
+    def load_message_ids(self):
+        """Load message IDs and original messages from database"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Get active messages with all their data
+            cursor.execute("""
+                SELECT sa.arb_hash, sa.message_id, m.teamHome, m.teamAway, m.startTime, sa.bet_type, 
+                       sa.margin, sa.best_odds, sa.profit, s.name as sport_name,
+                       bt.name as bet_type_name, m.bookmaker_id, m.odd1, m.odd2, m.odd3
+                FROM dbo.SentArbitrage sa
+                JOIN dbo.Sport s ON sa.sport_id = s.id
+                JOIN dbo.BetType bt ON sa.bet_type = bt.id
+                JOIN dbo.AllMatches m ON CONCAT(m.teamHome, ' vs ', m.teamAway) = sa.teams 
+                    AND m.startTime = sa.match_time
+                WHERE sa.sent_at > DATEADD(hour, -24, GETDATE())
+            """)  # Removed the message_id IS NOT NULL condition
+            
+            for row in cursor.fetchall():
+                arb_hash, message_id = row[0], row[1]
+                if message_id:  # Only store if message_id exists
+                    teams = f"{row[2]} vs {row[3]}"
+                    match_time = row[4]
+                    odds = [float(x) for x in row[7].split(',')]
+                    
+                    # Reconstruct the original message
+                    original_text = (
+                        f"🎯 New Arbitrage Opportunity! (2-way)\n\n"
+                        f"🏀 {row[9]}\n"  # sport_name
+                        f"🏟️ Teams: {teams}\n"
+                        f"⏰ Time: {match_time}\n"
+                        f"🎲 Bet Type: {row[10]}\n"  # bet_type_name
+                        f"📊 Margin: {row[6]}\n\n"  # margin
+                        f"💰 Best odds:\n"
+                        f"1️⃣ Outcome 1: {odds[0]}\n"
+                        f"2️⃣ Outcome 2: {odds[1]}\n\n"
+                        f"💸 Recommended stakes:\n"
+                        f"   Stake 1: {100/(1 + odds[0]/odds[1]):.2f}%\n"
+                        f"   Stake 2: {100/(1 + odds[1]/odds[0]):.2f}%\n"
+                        f"📈 Potential profit: {row[8]:.2f}%\n"  # profit
+                    )
+                    
+                    self.message_ids[arb_hash] = {
+                        'message_id': message_id,
+                        'original_text': original_text
+                    }
+            
+            print(f"Loaded {len(self.message_ids)} message IDs")
+            
+        except Exception as e:
+            print(f"Error loading message IDs: {e}")
+            print(f"Detailed error: {str(e)}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    async def send_arbitrage(self, arbitrage_data, arb_hash):
+        """Send new arbitrage message and store its ID"""
+        app = Application.builder().token(self.bot_token).build()
+        
+        # Format the message
+        message = (
+            f"🎯 New Arbitrage Opportunity! (2-way)\n\n"
+            f"🏀 Basketball\n"
+            f"🏟️ Teams: {arbitrage_data['teams'][0]} vs {arbitrage_data['teams'][1]}\n"
+            f"⏰ Time: {arbitrage_data['time']}\n"
+            f"🎲 Bet Type: {arbitrage_data['bet_type']}\n"
+            f"📊 Margin: {arbitrage_data['margin']}\n\n"
+            f"💰 Best odds:\n"
+            f"1️⃣ Outcome 1: {arbitrage_data['odds'][0][0]} ({arbitrage_data['odds'][0][1]})\n"
+            f"2️⃣ Outcome 2: {arbitrage_data['odds'][1][0]} ({arbitrage_data['odds'][1][1]})\n\n"
+            f"💸 Recommended stakes:\n"
+            f"   Stake 1: {arbitrage_data['stakes'][0]:.2f}%\n"
+            f"   Stake 2: {arbitrage_data['stakes'][1]:.2f}%\n"
+            f"📈 Potential profit: {arbitrage_data['profit']:.2f}%\n\n"
+            f"📋 All available odds:\n"
         )
-        print(f"Sent arbitrage alert for {arbitrage_data['teams'][0]} vs {arbitrage_data['teams'][1]}")
-    except Exception as e:
-        print(f"Error sending telegram message: {e}") 
+        
+        # Add all bookmaker odds from the odds array
+        bookies = set(bookie for _, bookie in arbitrage_data['odds'])
+        for bookie in bookies:
+            odds = [odd for odd, b in arbitrage_data['odds'] if b == bookie]
+            message += f"   {bookie}: {' - '.join(map(str, odds))} - 0.0\n"
+        
+        try:
+            sent_message = await app.bot.send_message(
+                chat_id=self.chat_id,
+                text=message
+            )
+            
+            # Store both message ID and original text in memory
+            self.message_ids[arb_hash] = {
+                'message_id': sent_message.message_id,
+                'original_text': message
+            }
+            
+            # Store message_id in database
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE SentArbitrage
+                SET message_id = ?
+                WHERE arb_hash = ?
+            """, (sent_message.message_id, arb_hash))
+            conn.commit()
+            conn.close()
+            
+        except Exception as e:
+            print(f"Error sending telegram message: {e}")
+
+    async def mark_expired(self, arb_hash):
+        """Mark arbitrage as expired in Telegram message"""
+        if arb_hash not in self.message_ids:
+            print(f"Message ID not found for hash {arb_hash}")
+            return
+        
+        message_data = self.message_ids[arb_hash]
+        original_text = message_data['original_text']
+        message_id = message_data['message_id']
+        
+        # Add expired notice at the top
+        expired_text = "⚠️ EXPIRED/CHANGED ⚠️\n\n" + original_text
+        
+        app = Application.builder().token(self.bot_token).build()
+        try:
+            await app.bot.edit_message_text(
+                chat_id=self.chat_id,
+                message_id=message_id,
+                text=expired_text
+            )
+            print(f"Successfully marked message {message_id} as expired")
+        except Exception as e:
+            print(f"Error editing telegram message: {e}")
+
+# Create global instance
+telegram_handler = TelegramHandler() 
