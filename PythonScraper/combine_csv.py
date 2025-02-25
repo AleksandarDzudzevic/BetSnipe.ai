@@ -3,15 +3,11 @@ import os
 import pandas as pd
 from datetime import datetime
 import time
-import asyncio
 from rapidfuzz import fuzz
 import numpy as np
-from arbitrage_storage import ArbitrageTracker
-from telegram_utils import TelegramHandler
-
-# Create instances
-arbitrage_tracker = ArbitrageTracker()
-telegram_handler = TelegramHandler()
+from arbitrage_storage import store_arbitrage
+from telegram_utils import send_to_telegram
+import asyncio
 
 
 def get_sport_name(sport_id):
@@ -95,32 +91,22 @@ def load_sport_matches(sport_name):
 
 async def process_arbitrage(arbitrage_data):
     """Process single arbitrage opportunity"""
-    # Extract required data and convert numpy types to Python native types
+    # Extract required data
     teams = f"{arbitrage_data['teams'][0]} vs {arbitrage_data['teams'][1]}"
     match_time = arbitrage_data['time']
-    sport_id = int(arbitrage_data['sport_id'])  # Convert numpy.int64 to Python int
-    bet_type = int(arbitrage_data['bet_type'])  # Convert numpy.int64 to Python int
-    margin = float(arbitrage_data['margin'])    # Convert numpy.float64 to Python float
-    best_odds = [float(odd) for odd, _ in arbitrage_data['odds']]  # Convert odds to Python float
-    profit = float(arbitrage_data['profit'])    # Convert numpy.float64 to Python float
-    
-    print(f"Processing arbitrage for {teams} with profit {profit}%")
+    sport_id = arbitrage_data['sport_id']
+    bet_type = arbitrage_data['bet_type']
+    margin = arbitrage_data['margin']
+    best_odds = [odd for odd, _ in arbitrage_data['odds']]
+    profit = arbitrage_data['profit']
     
     # Only process if profit is above 1.5%
     if profit > 1.5:
-        print("Profit above 1.5%, attempting to store...")
         # Try to store arbitrage
-        arb_hash = arbitrage_tracker.store_arbitrage(
-            teams, match_time, sport_id, bet_type, margin, best_odds, profit
-        )
-        print(f"Store arbitrage returned hash: {arb_hash}")
-        
-        if arb_hash:  # If it's a new arbitrage
-            print("New arbitrage, sending to Telegram...")
-            await telegram_handler.send_arbitrage(arbitrage_data, arb_hash)
+        if store_arbitrage(teams, match_time, sport_id, bet_type, margin, best_odds, profit):
+            # If successfully stored (meaning it's new), send to Telegram
+            await send_to_telegram(arbitrage_data)
             print(f"New arbitrage found and sent: {teams} with {profit:.2f}% profit")
-        else:
-            print("Arbitrage already exists or storage failed")
     else:
         print(f"Skipping low profit arbitrage: {teams} with {profit:.2f}% profit")
 
@@ -285,23 +271,9 @@ def find_arbitrage_opportunities(sport_name, similarity_threshold=75, time_windo
 
             processed_indices.update(matched_indices)
 
-    # Check for expired and changed arbitrages
-    expired_arbs, new_arbs = arbitrage_tracker.check_expired_arbitrages(arbitrage_opportunities)
-    
-    if expired_arbs:
-        print(f"Found {len(expired_arbs)} expired arbitrages")
-        # Mark expired arbitrages in Telegram - iterate through the set
-        for expired_hash in expired_arbs:
-            asyncio.run(telegram_handler.mark_expired(expired_hash))
-    
-    # Process new opportunities (including changed ones)
-    for arb in new_arbs:
-        asyncio.run(process_arbitrage(arb))
-    
-    # Process completely new opportunities
+    # Process each opportunity
     for arb in arbitrage_opportunities:
-        if arb not in new_arbs:  # Only process if not already handled
-            asyncio.run(process_arbitrage(arb))
+        asyncio.run(process_arbitrage(arb))
 
     return arbitrage_opportunities
 
