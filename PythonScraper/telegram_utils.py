@@ -14,7 +14,8 @@ BOOKMAKERS = {
     5: "Soccerbet",
     6: "1xBet",
     7: "Superbet",
-    8: "Merkur"
+    8: "Merkur",
+    10: "Topbet"
 }
 
 SPORTS = {
