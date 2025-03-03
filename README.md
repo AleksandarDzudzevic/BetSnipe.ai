@@ -1,4 +1,4 @@
-# Sports Arbitrage Betting Scanner
+# Arbitrage Betting Telegram bot
 
 An advanced Python-based system that scrapes betting odds from multiple Serbian bookmakers, identifies arbitrage opportunities in real-time, and automatically notifies users via Telegram. This tool helps find profitable betting opportunities across different bookmakers by analyzing odds discrepancies.
 
