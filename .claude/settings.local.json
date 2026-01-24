@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "WebFetch(domain:www.mozzartbet.com)",
+      "Bash(python test_match_501891.py:*)",
+      "Bash(python:*)",
+      "Bash(dir:*)"
+    ]
+  }
+}
