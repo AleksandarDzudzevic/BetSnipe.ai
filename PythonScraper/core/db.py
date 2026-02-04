@@ -603,6 +603,621 @@ class Database:
 
             return stats
 
+    async def get_match(self, match_id: int) -> Optional[Dict[str, Any]]:
+        """Get a match by ID with sport name."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT m.*, s.name as sport_name
+                FROM matches m
+                JOIN sports s ON m.sport_id = s.id
+                WHERE m.id = $1
+                """,
+                match_id
+            )
+            return dict(row) if row else None
+
+    async def get_arbitrage(self, arbitrage_id: int) -> Optional[Dict[str, Any]]:
+        """Get an arbitrage opportunity by ID."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT ao.*, m.team1, m.team2, m.start_time,
+                       s.name as sport_name, bt.name as bet_type_name
+                FROM arbitrage_opportunities ao
+                JOIN matches m ON ao.match_id = m.id
+                JOIN sports s ON m.sport_id = s.id
+                JOIN bet_types bt ON ao.bet_type_id = bt.id
+                WHERE ao.id = $1
+                """,
+                arbitrage_id
+            )
+            return dict(row) if row else None
+
+    # ==========================================
+    # USER PREFERENCES OPERATIONS
+    # ==========================================
+
+    async def get_user_preferences(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get user preferences by user ID (UUID string)."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT * FROM user_preferences WHERE user_id = $1::uuid
+                """,
+                user_id
+            )
+            return dict(row) if row else None
+
+    async def create_user_preferences(self, user_id: str) -> Dict[str, Any]:
+        """Create default user preferences."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO user_preferences (user_id)
+                VALUES ($1::uuid)
+                ON CONFLICT (user_id) DO NOTHING
+                RETURNING *
+                """,
+                user_id
+            )
+            if row:
+                return dict(row)
+            # If already exists, fetch it
+            return await self.get_user_preferences(user_id)
+
+    async def update_user_preferences(
+        self,
+        user_id: str,
+        min_profit_percentage: Optional[float] = None,
+        sports: Optional[List[int]] = None,
+        bookmakers: Optional[List[int]] = None,
+        notification_settings: Optional[Dict] = None,
+        display_settings: Optional[Dict] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Update user preferences."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                UPDATE user_preferences
+                SET
+                    min_profit_percentage = COALESCE($2, min_profit_percentage),
+                    sports = COALESCE($3, sports),
+                    bookmakers = COALESCE($4, bookmakers),
+                    notification_settings = COALESCE($5, notification_settings),
+                    display_settings = COALESCE($6, display_settings),
+                    updated_at = NOW()
+                WHERE user_id = $1::uuid
+                RETURNING *
+                """,
+                user_id, min_profit_percentage, sports, bookmakers,
+                notification_settings, display_settings
+            )
+            return dict(row) if row else None
+
+    # ==========================================
+    # USER DEVICE OPERATIONS
+    # ==========================================
+
+    async def register_user_device(
+        self,
+        user_id: str,
+        expo_push_token: str,
+        platform: str,
+        device_id: Optional[str] = None,
+        device_name: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Register or update a user device for push notifications."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO user_devices (user_id, expo_push_token, platform, device_id, device_name)
+                VALUES ($1::uuid, $2, $3, $4, $5)
+                ON CONFLICT (user_id, expo_push_token)
+                DO UPDATE SET
+                    platform = EXCLUDED.platform,
+                    device_id = COALESCE(EXCLUDED.device_id, user_devices.device_id),
+                    device_name = COALESCE(EXCLUDED.device_name, user_devices.device_name),
+                    is_active = true,
+                    last_used_at = NOW()
+                RETURNING *
+                """,
+                user_id, expo_push_token, platform, device_id, device_name
+            )
+            return dict(row) if row else None
+
+    async def get_user_devices(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+        """Get all devices for a user."""
+        async with self.acquire() as conn:
+            if active_only:
+                rows = await conn.fetch(
+                    """
+                    SELECT * FROM user_devices
+                    WHERE user_id = $1::uuid AND is_active = true
+                    ORDER BY last_used_at DESC
+                    """,
+                    user_id
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT * FROM user_devices
+                    WHERE user_id = $1::uuid
+                    ORDER BY last_used_at DESC
+                    """,
+                    user_id
+                )
+            return [dict(row) for row in rows]
+
+    async def get_user_device(self, user_id: str, device_id: int) -> Optional[Dict[str, Any]]:
+        """Get a specific device for a user."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                SELECT * FROM user_devices
+                WHERE user_id = $1::uuid AND id = $2
+                """,
+                user_id, device_id
+            )
+            return dict(row) if row else None
+
+    async def deactivate_user_device(self, user_id: str, device_id: int) -> bool:
+        """Deactivate a user device."""
+        async with self.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE user_devices
+                SET is_active = false
+                WHERE user_id = $1::uuid AND id = $2 AND is_active = true
+                """,
+                user_id, device_id
+            )
+            return "UPDATE 1" in result
+
+    async def get_user_device_count(self, user_id: str) -> int:
+        """Get count of active devices for a user."""
+        async with self.acquire() as conn:
+            return await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM user_devices
+                WHERE user_id = $1::uuid AND is_active = true
+                """,
+                user_id
+            ) or 0
+
+    # ==========================================
+    # USER WATCHLIST OPERATIONS
+    # ==========================================
+
+    async def get_user_watchlist(
+        self,
+        user_id: str,
+        sport_id: Optional[int] = None,
+        status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get user's watchlist with match details."""
+        async with self.acquire() as conn:
+            query = """
+                SELECT
+                    uw.id, uw.user_id, uw.match_id, uw.notify_on_odds_change,
+                    uw.odds_change_threshold, uw.notes, uw.created_at,
+                    m.team1, m.team2, m.start_time, m.status as match_status,
+                    s.name as sport_name, s.id as sport_id,
+                    l.name as league_name
+                FROM user_watchlist uw
+                JOIN matches m ON uw.match_id = m.id
+                JOIN sports s ON m.sport_id = s.id
+                LEFT JOIN leagues l ON m.league_id = l.id
+                WHERE uw.user_id = $1::uuid
+            """
+            params = [user_id]
+
+            if sport_id:
+                params.append(sport_id)
+                query += f" AND m.sport_id = ${len(params)}"
+
+            if status:
+                params.append(status)
+                query += f" AND m.status = ${len(params)}"
+
+            query += " ORDER BY m.start_time"
+
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+
+    async def get_user_watchlist_count(self, user_id: str) -> int:
+        """Get count of items in user's watchlist."""
+        async with self.acquire() as conn:
+            return await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM user_watchlist
+                WHERE user_id = $1::uuid
+                """,
+                user_id
+            ) or 0
+
+    async def add_to_watchlist(
+        self,
+        user_id: str,
+        match_id: int,
+        notify_on_odds_change: bool = True,
+        odds_change_threshold: float = 0.05,
+        notes: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Add a match to user's watchlist."""
+        async with self.acquire() as conn:
+            try:
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO user_watchlist (
+                        user_id, match_id, notify_on_odds_change,
+                        odds_change_threshold, notes
+                    ) VALUES ($1::uuid, $2, $3, $4, $5)
+                    RETURNING *
+                    """,
+                    user_id, match_id, notify_on_odds_change,
+                    odds_change_threshold, notes
+                )
+                if row:
+                    # Fetch with match details
+                    return await self._get_watchlist_item_with_details(
+                        conn, user_id, match_id
+                    )
+                return None
+            except asyncpg.UniqueViolationError:
+                return None  # Already in watchlist
+
+    async def _get_watchlist_item_with_details(
+        self,
+        conn: Connection,
+        user_id: str,
+        match_id: int
+    ) -> Optional[Dict[str, Any]]:
+        """Get watchlist item with match details."""
+        row = await conn.fetchrow(
+            """
+            SELECT
+                uw.id, uw.user_id, uw.match_id, uw.notify_on_odds_change,
+                uw.odds_change_threshold, uw.notes, uw.created_at,
+                m.team1, m.team2, m.start_time, m.status as match_status,
+                s.name as sport_name, s.id as sport_id,
+                l.name as league_name
+            FROM user_watchlist uw
+            JOIN matches m ON uw.match_id = m.id
+            JOIN sports s ON m.sport_id = s.id
+            LEFT JOIN leagues l ON m.league_id = l.id
+            WHERE uw.user_id = $1::uuid AND uw.match_id = $2
+            """,
+            user_id, match_id
+        )
+        return dict(row) if row else None
+
+    async def remove_from_watchlist(self, user_id: str, match_id: int) -> bool:
+        """Remove a match from user's watchlist."""
+        async with self.acquire() as conn:
+            result = await conn.execute(
+                """
+                DELETE FROM user_watchlist
+                WHERE user_id = $1::uuid AND match_id = $2
+                """,
+                user_id, match_id
+            )
+            return "DELETE 1" in result
+
+    async def update_watchlist_item(
+        self,
+        user_id: str,
+        match_id: int,
+        notify_on_odds_change: Optional[bool] = None,
+        odds_change_threshold: Optional[float] = None,
+        notes: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Update watchlist item settings."""
+        async with self.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE user_watchlist
+                SET
+                    notify_on_odds_change = COALESCE($3, notify_on_odds_change),
+                    odds_change_threshold = COALESCE($4, odds_change_threshold),
+                    notes = COALESCE($5, notes)
+                WHERE user_id = $1::uuid AND match_id = $2
+                """,
+                user_id, match_id, notify_on_odds_change, odds_change_threshold, notes
+            )
+            if "UPDATE 1" in result:
+                return await self._get_watchlist_item_with_details(
+                    conn, user_id, match_id
+                )
+            return None
+
+    # ==========================================
+    # USER ARBITRAGE HISTORY OPERATIONS
+    # ==========================================
+
+    async def get_user_arbitrage_history(
+        self,
+        user_id: str,
+        action: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get user's arbitrage interaction history."""
+        async with self.acquire() as conn:
+            query = """
+                SELECT
+                    uah.id, uah.arbitrage_id, uah.match_id, uah.action,
+                    uah.profit_percentage, uah.best_odds, uah.notes, uah.created_at,
+                    m.team1, m.team2, s.name as sport_name
+                FROM user_arbitrage_history uah
+                LEFT JOIN matches m ON uah.match_id = m.id
+                LEFT JOIN sports s ON m.sport_id = s.id
+                WHERE uah.user_id = $1::uuid
+            """
+            params = [user_id]
+
+            if action:
+                params.append(action)
+                query += f" AND uah.action = ${len(params)}"
+
+            query += " ORDER BY uah.created_at DESC"
+            params.extend([limit, offset])
+            query += f" LIMIT ${len(params)-1} OFFSET ${len(params)}"
+
+            rows = await conn.fetch(query, *params)
+            return [dict(row) for row in rows]
+
+    async def record_arbitrage_action(
+        self,
+        user_id: str,
+        arbitrage_id: int,
+        match_id: int,
+        action: str,
+        profit_percentage: Optional[float] = None,
+        best_odds: Optional[Dict] = None,
+        notes: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Record user's interaction with an arbitrage opportunity."""
+        async with self.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                INSERT INTO user_arbitrage_history (
+                    user_id, arbitrage_id, match_id, action,
+                    profit_percentage, best_odds, notes
+                ) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+                RETURNING *
+                """,
+                user_id, arbitrage_id, match_id, action,
+                profit_percentage, best_odds, notes
+            )
+            return dict(row) if row else None
+
+    async def get_user_arbitrage_stats(self, user_id: str) -> Dict[str, Any]:
+        """Get statistics about user's arbitrage interactions."""
+        async with self.acquire() as conn:
+            stats = {}
+
+            # Counts by action
+            rows = await conn.fetch(
+                """
+                SELECT action, COUNT(*) as count
+                FROM user_arbitrage_history
+                WHERE user_id = $1::uuid
+                GROUP BY action
+                """,
+                user_id
+            )
+            stats['by_action'] = {row['action']: row['count'] for row in rows}
+
+            # Total count
+            stats['total'] = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM user_arbitrage_history
+                WHERE user_id = $1::uuid
+                """,
+                user_id
+            ) or 0
+
+            # Average profit of viewed opportunities
+            stats['avg_profit_viewed'] = await conn.fetchval(
+                """
+                SELECT AVG(profit_percentage)
+                FROM user_arbitrage_history
+                WHERE user_id = $1::uuid AND profit_percentage IS NOT NULL
+                """,
+                user_id
+            ) or 0
+
+            # Count from last 7 days
+            stats['last_7_days'] = await conn.fetchval(
+                """
+                SELECT COUNT(*) FROM user_arbitrage_history
+                WHERE user_id = $1::uuid
+                AND created_at >= NOW() - INTERVAL '7 days'
+                """,
+                user_id
+            ) or 0
+
+            return stats
+
+    # ==========================================
+    # SEARCH OPERATIONS
+    # ==========================================
+
+    async def search_matches(
+        self,
+        query: str,
+        sport_id: Optional[int] = None,
+        status: str = 'upcoming',
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """Full-text search for matches."""
+        async with self.acquire() as conn:
+            # Use plainto_tsquery for simpler search
+            sql = """
+                SELECT m.*, s.name as sport_name,
+                       ts_rank(m.search_vector, plainto_tsquery('simple', $1)) as rank
+                FROM matches m
+                JOIN sports s ON m.sport_id = s.id
+                WHERE m.search_vector @@ plainto_tsquery('simple', $1)
+                  AND m.status = $2
+            """
+            params = [query, status]
+
+            if sport_id:
+                params.append(sport_id)
+                sql += f" AND m.sport_id = ${len(params)}"
+
+            sql += " ORDER BY rank DESC, m.start_time"
+            params.append(limit)
+            sql += f" LIMIT ${len(params)}"
+
+            rows = await conn.fetch(sql, *params)
+            return [dict(row) for row in rows]
+
+    async def get_odds_trends(
+        self,
+        match_id: int,
+        bet_type_id: int = 2,  # Default to 1X2
+        hours: int = 24
+    ) -> Dict[str, Any]:
+        """Get odds movement analysis for a match."""
+        async with self.acquire() as conn:
+            since = datetime.utcnow() - timedelta(hours=hours)
+
+            # Get history grouped by bookmaker
+            rows = await conn.fetch(
+                """
+                SELECT
+                    b.name as bookmaker_name,
+                    oh.odd1, oh.odd2, oh.odd3,
+                    oh.recorded_at
+                FROM odds_history oh
+                JOIN bookmakers b ON oh.bookmaker_id = b.id
+                WHERE oh.match_id = $1
+                  AND oh.bet_type_id = $2
+                  AND oh.recorded_at >= $3
+                ORDER BY oh.recorded_at
+                """,
+                match_id, bet_type_id, since
+            )
+
+            # Group by bookmaker
+            by_bookmaker = {}
+            for row in rows:
+                bm = row['bookmaker_name']
+                if bm not in by_bookmaker:
+                    by_bookmaker[bm] = []
+                by_bookmaker[bm].append({
+                    'odd1': float(row['odd1']) if row['odd1'] else None,
+                    'odd2': float(row['odd2']) if row['odd2'] else None,
+                    'odd3': float(row['odd3']) if row['odd3'] else None,
+                    'timestamp': row['recorded_at'].isoformat()
+                })
+
+            # Calculate movement stats
+            movement = {}
+            for bm, history in by_bookmaker.items():
+                if len(history) >= 2:
+                    first = history[0]
+                    last = history[-1]
+                    movement[bm] = {
+                        'odd1_change': (last['odd1'] - first['odd1']) if first['odd1'] and last['odd1'] else None,
+                        'odd2_change': (last['odd2'] - first['odd2']) if first['odd2'] and last['odd2'] else None,
+                        'odd3_change': (last['odd3'] - first['odd3']) if first['odd3'] and last['odd3'] else None,
+                        'data_points': len(history)
+                    }
+
+            return {
+                'match_id': match_id,
+                'bet_type_id': bet_type_id,
+                'hours': hours,
+                'history': by_bookmaker,
+                'movement': movement
+            }
+
+    # ==========================================
+    # PUSH NOTIFICATION HELPERS
+    # ==========================================
+
+    async def get_arbitrage_notification_recipients(
+        self,
+        profit_percentage: float,
+        sport_id: int
+    ) -> List[Dict[str, Any]]:
+        """Get users who should receive arbitrage notifications."""
+        async with self.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT DISTINCT
+                    up.user_id,
+                    ud.expo_push_token,
+                    up.min_profit_percentage
+                FROM user_preferences up
+                JOIN user_devices ud ON ud.user_id = up.user_id
+                WHERE ud.is_active = true
+                AND up.min_profit_percentage <= $1
+                AND $2 = ANY(up.sports)
+                AND (up.notification_settings->>'arbitrage_alerts')::boolean = true
+                """,
+                profit_percentage, sport_id
+            )
+            return [dict(row) for row in rows]
+
+    async def get_watchlist_notification_recipients(
+        self,
+        match_id: int,
+        odds_change: float = 0
+    ) -> List[Dict[str, Any]]:
+        """Get users watching a match who should be notified."""
+        async with self.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT DISTINCT
+                    uw.user_id,
+                    ud.expo_push_token,
+                    uw.notify_on_odds_change,
+                    uw.odds_change_threshold
+                FROM user_watchlist uw
+                JOIN user_devices ud ON ud.user_id = uw.user_id
+                JOIN user_preferences up ON up.user_id = uw.user_id
+                WHERE uw.match_id = $1
+                AND ud.is_active = true
+                AND uw.notify_on_odds_change = true
+                AND ABS($2) >= uw.odds_change_threshold
+                AND (up.notification_settings->>'watchlist_odds_change')::boolean = true
+                """,
+                match_id, odds_change
+            )
+            return [dict(row) for row in rows]
+
+    async def log_push_notification(
+        self,
+        user_id: str,
+        device_id: Optional[int],
+        notification_type: str,
+        title: str,
+        body: str,
+        data: Optional[Dict] = None,
+        status: str = 'pending',
+        expo_receipt_id: Optional[str] = None,
+        error_message: Optional[str] = None
+    ) -> int:
+        """Log a push notification."""
+        async with self.acquire() as conn:
+            return await conn.fetchval(
+                """
+                INSERT INTO push_notifications (
+                    user_id, device_id, notification_type, title, body,
+                    data, status, expo_receipt_id, error_message,
+                    sent_at
+                ) VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                RETURNING id
+                """,
+                user_id, device_id, notification_type, title, body,
+                data, status, expo_receipt_id, error_message
+            )
+
 
 # Global database instance
 db = Database()

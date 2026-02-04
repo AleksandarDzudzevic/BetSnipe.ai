@@ -14,7 +14,15 @@ import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+try:
+    from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    async_playwright = None
+    Browser = None
+    BrowserContext = None
+    Page = None
 
 from .base import BaseScraper, ScrapedMatch, ScrapedOdds
 

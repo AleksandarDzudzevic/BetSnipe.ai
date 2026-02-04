@@ -1,0 +1,69 @@
+# BetSnipe.ai v3.0 - Docker Compose Configuration
+# For local development and testing
+
+version: '3.8'
+
+services:
+  # Main application
+  betsnipe-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: betsnipe-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - SCRAPE_INTERVAL_SECONDS=${SCRAPE_INTERVAL_SECONDS:-2}
+      - MIN_PROFIT_PERCENTAGE=${MIN_PROFIT_PERCENTAGE:-1.0}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_TELEGRAM=${ENABLE_TELEGRAM:-true}
+      - ENABLE_WEBSOCKET=${ENABLE_WEBSOCKET:-true}
+      - ENABLE_ODDS_HISTORY=${ENABLE_ODDS_HISTORY:-true}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - betsnipe-network
+
+  # PostgreSQL (for local development only - use Supabase in production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: betsnipe-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=betsnipe
+      - POSTGRES_PASSWORD=betsnipe_dev
+      - POSTGRES_DB=betsnipe
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./db/schema_v3.sql:/docker-entrypoint-initdb.d/02-schema_v3.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U betsnipe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betsnipe-network
+    profiles:
+      - dev  # Only start with --profile dev
+
+volumes:
+  postgres_data:
+
+networks:
+  betsnipe-network:
+    driver: bridge

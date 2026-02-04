@@ -46,6 +46,12 @@ websockets>=12.0
 pydantic>=2.0.0
 pydantic-settings>=2.1.0
 
+# JWT authentication
+PyJWT>=2.8.0
+
+# Expo Push Notifications
+exponent-server-sdk>=2.0.0
+
 # ==========================================
 # Optional Dependencies
 # ==========================================

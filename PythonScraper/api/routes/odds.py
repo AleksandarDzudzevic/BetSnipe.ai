@@ -367,3 +367,128 @@ async def get_best_odds(
     results.sort(key=lambda x: x['max_difference_pct'], reverse=True)
 
     return {'best_odds': results[:limit]}
+
+
+# ==========================================
+# SEARCH & TRENDS ENDPOINTS
+# ==========================================
+
+class SearchResult(BaseModel):
+    """Search result item."""
+    id: int
+    team1: str
+    team2: str
+    sport_id: int
+    sport_name: str
+    start_time: datetime
+    status: str
+    relevance: float
+
+
+class SearchResponse(BaseModel):
+    """Search response."""
+    query: str
+    results: List[SearchResult]
+    total: int
+
+
+class OddsTrendEntry(BaseModel):
+    """Single trend data point."""
+    odd1: Optional[float]
+    odd2: Optional[float]
+    odd3: Optional[float]
+    timestamp: str
+
+
+class BookmakerTrend(BaseModel):
+    """Trend data for a bookmaker."""
+    odd1_change: Optional[float]
+    odd2_change: Optional[float]
+    odd3_change: Optional[float]
+    data_points: int
+
+
+class OddsTrendsResponse(BaseModel):
+    """Odds trends analysis."""
+    match_id: int
+    bet_type_id: int
+    hours: int
+    history: dict  # bookmaker_name -> List[OddsTrendEntry]
+    movement: dict  # bookmaker_name -> BookmakerTrend
+
+
+@router.get("/search", response_model=SearchResponse)
+async def search_matches(
+    q: str = Query(..., min_length=2, max_length=100, description="Search query"),
+    sport_id: Optional[int] = Query(None, description="Filter by sport ID"),
+    status: str = Query("upcoming", pattern="^(upcoming|live|finished)$"),
+    limit: int = Query(20, ge=1, le=50, description="Maximum results")
+):
+    """
+    Search for matches by team name.
+
+    Uses full-text search with fuzzy matching for team names.
+    """
+    if not db.is_connected:
+        raise HTTPException(status_code=503, detail="Database not connected")
+
+    matches = await db.search_matches(
+        query=q,
+        sport_id=sport_id,
+        status=status,
+        limit=limit
+    )
+
+    results = [
+        SearchResult(
+            id=m['id'],
+            team1=m['team1'],
+            team2=m['team2'],
+            sport_id=m['sport_id'],
+            sport_name=m.get('sport_name', ''),
+            start_time=m['start_time'],
+            status=m.get('status', 'upcoming'),
+            relevance=float(m.get('rank', 0))
+        )
+        for m in matches
+    ]
+
+    return SearchResponse(
+        query=q,
+        results=results,
+        total=len(results)
+    )
+
+
+@router.get("/odds/trends/{match_id}", response_model=OddsTrendsResponse)
+async def get_odds_trends(
+    match_id: int,
+    bet_type_id: int = Query(2, description="Bet type ID (default: 1X2)"),
+    hours: int = Query(24, ge=1, le=168, description="Hours of history")
+):
+    """
+    Get odds movement analysis for a match.
+
+    Returns historical odds grouped by bookmaker with change calculations.
+    Useful for visualizing how odds have moved over time.
+    """
+    if not db.is_connected:
+        raise HTTPException(status_code=503, detail="Database not connected")
+
+    match = await db.get_match_by_id(match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    trends = await db.get_odds_trends(
+        match_id=match_id,
+        bet_type_id=bet_type_id,
+        hours=hours
+    )
+
+    return OddsTrendsResponse(
+        match_id=trends['match_id'],
+        bet_type_id=trends['bet_type_id'],
+        hours=trends['hours'],
+        history=trends['history'],
+        movement=trends['movement']
+    )

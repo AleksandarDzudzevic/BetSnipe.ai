@@ -5,7 +5,8 @@
       "WebFetch(domain:www.mozzartbet.com)",
       "Bash(python test_match_501891.py:*)",
       "Bash(python:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

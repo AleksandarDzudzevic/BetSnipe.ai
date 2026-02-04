@@ -1,7 +1,8 @@
 """
-FastAPI Application for BetSnipe.ai v2.0
+FastAPI Application for BetSnipe.ai v3.0
 
 Main entry point for the REST API and WebSocket server.
+Includes user authentication and push notifications.
 """
 
 import asyncio
@@ -27,7 +28,7 @@ from core.scrapers import (
     TopbetScraper,
 )
 
-from .routes import odds, arbitrage
+from .routes import odds, arbitrage, auth, user
 from .websocket import router as websocket_router, manager
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ async def lifespan(app: FastAPI):
     engine.register_scraper(SuperbetScraper())
     engine.register_scraper(MerkurScraper())
     engine.register_scraper(TopbetScraper())
-    logger.info(f"Registered {len(engine.scrapers)} scrapers")
+    logger.info(f"Registered {len(engine._scrapers)} scrapers")
 
     # Register WebSocket update callback
     async def on_update(update_type: str, data):
@@ -92,7 +93,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="BetSnipe.ai API",
         description="Real-time odds comparison and arbitrage detection for Serbian bookmakers",
-        version="2.0.0",
+        version="3.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
@@ -110,6 +111,8 @@ def create_app() -> FastAPI:
     # Include routers
     app.include_router(odds.router, prefix="/api", tags=["odds"])
     app.include_router(arbitrage.router, prefix="/api", tags=["arbitrage"])
+    app.include_router(auth.router, prefix="/api", tags=["auth"])
+    app.include_router(user.router, prefix="/api", tags=["user"])
     app.include_router(websocket_router, tags=["websocket"])
 
     # Error handlers

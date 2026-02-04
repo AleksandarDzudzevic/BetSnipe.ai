@@ -24,6 +24,16 @@ class Settings(BaseSettings):
     # Supabase specific (optional)
     supabase_url: Optional[str] = Field(default=None, alias="SUPABASE_URL")
     supabase_key: Optional[str] = Field(default=None, alias="SUPABASE_KEY")
+    supabase_jwt_secret: Optional[str] = Field(
+        default=None,
+        alias="SUPABASE_JWT_SECRET",
+        description="JWT secret for validating Supabase tokens"
+    )
+    supabase_service_role_key: Optional[str] = Field(
+        default=None,
+        alias="SUPABASE_SERVICE_ROLE_KEY",
+        description="Service role key for admin operations"
+    )
 
     # Telegram notifications
     telegram_bot_token: Optional[str] = Field(default=None, alias="TELEGRAM_BOT_TOKEN")

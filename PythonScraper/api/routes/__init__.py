@@ -1,7 +1,7 @@
 """
-API Routes for BetSnipe.ai v2.0
+API Routes for BetSnipe.ai v3.0
 """
 
-from . import odds, arbitrage
+from . import odds, arbitrage, auth, user
 
-__all__ = ['odds', 'arbitrage']
+__all__ = ['odds', 'arbitrage', 'auth', 'user']
