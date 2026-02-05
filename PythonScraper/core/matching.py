@@ -11,12 +11,21 @@ Multi-field scoring algorithm combining:
 import re
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, List, Tuple, Any
 
 from rapidfuzz import fuzz
 
 from .config import settings, SPORTS
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime is timezone-aware (UTC)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 logger = logging.getLogger(__name__)
 
@@ -217,6 +226,10 @@ class MatchMatcher:
         # Get sport-specific time window
         sport_config = SPORTS.get(sport_id, {})
         max_window_minutes = sport_config.get('time_window_minutes', 30)
+
+        # Ensure both datetimes are timezone-aware
+        time_a = ensure_utc(time_a)
+        time_b = ensure_utc(time_b)
 
         # Calculate difference in minutes
         diff_seconds = abs((time_a - time_b).total_seconds())

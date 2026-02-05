@@ -8,7 +8,7 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 import aiohttp
 from aiohttp import ClientTimeout, ClientSession
@@ -143,7 +143,7 @@ class BaseScraper(ABC):
                 all_matches.extend(result)
                 logger.debug(f"[{self.bookmaker_name}] Sport {sport_id}: {len(result)} matches")
 
-        self._last_scrape = datetime.utcnow()
+        self._last_scrape = datetime.now(timezone.utc)
         logger.info(f"[{self.bookmaker_name}] Total: {len(all_matches)} matches")
 
         return all_matches
@@ -228,15 +228,17 @@ class BaseScraper(ABC):
         return match_name.strip(), ""
 
     def parse_timestamp(self, timestamp: Any) -> Optional[datetime]:
-        """Parse various timestamp formats to datetime."""
+        """Parse various timestamp formats to datetime (returns UTC-aware datetime)."""
+        result = None
         if isinstance(timestamp, datetime):
-            return timestamp
-        if isinstance(timestamp, (int, float)):
+            result = timestamp
+        elif isinstance(timestamp, (int, float)):
             # Unix timestamp (seconds or milliseconds)
             if timestamp > 1e12:  # Milliseconds
-                return datetime.utcfromtimestamp(timestamp / 1000)
-            return datetime.utcfromtimestamp(timestamp)
-        if isinstance(timestamp, str):
+                result = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc)
+            else:
+                result = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        elif isinstance(timestamp, str):
             # Remove trailing 'Z' for UTC
             timestamp = timestamp.rstrip('Z')
             # Try common formats
@@ -247,10 +249,15 @@ class BaseScraper(ABC):
                 '%Y-%m-%d %H:%M',
             ]:
                 try:
-                    return datetime.strptime(timestamp, fmt)
+                    result = datetime.strptime(timestamp, fmt)
+                    break
                 except ValueError:
                     continue
-        return None
+
+        # Ensure result is timezone-aware (UTC)
+        if result and result.tzinfo is None:
+            result = result.replace(tzinfo=timezone.utc)
+        return result
 
     def get_stats(self) -> Dict[str, Any]:
         """Get scraper statistics."""

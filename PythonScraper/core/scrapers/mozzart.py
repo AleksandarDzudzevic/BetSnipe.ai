@@ -68,39 +68,46 @@ class MozzartScraper(BaseScraper):
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
         self._initialized = False
+        self._init_lock = asyncio.Lock()  # Prevent race condition during initialization
 
     async def _ensure_initialized(self):
         """Initialize Playwright browser if not already done."""
         if self._initialized:
             return
 
-        try:
-            self._playwright = await async_playwright().start()
-            self._browser = await self._playwright.chromium.launch(
-                headless=True,
-                args=['--disable-blink-features=AutomationControlled']
-            )
-            self._context = await self._browser.new_context(
-                viewport={'width': 1920, 'height': 1080},
-                user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
-            )
+        # Use lock to prevent race condition when multiple sports scrape concurrently
+        async with self._init_lock:
+            # Double-check after acquiring lock (another task may have initialized)
+            if self._initialized:
+                return
 
-            # Create a persistent page for making API requests
-            self._page = await self._context.new_page()
-
-            # Warm up session by visiting the betting page
             try:
-                await self._page.goto('https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today', timeout=45000)
-                await asyncio.sleep(3)
-                logger.info("[Mozzart] Playwright browser initialized and warmed up")
+                self._playwright = await async_playwright().start()
+                self._browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=['--disable-blink-features=AutomationControlled']
+                )
+                self._context = await self._browser.new_context(
+                    viewport={'width': 1920, 'height': 1080},
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
+                )
+
+                # Create a persistent page for making API requests
+                self._page = await self._context.new_page()
+
+                # Warm up session by visiting the betting page
+                try:
+                    await self._page.goto('https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today', timeout=45000)
+                    await asyncio.sleep(3)
+                    logger.info("[Mozzart] Playwright browser initialized and warmed up")
+                except Exception as e:
+                    logger.warning(f"[Mozzart] Warmup navigation issue: {e}")
+
+                self._initialized = True
+
             except Exception as e:
-                logger.warning(f"[Mozzart] Warmup navigation issue: {e}")
-
-            self._initialized = True
-
-        except Exception as e:
-            logger.error(f"[Mozzart] Failed to initialize Playwright: {e}")
-            raise
+                logger.error(f"[Mozzart] Failed to initialize Playwright: {e}")
+                raise
 
     async def close(self):
         """Clean up Playwright resources."""

@@ -1,292 +1,104 @@
-# BetSnipe.ai v2.0 - Implementation Plan
+# BetSnipe.ai - Project Plan
 
-## Goal
-Transform the current batch-based arbitrage detector into a real-time odds platform (OddsJam for Serbian market).
+## Current Status (Feb 2026)
 
----
+### Backend - WORKING
+- [x] 7 bookmaker scrapers active (Admiral, Soccerbet, Mozzart, Maxbet, Superbet, Merkur, Topbet)
+- [x] Bulk database operations (~2 queries per 500 matches)
+- [x] Arbitrage detection after each scrape cycle
+- [x] FastAPI with REST + WebSocket endpoints
+- [x] Supabase integration with RLS enabled
+- [x] Timing logs for each bookmaker
 
-## Architecture Overview
+### Database - OPTIMIZED
+- [x] Unique constraint on matches for fast ON CONFLICT upserts
+- [x] Composite indexes for bulk lookups
+- [x] Foreign key indexes added
+- [x] RLS enabled with public read policies
+- [x] Views fixed (SECURITY INVOKER)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     BetSnipe.ai v2.0                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐      │
-│  │   Unified    │    │   Match      │    │   FastAPI    │      │
-│  │   Scraper    │───▶│   Engine     │───▶│   WebSocket  │      │
-│  │   Engine     │    │   (Matching) │    │   Server     │      │
-│  └──────────────┘    └──────────────┘    └──────────────┘      │
-│         │                   │                   │               │
-│         ▼                   ▼                   ▼               │
-│  ┌─────────────────────────────────────────────────────┐       │
-│  │              PostgreSQL (Supabase)                   │       │
-│  │  - matches, odds_history, arbitrage_opportunities   │       │
-│  └─────────────────────────────────────────────────────┘       │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Deployment (Free Tier)
-
-| Component | Service | Cost |
-|-----------|---------|------|
-| Database | Supabase Free | $0 (500MB PostgreSQL) |
-| Backend | Railway.app or Render.com | $0 (free tier) |
-| Mobile (Phase 2) | Expo | $0 |
+### Mobile App - IN PROGRESS
+- [x] Expo/React Native setup
+- [x] Basic screens (Home, Arbitrage, Matches, Settings)
+- [x] Supabase Auth integration
+- [x] API service layer
+- [ ] Full testing with live backend
+- [ ] Push notifications testing
+- [ ] UI polish
 
 ---
 
-## Phase 1: Backend (What We Build Now)
+## Performance Metrics
 
-### 1.1 Database Schema
+| Bookmaker | Matches | Scrape Time | DB Time | Total |
+|-----------|---------|-------------|---------|-------|
+| Topbet | ~700 | ~1s | ~1s | ~2s |
+| Admiral | ~1200 | ~15s | ~1s | ~16s |
+| Soccerbet | ~1100 | ~15s | ~1s | ~16s |
+| Maxbet | ~1100 | ~17s | ~1s | ~18s |
+| Merkur | ~800 | ~20s | ~1s | ~21s |
+| Superbet | ~1300 | ~80s | ~1s | ~81s |
+| Mozzart | ~varies | ~varies | ~1s | varies |
 
-**Tables:**
-
-```sql
--- Reference tables
-bookmakers (id, name, api_base_url, is_active)
-sports (id, name, name_sr)
-bet_types (id, name, num_outcomes)
-leagues (id, name, sport_id, country, external_ids)
-
--- Core tables
-matches (id, team1, team2, team1_normalized, team2_normalized,
-         sport_id, league_id, start_time, external_ids, status)
-
-current_odds (match_id, bookmaker_id, bet_type_id, margin,
-              odd1, odd2, odd3, updated_at)
-
-odds_history (id, match_id, bookmaker_id, bet_type_id, margin,
-              odd1, odd2, odd3, recorded_at)
-
-arbitrage_opportunities (id, match_id, bet_type_id, margin,
-                         profit_percentage, best_odds, stakes,
-                         arb_hash, detected_at, notified_at, is_active)
-```
-
-### 1.2 Unified Scraper Engine
-
-**Key improvements over current system:**
-- Single async process (not 20+ subprocesses)
-- Persistent HTTP connection pools (faster)
-- Incremental updates (UPSERT, not DELETE/INSERT)
-- Real-time match deduplication
-
-**Flow:**
-```
-while True:
-    1. Fetch odds from all 8 bookmakers in parallel (asyncio)
-    2. For each match found:
-       - Normalize team names
-       - Find or create unified match record
-       - Update current_odds table
-       - Insert into odds_history
-    3. Detect arbitrage opportunities
-    4. Send Telegram alerts for new opportunities
-    5. Sleep 1-2 seconds
-    6. Repeat
-```
-
-### 1.3 Enhanced Match Matching
-
-**Current system:** Team name fuzzy matching only
-
-**New system:** Multi-factor scoring
-1. **Team name similarity** (RapidFuzz) - 50% weight
-2. **Time proximity** (within 2 hours) - 25% weight
-3. **League match** (if available) - 15% weight
-4. **Odds similarity** (within 20%) - 10% weight
-
-**Confidence tiers:**
-- Score >= 85: Auto-match
-- Score 70-84: Match if time within 30min
-- Score < 70: Create new match record
-
-**Tennis-specific:**
-- Extract surnames from player names
-- Handle name order reversal (Player A vs Player B = Player B vs Player A)
-
-### 1.4 FastAPI Server
-
-**REST Endpoints:**
-```
-GET  /health              - Health check
-GET  /stats               - System statistics
-GET  /api/sports          - List sports
-GET  /api/bookmakers      - List bookmakers
-GET  /api/matches         - List matches with odds
-GET  /api/matches/{id}    - Get match details
-GET  /api/matches/{id}/odds-history  - Odds history for charting
-GET  /api/odds/best       - Best odds comparison
-GET  /api/arbitrage       - Active arbitrage opportunities
-GET  /api/arbitrage/stats - Arbitrage statistics
-POST /api/arbitrage/calculate - Calculate arbitrage from given odds
-```
-
-**WebSocket Endpoints:**
-```
-WS /ws                - Main feed (all updates)
-WS /ws/odds           - Odds updates only
-WS /ws/arbitrage      - Arbitrage alerts only
-```
+**Full cycle**: ~80-90s for all 7 bookmakers (limited by Superbet API speed)
 
 ---
 
-## Phase 2: Mobile App (Future)
+## Next Steps
 
-React Native with Expo:
-- Real-time odds feed via WebSocket
-- Push notifications for arbitrage
-- Odds comparison charts
-- User authentication
-- Subscription management
+### High Priority
+1. [ ] Test arbitrage detection with lower MIN_PROFIT_PERCENTAGE (0.5%)
+2. [ ] Set up Telegram notifications
+3. [ ] Test mobile app with live backend
+4. [ ] Deploy backend to production (Railway/Render/VPS)
 
----
+### Medium Priority
+5. [ ] Add more bet types (Double Chance, Draw No Bet)
+6. [ ] Improve Mozzart scraper reliability
+7. [ ] Add odds movement tracking/alerts
+8. [ ] Implement user watchlist notifications
 
-## New File Structure
-
-```
-PythonScraper/
-├── main.py                 # NEW: Entry point
-├── requirements.txt        # UPDATED: New dependencies
-├── .env.example            # NEW: Environment template
-│
-├── core/                   # NEW: Core business logic
-│   ├── __init__.py
-│   ├── config.py           # Configuration (pydantic)
-│   ├── db.py               # Database operations (asyncpg)
-│   ├── scraper_engine.py   # Main orchestrator
-│   ├── matching.py         # Enhanced match matching
-│   ├── arbitrage.py        # Arbitrage detection
-│   └── scrapers/           # Bookmaker scrapers
-│       ├── __init__.py
-│       ├── base.py         # Base scraper class
-│       ├── admiral.py
-│       ├── soccerbet.py
-│       ├── mozzart.py
-│       ├── meridian.py
-│       ├── maxbet.py
-│       ├── superbet.py
-│       ├── merkur.py
-│       └── topbet.py
-│
-├── api/                    # NEW: FastAPI application
-│   ├── __init__.py
-│   ├── main.py             # FastAPI app
-│   ├── websocket.py        # WebSocket handler
-│   └── routes/
-│       ├── odds.py         # Odds endpoints
-│       └── arbitrage.py    # Arbitrage endpoints
-│
-├── db/                     # NEW: Database files
-│   └── schema.sql          # PostgreSQL schema
-│
-└── telegram_utils.py       # KEEP: Telegram notifications
-```
+### Low Priority
+9. [ ] Re-enable Meridian scraper
+10. [ ] Add 1xBet, LVBet scrapers
+11. [ ] Historical arbitrage analytics
+12. [ ] Profit tracking for users
 
 ---
 
-## Implementation Steps
+## Known Issues
 
-### Step 1: Database Setup
-1. Create Supabase account (free)
-2. Create `db/schema.sql` with all tables
-3. Run schema on Supabase
-4. Create `core/config.py` for environment variables
-5. Create `core/db.py` with asyncpg connection pool
-
-### Step 2: Core Scraper Infrastructure
-1. Create `core/scrapers/base.py` - base class with common HTTP logic
-2. Port Admiral scraper to new format (as template)
-3. Port remaining 7 scrapers
-4. Create `core/scraper_engine.py` - orchestrator
-
-### Step 3: Match Matching
-1. Create `core/matching.py` with multi-factor scoring
-2. Add league normalization mappings
-3. Add tennis-specific name handling
-4. Test matching accuracy
-
-### Step 4: Arbitrage Detection
-1. Create `core/arbitrage.py`
-2. Implement 2-way and 3-way arbitrage calculation
-3. Add deduplication (24-hour window)
-4. Integrate Telegram notifications
-
-### Step 5: FastAPI Server
-1. Create `api/main.py` with FastAPI app
-2. Create REST endpoints
-3. Create WebSocket handler
-4. Test locally
-
-### Step 6: Deployment
-1. Create `.env.example` template
-2. Deploy to Railway/Render
-3. Connect to Supabase
-4. Test end-to-end
+1. **Superbet slow** - Their API is slow, taking ~80s per cycle
+2. **Mozzart Playwright** - Requires Chromium, adds overhead
+3. **Duplicate matches** - Some scrapers return duplicates (now handled with deduplication)
 
 ---
 
-## Key Technical Decisions
-
-| Decision | Choice | Reason |
-|----------|--------|--------|
-| Database | PostgreSQL (Supabase) | Free, time-series support, real-time subscriptions |
-| Async framework | asyncio + aiohttp | Native Python, no external broker needed |
-| API framework | FastAPI | Async support, WebSocket, auto-docs |
-| Match storage | Unified matches table | One match = one record, link odds via foreign key |
-| Odds storage | current_odds + odds_history | Fast queries + full history |
-| Deployment | Railway/Render | Free tier, easy Python deployment |
-
----
-
-## Sports & Bookmaker IDs (Internal)
-
-**Sports:**
-- Football (1), Basketball (2), Tennis (3), Hockey (4), Table Tennis (5)
-
-**Bookmakers:**
-- Mozzart (1), Meridian (2), Maxbet (3), Admiral (4), Soccerbet (5)
-- Superbet (6), Merkur (7), 1xBet (8), LVBet (9), Topbet (10)
-
-**Bet Types:**
-- 12 (1), 1X2 (2), 1X2_H1 (3), 1X2_H2 (4), Total (5-7), BTTS (8), Handicap (9)
-
----
-
-## Environment Variables
+## Environment Setup
 
 ```bash
-# Database (Supabase)
-DATABASE_URL=postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres
-
-# Telegram
-TELEGRAM_BOT_TOKEN=your-bot-token
-TELEGRAM_CHAT_ID=your-chat-id
-
-# API Server
-API_HOST=0.0.0.0
-API_PORT=8000
-
-# Scraper Settings
-SCRAPE_INTERVAL_SECONDS=2
+# Required
+DATABASE_URL=postgresql://...
 MIN_PROFIT_PERCENTAGE=1.0
-MATCH_SIMILARITY_THRESHOLD=75
+
+# Optional
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+SUPABASE_JWT_SECRET=...
+SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
 ---
 
-## Verification Checklist
+## Quick Commands
 
-- [ ] Database tables created successfully
-- [ ] All 8 scrapers fetch data correctly
-- [ ] Same match from 2 bookmakers links to one record
-- [ ] Odds history accumulates over time
-- [ ] Arbitrage detected when profitable odds exist
-- [ ] Telegram alerts sent for new arbitrage
-- [ ] REST API returns correct data
-- [ ] WebSocket broadcasts updates in real-time
-- [ ] System runs continuously without memory leaks
+```bash
+# Start everything
+cd PythonScraper && python main.py
+
+# Start mobile app
+cd MobileApp && npx expo start
+
+# Check database
+# Use Supabase MCP or dashboard
+```

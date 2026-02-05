@@ -205,68 +205,88 @@ class MerkurScraper(BaseScraper):
 
         return odds_list
 
-    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all matches for a sport."""
+    async def _process_league(
+        self,
+        sport_id: int,
+        league_id: str,
+        league_name: str
+    ) -> List[ScrapedMatch]:
+        """Process a single league and return its matches."""
         matches: List[ScrapedMatch] = []
 
+        try:
+            league_matches = await self.fetch_league_matches(sport_id, league_id)
+            if not league_matches:
+                return matches
+
+            # Fetch all match details concurrently
+            batch_size = 20
+            for i in range(0, len(league_matches), batch_size):
+                batch = league_matches[i:i + batch_size]
+
+                tasks = [
+                    self.fetch_match_details(m["id"])
+                    for m in batch
+                ]
+                details = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for match_info, detail in zip(batch, details):
+                    if isinstance(detail, Exception) or not detail:
+                        continue
+
+                    try:
+                        team1 = match_info.get("home", "")
+                        team2 = match_info.get("away", "")
+                        if not team1 or not team2:
+                            continue
+
+                        kick_off = detail.get("kickOffTime")
+                        start_time = self.parse_timestamp(kick_off)
+                        if not start_time:
+                            continue
+
+                        scraped = ScrapedMatch(
+                            team1=team1,
+                            team2=team2,
+                            sport_id=sport_id,
+                            start_time=start_time,
+                            league_name=league_name,
+                            external_id=str(match_info.get("id")),
+                        )
+
+                        scraped.odds = self.parse_odds(detail, sport_id)
+
+                        if scraped.odds:
+                            matches.append(scraped)
+
+                    except Exception as e:
+                        logger.warning(f"[Merkur] Error processing match: {e}")
+
+        except Exception as e:
+            logger.warning(f"[Merkur] Error processing league {league_name}: {e}")
+
+        return matches
+
+    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
+        """Scrape all matches for a sport."""
         leagues = await self.fetch_leagues(sport_id)
         if not leagues:
-            return matches
+            return []
 
         logger.debug(f"[Merkur] Found {len(leagues)} leagues for sport {sport_id}")
 
-        for league_id, league_name in leagues:
-            try:
-                league_matches = await self.fetch_league_matches(sport_id, league_id)
-                if not league_matches:
-                    continue
+        # Process ALL leagues concurrently
+        league_tasks = [
+            self._process_league(sport_id, league_id, league_name)
+            for league_id, league_name in leagues
+        ]
 
-                # Process in batches
-                batch_size = 10
-                for i in range(0, len(league_matches), batch_size):
-                    batch = league_matches[i:i + batch_size]
+        results = await asyncio.gather(*league_tasks, return_exceptions=True)
 
-                    tasks = [
-                        self.fetch_match_details(m["id"])
-                        for m in batch
-                    ]
-                    details = await asyncio.gather(*tasks, return_exceptions=True)
+        # Combine all matches
+        all_matches: List[ScrapedMatch] = []
+        for result in results:
+            if isinstance(result, list):
+                all_matches.extend(result)
 
-                    for match_info, detail in zip(batch, details):
-                        if isinstance(detail, Exception) or not detail:
-                            continue
-
-                        try:
-                            team1 = match_info.get("home", "")
-                            team2 = match_info.get("away", "")
-                            if not team1 or not team2:
-                                continue
-
-                            kick_off = detail.get("kickOffTime")
-                            if not kick_off:
-                                continue
-                            start_time = datetime.utcfromtimestamp(kick_off / 1000)
-
-                            scraped = ScrapedMatch(
-                                team1=team1,
-                                team2=team2,
-                                sport_id=sport_id,
-                                start_time=start_time,
-                                league_name=league_name,
-                                external_id=str(match_info.get("id")),
-                            )
-
-                            scraped.odds = self.parse_odds(detail, sport_id)
-
-                            if scraped.odds:
-                                matches.append(scraped)
-
-                        except Exception as e:
-                            logger.warning(f"[Merkur] Error processing match: {e}")
-
-                    await asyncio.sleep(0.05)
-
-            except Exception as e:
-                logger.warning(f"[Merkur] Error processing league {league_name}: {e}")
-
-        return matches
+        return all_matches

@@ -6,7 +6,9 @@
       "Bash(python test_match_501891.py:*)",
       "Bash(python:*)",
       "Bash(dir:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "mcp__github__list_commits",
+      "mcp__github__search_repositories"
     ]
   }
 }

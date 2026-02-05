@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BetSnipe.ai is a Python-based real-time arbitrage betting detection system that scrapes odds from Serbian bookmakers, identifies arbitrage opportunities, and sends Telegram notifications.
+BetSnipe.ai is a Python-based real-time arbitrage betting detection system that scrapes odds from Serbian bookmakers, identifies arbitrage opportunities, and provides a mobile app + API for users.
+
+## Tech Stack
+
+- **Backend**: Python FastAPI + asyncpg (PostgreSQL) + WebSocket
+- **Database**: Supabase (PostgreSQL with Row Level Security)
+- **Mobile**: Expo/React Native with TypeScript
+- **Auth**: Supabase Auth with JWT tokens
+- **Scraping**: aiohttp + Playwright (for Cloudflare-protected sites)
 
 ## Commands
 
@@ -27,9 +35,8 @@ python main.py --reload --debug
 # Test scrapers without database
 python test_scrapers.py                     # All scrapers
 python test_scrapers.py --scraper admiral   # Single scraper
-python test_scrapers.py --sport 1           # Football only (1=Football, 2=Basketball, 3=Tennis, 4=Hockey, 5=Table Tennis)
+python test_scrapers.py --sport 1           # Football only
 python test_scrapers.py --arbitrage         # Include arbitrage detection
-python test_scrapers.py --telegram          # Test Telegram notifications
 ```
 
 ## Architecture
@@ -39,40 +46,41 @@ ScraperEngine (core/scraper_engine.py)
     │
     ├── Registers scrapers → BaseScraper subclasses (core/scrapers/*.py)
     │
-    ├── Processes matches → MatchMatcher (core/matching.py)
-    │   └── Fuzzy matching with rapidfuzz, time windows, league similarity
+    ├── Bulk processes matches → bulk_upsert_matches_and_odds (core/db.py)
+    │   └── Uses ON CONFLICT for fast upserts, deduplicates before insert
     │
-    ├── Stores to PostgreSQL → Database (core/db.py)
-    │   └── asyncpg connection pool
+    ├── Stores to Supabase → Database (core/db.py)
+    │   └── asyncpg connection pool (50 connections)
     │
     ├── Detects arbitrage → ArbitrageDetector (core/arbitrage.py)
+    │   └── Runs after each scrape cycle, checks all matches
     │
     └── Broadcasts updates → WebSocket (api/websocket.py)
                           → Telegram (telegram_utils.py)
+                          → Push notifications (core/push_notifications.py)
 ```
 
-The FastAPI app (`api/main.py`) starts the scraper engine on startup and exposes REST/WebSocket endpoints.
+## Active Scrapers
 
-## Creating a New Scraper
-
-1. Create `core/scrapers/{bookmaker}.py` inheriting from `BaseScraper`
-2. Implement required methods:
-   - `get_base_url()` - API base URL
-   - `get_supported_sports()` - List of sport IDs (1-5)
-   - `scrape_sport(sport_id)` - Returns `List[ScrapedMatch]`
-3. Use `fetch_json()` for HTTP requests (handles rate limiting, timeouts)
-4. Use `ScrapedMatch.add_odds()` to attach odds with `bet_type_id`
-5. Register in `main.py` and `test_scrapers.py`
-
-Note: Mozzart scraper exists but is disabled in production due to Cloudflare protection.
+| Bookmaker | ID | Method | Status |
+|-----------|-----|--------|--------|
+| Admiral | 4 | aiohttp | ✅ Active |
+| Soccerbet | 5 | aiohttp | ✅ Active |
+| Mozzart | 1 | Playwright | ✅ Active (Cloudflare bypass) |
+| Maxbet | 3 | aiohttp | ✅ Active |
+| Superbet | 6 | aiohttp | ✅ Active |
+| Merkur | 7 | aiohttp | ✅ Active |
+| Topbet | 10 | aiohttp | ✅ Active |
+| Meridian | 2 | - | ❌ Disabled |
 
 ## ID Mappings
 
 **Sports**: Football (1), Basketball (2), Tennis (3), Hockey (4), Table Tennis (5)
 
-**Bookmakers**: Mozzart (1), Meridian (2), Maxbet (3), Admiral (4), Soccerbet (5), Superbet (6), Merkur (7), 1xBet (8), LVBet (9), Topbet (10)
-
-**Bet Types**: 12 (1), 1X2 (2), 1X2_H1 (3), 1X2_H2 (4), Total (5-7), BTTS (8), Handicap (9)
+**Bet Types**:
+- 12/Winner (1), 1X2 (2), 1X2_H1 (3), 1X2_H2 (4)
+- Total O/U (5), Total H1 (6), Total H2 (7)
+- BTTS (8), Handicap (9), Total Points (10)
 
 ## Key Configuration (.env)
 
@@ -83,7 +91,27 @@ TELEGRAM_CHAT_ID=your-chat-id
 MIN_PROFIT_PERCENTAGE=1.0      # Minimum arbitrage profit to report
 MATCH_SIMILARITY_THRESHOLD=75  # Fuzzy match threshold (0-100)
 SCRAPE_INTERVAL_SECONDS=2      # Time between scrape cycles
+
+# Supabase (for auth)
+SUPABASE_JWT_SECRET=your-jwt-secret
+SUPABASE_SERVICE_ROLE_KEY=your-service-key
 ```
+
+## Database Schema
+
+Key tables in Supabase:
+- `matches` - Deduplicated matches with unique constraint on (team1_normalized, team2_normalized, sport_id, start_time)
+- `current_odds` - Latest odds with PK (match_id, bookmaker_id, bet_type_id, margin)
+- `arbitrage_opportunities` - Detected arbitrage with profit %, stakes
+- `odds_history` - Historical odds for trend analysis
+
+User tables (v3):
+- `user_preferences` - Min profit, sports, bookmaker filters
+- `user_devices` - Expo push tokens
+- `user_watchlist` - Watched matches
+- `user_arbitrage_history` - User interactions
+
+RLS is enabled on all tables with public read policies.
 
 ## API Endpoints
 
@@ -100,6 +128,18 @@ WS   /ws/odds         # Odds updates only
 WS   /ws/arbitrage    # Arbitrage alerts only
 ```
 
-## Database Tables
+## Performance Optimizations
 
-See `db/schema.sql`: bookmakers, sports, bet_types, leagues, matches, current_odds, odds_history, arbitrage_opportunities
+1. **Bulk inserts** - Uses `unnest()` arrays with ON CONFLICT for ~100x faster DB operations
+2. **Deduplication** - Matches and odds deduplicated before insert to avoid conflicts
+3. **Connection pool** - 50 connections for concurrent operations
+4. **Composite indexes** - `idx_matches_bulk_lookup` for fast lookups
+5. **Concurrent scraping** - All 7 bookmakers scraped in parallel
+
+## Mobile App (MobileApp/)
+
+Expo/React Native app with:
+- `src/app/` - Expo Router screens
+- `src/services/` - API, WebSocket, Auth, Notifications
+- `src/stores/` - Zustand state management
+- `src/types/` - TypeScript types

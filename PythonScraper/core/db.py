@@ -5,15 +5,42 @@ Uses asyncpg for async PostgreSQL operations with connection pooling.
 """
 
 import asyncio
+import json
 import logging
 from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
+
+
+def ensure_utc(dt: datetime) -> datetime:
+    """Ensure datetime is timezone-aware (UTC)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        # Assume naive datetime is UTC
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
 
 import asyncpg
 from asyncpg import Pool, Connection
 
 from .config import settings
+
+
+async def _init_connection(conn: Connection) -> None:
+    """Initialize connection with JSON codec for JSONB columns."""
+    await conn.set_type_codec(
+        'jsonb',
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema='pg_catalog'
+    )
+    await conn.set_type_codec(
+        'json',
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema='pg_catalog'
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -34,10 +61,11 @@ class Database:
         try:
             self._pool = await asyncpg.create_pool(
                 self.database_url,
-                min_size=2,
-                max_size=10,
+                min_size=5,
+                max_size=50,
                 command_timeout=60,
                 statement_cache_size=100,
+                init=_init_connection,
             )
             self._connected = True
             logger.info("Database connection pool established")
@@ -66,6 +94,135 @@ class Database:
             yield conn
 
     # ==========================================
+    # BULK OPERATIONS (for fast scraper processing)
+    # ==========================================
+
+    async def bulk_upsert_matches_and_odds(
+        self,
+        matches_data: List[Dict],
+        bookmaker_id: int
+    ) -> int:
+        """
+        Bulk upsert matches and odds using efficient batch operations.
+        Uses ON CONFLICT with unique constraint for maximum speed.
+
+        Args:
+            matches_data: List of dicts with match and odds data
+            bookmaker_id: The bookmaker ID
+
+        Returns:
+            Number of matches processed
+        """
+        if not matches_data:
+            return 0
+
+        # Deduplicate matches - some scrapers return duplicates
+        seen = {}
+        unique_matches = []
+        for m in matches_data:
+            key = (m['team1_normalized'], m['team2_normalized'], m['sport_id'],
+                   ensure_utc(m['start_time']).isoformat())
+            if key not in seen:
+                seen[key] = len(unique_matches)
+                unique_matches.append(m)
+            else:
+                # Merge odds from duplicate into existing match
+                existing_idx = seen[key]
+                unique_matches[existing_idx]['odds'].extend(m.get('odds', []))
+
+        async with self.acquire() as conn:
+            processed = 0
+
+            # Process in chunks
+            chunk_size = 500
+            for i in range(0, len(unique_matches), chunk_size):
+                chunk = unique_matches[i:i + chunk_size]
+
+                # Step 1: Bulk upsert all matches using ON CONFLICT
+                # Build arrays for unnest
+                t1 = [m['team1'] for m in chunk]
+                t2 = [m['team2'] for m in chunk]
+                t1n = [m['team1_normalized'] for m in chunk]
+                t2n = [m['team2_normalized'] for m in chunk]
+                sids = [m['sport_id'] for m in chunk]
+                times = [ensure_utc(m['start_time']) for m in chunk]
+                ext_ids = [
+                    {str(bookmaker_id): m['external_id']} if m.get('external_id') else {}
+                    for m in chunk
+                ]
+
+                # Bulk insert/update matches and get all IDs back
+                match_rows = await conn.fetch("""
+                    INSERT INTO matches (team1, team2, team1_normalized, team2_normalized,
+                                        sport_id, start_time, external_ids, metadata)
+                    SELECT
+                        unnest($1::text[]), unnest($2::text[]),
+                        unnest($3::text[]), unnest($4::text[]),
+                        unnest($5::int[]), unnest($6::timestamptz[]),
+                        unnest($7::jsonb[]), '{}'::jsonb
+                    ON CONFLICT (team1_normalized, team2_normalized, sport_id, start_time)
+                    DO UPDATE SET
+                        updated_at = NOW(),
+                        external_ids = matches.external_ids || EXCLUDED.external_ids
+                    RETURNING id, team1_normalized, team2_normalized, sport_id, start_time
+                """, t1, t2, t1n, t2n, sids, times, ext_ids)
+
+                # Build lookup from returned rows
+                match_id_lookup = {}
+                for row in match_rows:
+                    key = (row['team1_normalized'], row['team2_normalized'],
+                           row['sport_id'], row['start_time'])
+                    match_id_lookup[key] = row['id']
+
+                # Step 2: Collect all odds with their match IDs (deduplicated)
+                odds_data = []
+                odds_seen = set()
+                for m in chunk:
+                    key = (m['team1_normalized'], m['team2_normalized'],
+                           m['sport_id'], ensure_utc(m['start_time']))
+                    match_id = match_id_lookup.get(key)
+
+                    if not match_id:
+                        continue
+
+                    processed += 1
+                    for odds in m.get('odds', []):
+                        margin = round(odds.get('margin', 0.0), 2)
+                        odds_key = (match_id, odds['bet_type_id'], margin)
+                        if odds_key in odds_seen:
+                            continue  # Skip duplicate odds
+                        odds_seen.add(odds_key)
+                        odds_data.append((
+                            match_id, odds['bet_type_id'],
+                            odds['odd1'], odds['odd2'], odds.get('odd3'),
+                            margin
+                        ))
+
+                # Step 3: Bulk upsert all odds
+                if odds_data:
+                    await conn.execute("""
+                        INSERT INTO current_odds (match_id, bookmaker_id, bet_type_id, odd1, odd2, odd3, margin)
+                        SELECT
+                            unnest($1::int[]), $2,
+                            unnest($3::int[]),
+                            unnest($4::numeric[]), unnest($5::numeric[]), unnest($6::numeric[]),
+                            unnest($7::numeric[])
+                        ON CONFLICT (match_id, bookmaker_id, bet_type_id, margin)
+                        DO UPDATE SET
+                            odd1 = EXCLUDED.odd1,
+                            odd2 = EXCLUDED.odd2,
+                            odd3 = EXCLUDED.odd3,
+                            updated_at = NOW()
+                    """,
+                        [o[0] for o in odds_data], bookmaker_id,
+                        [o[1] for o in odds_data],
+                        [o[2] for o in odds_data], [o[3] for o in odds_data], [o[4] for o in odds_data],
+                        [o[5] for o in odds_data]
+                    )
+
+            return processed
+
+    # ==========================================
     # MATCH OPERATIONS
     # ==========================================
 
@@ -79,9 +236,11 @@ class Database:
     ) -> Optional[Dict[str, Any]]:
         """Find an existing match that matches the given criteria."""
         async with self.acquire() as conn:
+            # Ensure timezone-aware datetime
+            start_time_utc = ensure_utc(start_time)
             # Search within time window
-            time_start = start_time - timedelta(minutes=time_window_minutes)
-            time_end = start_time + timedelta(minutes=time_window_minutes)
+            time_start = start_time_utc - timedelta(minutes=time_window_minutes)
+            time_end = start_time_utc + timedelta(minutes=time_window_minutes)
 
             row = await conn.fetchrow(
                 """
@@ -110,8 +269,10 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Find all potential matches within time window for fuzzy matching."""
         async with self.acquire() as conn:
-            time_start = start_time - timedelta(minutes=time_window_minutes)
-            time_end = start_time + timedelta(minutes=time_window_minutes)
+            # Ensure timezone-aware datetime
+            start_time_utc = ensure_utc(start_time)
+            time_start = start_time_utc - timedelta(minutes=time_window_minutes)
+            time_end = start_time_utc + timedelta(minutes=time_window_minutes)
 
             rows = await conn.fetch(
                 """
@@ -140,10 +301,29 @@ class Database:
         metadata: Optional[Dict] = None
     ) -> int:
         """Insert or update a match, returning the match ID."""
+        # Ensure timezone-aware datetime
+        start_time = ensure_utc(start_time)
+        time_window_minutes = 120
+        time_start = start_time - timedelta(minutes=time_window_minutes)
+        time_end = start_time + timedelta(minutes=time_window_minutes)
+
         async with self.acquire() as conn:
-            # Check for existing match first
-            existing = await self.find_matching_match(
-                team1_normalized, team2_normalized, sport_id, start_time
+            # Check for existing match first (inline query to avoid nested connection)
+            existing = await conn.fetchrow(
+                """
+                SELECT id, team1, team2, team1_normalized, team2_normalized,
+                       sport_id, league_id, start_time, external_ids, status
+                FROM matches
+                WHERE sport_id = $1
+                  AND start_time BETWEEN $2 AND $3
+                  AND status = 'upcoming'
+                  AND (
+                      (team1_normalized = $4 AND team2_normalized = $5)
+                      OR (team1_normalized = $5 AND team2_normalized = $4)
+                  )
+                LIMIT 1
+                """,
+                sport_id, time_start, time_end, team1_normalized, team2_normalized
             )
 
             if existing:
@@ -151,7 +331,7 @@ class Database:
                 # Update external_ids if provided
                 if external_id:
                     bookmaker_id, ext_id = external_id
-                    current_ids = existing.get('external_ids') or {}
+                    current_ids = existing['external_ids'] or {}
                     current_ids[str(bookmaker_id)] = ext_id
                     await conn.execute(
                         """
@@ -199,7 +379,7 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Get upcoming matches."""
         async with self.acquire() as conn:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             end_time = now + timedelta(hours=hours_ahead)
 
             if sport_id:
@@ -346,7 +526,7 @@ class Database:
     ) -> List[Dict[str, Any]]:
         """Get historical odds for a match."""
         async with self.acquire() as conn:
-            since = datetime.utcnow() - timedelta(hours=hours)
+            since = datetime.now(timezone.utc) - timedelta(hours=hours)
 
             query = """
                 SELECT oh.*, b.name as bookmaker_name, bt.name as bet_type_name
@@ -377,7 +557,7 @@ class Database:
     async def check_arbitrage_exists(self, arb_hash: str) -> bool:
         """Check if arbitrage opportunity was already detected."""
         async with self.acquire() as conn:
-            since = datetime.utcnow() - timedelta(hours=settings.arbitrage_dedup_hours)
+            since = datetime.now(timezone.utc) - timedelta(hours=settings.arbitrage_dedup_hours)
             exists = await conn.fetchval(
                 """
                 SELECT EXISTS(
@@ -546,7 +726,7 @@ class Database:
     async def cleanup_old_data(self, days_to_keep: int = 7) -> Dict[str, int]:
         """Clean up old data from database."""
         async with self.acquire() as conn:
-            cutoff = datetime.utcnow() - timedelta(days=days_to_keep)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
             # Delete old odds history
             result1 = await conn.execute(
@@ -1083,7 +1263,7 @@ class Database:
     ) -> Dict[str, Any]:
         """Get odds movement analysis for a match."""
         async with self.acquire() as conn:
-            since = datetime.utcnow() - timedelta(hours=hours)
+            since = datetime.now(timezone.utc) - timedelta(hours=hours)
 
             # Get history grouped by bookmaker
             rows = await conn.fetch(

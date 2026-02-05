@@ -430,9 +430,9 @@ class MaxbetScraper(BaseScraper):
                     continue
 
                 kick_off = detail.get("kickOffTime")
-                if not kick_off:
+                start_time = self.parse_timestamp(kick_off)
+                if not start_time:
                     continue
-                start_time = datetime.utcfromtimestamp(kick_off / 1000)
 
                 scraped = ScrapedMatch(
                     team1=team1,

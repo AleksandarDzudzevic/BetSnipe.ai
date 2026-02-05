@@ -100,11 +100,11 @@ async def run_scraper_only():
     from core.scrapers.admiral import AdmiralScraper
     from core.scrapers.soccerbet import SoccerbetScraper
     from core.scrapers.maxbet import MaxbetScraper
-    from core.scrapers.meridian import MeridianScraper
+    from core.scrapers.mozzart import MozzartScraper
+    # from core.scrapers.meridian import MeridianScraper  # Disabled temporarily
     from core.scrapers.superbet import SuperbetScraper
     from core.scrapers.merkur import MerkurScraper
     from core.scrapers.topbet import TopbetScraper
-    # MozzartScraper disabled - Cloudflare protection
 
     logger = logging.getLogger(__name__)
 
@@ -113,11 +113,12 @@ async def run_scraper_only():
     # Connect to database
     await db.connect()
 
-    # Register all scrapers (Mozzart disabled due to Cloudflare)
+    # Register all scrapers
     engine.register_scraper(AdmiralScraper())
     engine.register_scraper(SoccerbetScraper())
     engine.register_scraper(MaxbetScraper())
-    engine.register_scraper(MeridianScraper())
+    engine.register_scraper(MozzartScraper())
+    # engine.register_scraper(MeridianScraper())  # Disabled temporarily
     engine.register_scraper(SuperbetScraper())
     engine.register_scraper(MerkurScraper())
     engine.register_scraper(TopbetScraper())

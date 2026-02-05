@@ -377,87 +377,100 @@ class SoccerbetScraper(BaseScraper):
             return self.parse_table_tennis_odds(bet_map)
         return []
 
-    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all matches for a sport."""
+    async def _process_league(
+        self,
+        sport_id: int,
+        league_id: str,
+        league_name: str
+    ) -> List[ScrapedMatch]:
+        """Process a single league and return its matches."""
         matches: List[ScrapedMatch] = []
 
+        try:
+            league_matches = await self.fetch_league_matches(sport_id, league_id)
+
+            if not league_matches:
+                return matches
+
+            # Fetch all match details concurrently (in batches to avoid overwhelming the API)
+            batch_size = 20
+            for i in range(0, len(league_matches), batch_size):
+                batch = league_matches[i:i + batch_size]
+
+                # Fetch details concurrently
+                detail_tasks = [
+                    self.fetch_match_details(str(m["id"]))
+                    for m in batch
+                ]
+                details = await asyncio.gather(*detail_tasks, return_exceptions=True)
+
+                # Process each match
+                for match_data, detail in zip(batch, details):
+                    try:
+                        if isinstance(detail, Exception) or not detail:
+                            continue
+
+                        team1 = match_data.get("home", "")
+                        team2 = match_data.get("away", "")
+
+                        if not team1 or not team2:
+                            continue
+
+                        # Parse timestamp using base class method (returns UTC-aware datetime)
+                        kick_off = detail.get("kickOffTime", 0)
+                        start_time = self.parse_timestamp(kick_off)
+                        if not start_time:
+                            continue
+
+                        # Create match
+                        scraped_match = ScrapedMatch(
+                            team1=team1,
+                            team2=team2,
+                            sport_id=sport_id,
+                            start_time=start_time,
+                            league_name=league_name,
+                            external_id=str(match_data.get("id")),
+                        )
+
+                        # Parse odds based on sport
+                        bet_map = detail.get("betMap", {})
+                        scraped_match.odds = self.parse_odds(bet_map, sport_id)
+
+                        if scraped_match.odds:
+                            matches.append(scraped_match)
+
+                    except Exception as e:
+                        logger.warning(f"[Soccerbet] Error processing match: {e}")
+                        continue
+
+        except Exception as e:
+            logger.warning(f"[Soccerbet] Error processing league {league_name}: {e}")
+
+        return matches
+
+    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
+        """Scrape all matches for a sport."""
         # Get leagues
         leagues = await self.fetch_leagues(sport_id)
 
         if not leagues:
             logger.debug(f"[Soccerbet] No leagues for sport {sport_id}")
-            return matches
+            return []
 
         logger.debug(f"[Soccerbet] Found {len(leagues)} leagues for sport {sport_id}")
 
-        # Process each league
-        for league_id, league_name in leagues:
-            try:
-                league_matches = await self.fetch_league_matches(sport_id, league_id)
+        # Process ALL leagues concurrently
+        league_tasks = [
+            self._process_league(sport_id, league_id, league_name)
+            for league_id, league_name in leagues
+        ]
 
-                if not league_matches:
-                    continue
+        results = await asyncio.gather(*league_tasks, return_exceptions=True)
 
-                # Fetch match details in batches
-                batch_size = 10
-                for i in range(0, len(league_matches), batch_size):
-                    batch = league_matches[i:i + batch_size]
+        # Combine all matches from all leagues
+        all_matches: List[ScrapedMatch] = []
+        for result in results:
+            if isinstance(result, list):
+                all_matches.extend(result)
 
-                    # Fetch details concurrently
-                    detail_tasks = [
-                        self.fetch_match_details(str(m["id"]))
-                        for m in batch
-                    ]
-                    details = await asyncio.gather(*detail_tasks, return_exceptions=True)
-
-                    # Process each match
-                    for match_data, detail in zip(batch, details):
-                        try:
-                            if isinstance(detail, Exception):
-                                continue
-
-                            if not detail:
-                                continue
-
-                            team1 = match_data.get("home", "")
-                            team2 = match_data.get("away", "")
-
-                            if not team1 or not team2:
-                                continue
-
-                            # Parse timestamp (milliseconds)
-                            kick_off = detail.get("kickOffTime", 0)
-                            if kick_off:
-                                start_time = datetime.utcfromtimestamp(kick_off / 1000)
-                            else:
-                                continue
-
-                            # Create match
-                            scraped_match = ScrapedMatch(
-                                team1=team1,
-                                team2=team2,
-                                sport_id=sport_id,
-                                start_time=start_time,
-                                league_name=league_name,
-                                external_id=str(match_data.get("id")),
-                            )
-
-                            # Parse odds based on sport
-                            bet_map = detail.get("betMap", {})
-                            scraped_match.odds = self.parse_odds(bet_map, sport_id)
-
-                            if scraped_match.odds:
-                                matches.append(scraped_match)
-
-                        except Exception as e:
-                            logger.warning(f"[Soccerbet] Error processing match: {e}")
-                            continue
-
-                    # Small delay between batches
-                    await asyncio.sleep(0.05)
-
-            except Exception as e:
-                logger.warning(f"[Soccerbet] Error processing league {league_name}: {e}")
-                continue
-
-        return matches
+        return all_matches

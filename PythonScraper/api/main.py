@@ -21,7 +21,7 @@ from core.scrapers import (
     AdmiralScraper,
     SoccerbetScraper,
     MozzartScraper,
-    MeridianScraper,
+    # MeridianScraper,  # Disabled temporarily
     MaxbetScraper,
     SuperbetScraper,
     MerkurScraper,
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     engine.register_scraper(AdmiralScraper())
     engine.register_scraper(SoccerbetScraper())
     engine.register_scraper(MozzartScraper())
-    engine.register_scraper(MeridianScraper())
+    # engine.register_scraper(MeridianScraper())  # Disabled temporarily
     engine.register_scraper(MaxbetScraper())
     engine.register_scraper(SuperbetScraper())
     engine.register_scraper(MerkurScraper())

@@ -176,30 +176,39 @@ class SuperbetScraper(BaseScraper):
 
         for margin, totals in markets["TG"].items():
             if all(totals.values()):
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=5,
-                    odd1=float(totals["under"]),
-                    odd2=float(totals["over"]),
-                    margin=float(margin)
-                ))
+                try:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=5,
+                        odd1=float(totals["under"]),
+                        odd2=float(totals["over"]),
+                        margin=float(margin)
+                    ))
+                except (ValueError, TypeError):
+                    pass
 
         for margin, totals in markets["TGF"].items():
             if all(totals.values()):
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=6,
-                    odd1=float(totals["under"]),
-                    odd2=float(totals["over"]),
-                    margin=float(margin)
-                ))
+                try:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=6,
+                        odd1=float(totals["under"]),
+                        odd2=float(totals["over"]),
+                        margin=float(margin)
+                    ))
+                except (ValueError, TypeError):
+                    pass
 
         for margin, totals in markets["TGS"].items():
             if all(totals.values()):
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=7,
-                    odd1=float(totals["under"]),
-                    odd2=float(totals["over"]),
-                    margin=float(margin)
-                ))
+                try:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=7,
+                        odd1=float(totals["under"]),
+                        odd2=float(totals["over"]),
+                        margin=float(margin)
+                    ))
+                except (ValueError, TypeError):
+                    pass
 
         return odds_list
 
@@ -252,22 +261,32 @@ class SuperbetScraper(BaseScraper):
         # Handicaps
         for margin, hcp in handicaps.items():
             if all(hcp.values()):
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=9,
-                    odd1=float(hcp["1"]),
-                    odd2=float(hcp["2"]),
-                    margin=float(margin)
-                ))
+                try:
+                    # Parse margin - handle formats like '1.5', '-1.5', '1.5-1'
+                    margin_str = str(margin).split('-')[0] if '-' in str(margin) and not str(margin).startswith('-') else str(margin)
+                    margin_val = float(margin_str)
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=9,
+                        odd1=float(hcp["1"]),
+                        odd2=float(hcp["2"]),
+                        margin=margin_val
+                    ))
+                except (ValueError, TypeError):
+                    pass
 
         # Totals
         for margin, tot in totals.items():
             if all(tot.values()):
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=10,
-                    odd1=float(tot["under"]),
-                    odd2=float(tot["over"]),
-                    margin=float(margin)
-                ))
+                try:
+                    margin_val = float(margin)
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=10,
+                        odd1=float(tot["under"]),
+                        odd2=float(tot["over"]),
+                        margin=margin_val
+                    ))
+                except (ValueError, TypeError):
+                    pass
 
         return odds_list
 
