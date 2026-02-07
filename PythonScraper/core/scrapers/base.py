@@ -88,6 +88,12 @@ class BaseScraper(ABC):
             )
         return self._session
 
+    async def reset_session(self) -> None:
+        """Reset the session for error recovery (close and null so it's lazily recreated)."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+        self._session = None
+
     async def close(self) -> None:
         """Close the aiohttp session."""
         if self._session and not self._session.closed:

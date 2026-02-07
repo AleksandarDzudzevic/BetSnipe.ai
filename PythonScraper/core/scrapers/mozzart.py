@@ -109,6 +109,10 @@ class MozzartScraper(BaseScraper):
                 logger.error(f"[Mozzart] Failed to initialize Playwright: {e}")
                 raise
 
+    async def reset_session(self) -> None:
+        """No-op: Mozzart browser persists across cycles for performance."""
+        pass
+
     async def close(self):
         """Clean up Playwright resources."""
         if hasattr(self, '_page') and self._page:
@@ -617,10 +621,17 @@ class MozzartScraper(BaseScraper):
                     if not match_ids:
                         continue
 
-                    # Fetch match details with limited concurrency
-                    for match_id in match_ids:
+                    # Fetch all match details concurrently (semaphore limits to 3 at a time)
+                    tasks = [self.fetch_match_details(mid, sport_id, league_id) for mid in match_ids]
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                    for match_id, result in zip(match_ids, results):
                         try:
-                            match_data = await self.fetch_match_details(match_id, sport_id, league_id)
+                            if isinstance(result, Exception):
+                                logger.warning(f"[Mozzart] Error fetching match {match_id}: {result}")
+                                continue
+
+                            match_data = result
                             if not match_data:
                                 continue
 

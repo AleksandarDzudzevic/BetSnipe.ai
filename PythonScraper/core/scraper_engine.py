@@ -256,11 +256,9 @@ class ScraperEngine:
         except Exception as e:
             logger.error(f"Error scraping {scraper.bookmaker_name}: {e}", exc_info=True)
             self._stats['errors'] += 1
+            # Reset session on error to avoid poisoned connections next cycle
+            await scraper.reset_session()
             return 0
-
-        finally:
-            # Close scraper session
-            await scraper.close()
 
     async def run_cycle(self) -> Dict[str, Any]:
         """
