@@ -205,7 +205,8 @@ class ArbitrageDetector:
         bet_type_id: int,
         margin: float,
         best_odds: List[Dict],
-        profit_pct: float
+        profit_pct: float,
+        selection: str = ''
     ) -> str:
         """Generate unique hash for arbitrage opportunity."""
         # Sort odds for consistent hashing
@@ -215,6 +216,7 @@ class ArbitrageDetector:
             'match_id': match_id,
             'bet_type_id': bet_type_id,
             'margin': float(margin),
+            'selection': selection,
             'odds': [(o['bookmaker_id'], o['outcome'], round(o['odd'], 3)) for o in sorted_odds],
             'profit': round(profit_pct, 2)
         }
@@ -245,20 +247,25 @@ class ArbitrageDetector:
         if len(current_odds) < 2:
             return opportunities
 
-        # Group odds by bet_type_id and margin
-        odds_groups: Dict[Tuple[int, float], List] = {}
+        # Group odds by bet_type_id, margin, and selection
+        odds_groups: Dict[Tuple[int, float, str], List] = {}
         for odd in current_odds:
-            key = (odd['bet_type_id'], float(odd.get('margin', 0)))
+            key = (odd['bet_type_id'], float(odd.get('margin', 0)), odd.get('selection', ''))
             if key not in odds_groups:
                 odds_groups[key] = []
             odds_groups[key].append(odd)
 
         # Check each group for arbitrage
-        for (bet_type_id, margin), group_odds in odds_groups.items():
+        for (bet_type_id, margin, selection), group_odds in odds_groups.items():
             if len(group_odds) < 2:
                 continue
 
             bet_type = BET_TYPES.get(bet_type_id, {})
+
+            # Skip selection-based markets (outcomes=1) for now —
+            # arbitrage detection for these requires comparing ALL selections
+            if bet_type.get('outcomes', 2) == 1:
+                continue
             is_three_way = bet_type.get('outcomes', 2) == 3
 
             if is_three_way:

@@ -23,12 +23,13 @@ class ScrapedOdds:
     """Represents odds scraped from a bookmaker."""
     bet_type_id: int
     odd1: float
-    odd2: float
+    odd2: Optional[float] = None
     odd3: Optional[float] = None
     margin: float = 0.0
+    selection: str = ''  # outcome identifier for multi-outcome markets
 
     def to_tuple(self) -> Tuple:
-        return (self.bet_type_id, self.margin, self.odd1, self.odd2, self.odd3)
+        return (self.bet_type_id, self.margin, self.odd1, self.odd2, self.odd3, self.selection)
 
 
 @dataclass
@@ -43,15 +44,17 @@ class ScrapedMatch:
     external_id: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def add_odds(self, bet_type_id: int, odd1: float, odd2: float,
-                 odd3: Optional[float] = None, margin: float = 0.0) -> None:
+    def add_odds(self, bet_type_id: int, odd1: float, odd2: Optional[float] = None,
+                 odd3: Optional[float] = None, margin: float = 0.0,
+                 selection: str = '') -> None:
         """Add odds to this match."""
         self.odds.append(ScrapedOdds(
             bet_type_id=bet_type_id,
             odd1=odd1,
             odd2=odd2,
             odd3=odd3,
-            margin=margin
+            margin=margin,
+            selection=selection
         ))
 
 

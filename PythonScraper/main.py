@@ -279,6 +279,7 @@ async def run_single_scraper_debug(scraper_name: str, args):
                             'odd2': odds.odd2,
                             'odd3': odds.odd3,
                             'margin': odds.margin,
+                            'selection': odds.selection,
                         })
 
                     matches_data.append({

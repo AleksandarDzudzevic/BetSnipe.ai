@@ -188,26 +188,28 @@ class Database:
                     processed += 1
                     for odds in m.get('odds', []):
                         margin = round(odds.get('margin', 0.0), 2)
-                        odds_key = (match_id, odds['bet_type_id'], margin)
+                        selection = odds.get('selection', '')
+                        odds_key = (match_id, odds['bet_type_id'], margin, selection)
                         if odds_key in odds_seen:
                             continue  # Skip duplicate odds
                         odds_seen.add(odds_key)
                         odds_data.append((
                             match_id, odds['bet_type_id'],
                             odds['odd1'], odds['odd2'], odds.get('odd3'),
-                            margin
+                            margin, selection
                         ))
 
                 # Step 3: Bulk upsert all odds
                 if odds_data:
                     await conn.execute("""
-                        INSERT INTO current_odds (match_id, bookmaker_id, bet_type_id, odd1, odd2, odd3, margin)
+                        INSERT INTO current_odds (match_id, bookmaker_id, bet_type_id, odd1, odd2, odd3, margin, selection)
                         SELECT
                             unnest($1::int[]), $2,
                             unnest($3::int[]),
                             unnest($4::numeric[]), unnest($5::numeric[]), unnest($6::numeric[]),
-                            unnest($7::numeric[])
-                        ON CONFLICT (match_id, bookmaker_id, bet_type_id, margin)
+                            unnest($7::numeric[]),
+                            unnest($8::text[])
+                        ON CONFLICT (match_id, bookmaker_id, bet_type_id, margin, selection)
                         DO UPDATE SET
                             odd1 = EXCLUDED.odd1,
                             odd2 = EXCLUDED.odd2,
@@ -217,7 +219,8 @@ class Database:
                         [o[0] for o in odds_data], bookmaker_id,
                         [o[1] for o in odds_data],
                         [o[2] for o in odds_data], [o[3] for o in odds_data], [o[4] for o in odds_data],
-                        [o[5] for o in odds_data]
+                        [o[5] for o in odds_data],
+                        [o[6] for o in odds_data]
                     )
 
             return processed
@@ -422,9 +425,10 @@ class Database:
         bookmaker_id: int,
         bet_type_id: int,
         odd1: float,
-        odd2: float,
+        odd2: Optional[float] = None,
         odd3: Optional[float] = None,
-        margin: float = 0
+        margin: float = 0,
+        selection: str = ''
     ) -> bool:
         """Update or insert current odds. Returns True if odds changed."""
         async with self.acquire() as conn:
@@ -433,9 +437,9 @@ class Database:
                 """
                 SELECT odd1, odd2, odd3 FROM current_odds
                 WHERE match_id = $1 AND bookmaker_id = $2
-                  AND bet_type_id = $3 AND margin = $4
+                  AND bet_type_id = $3 AND margin = $4 AND selection = $5
                 """,
-                match_id, bookmaker_id, bet_type_id, margin
+                match_id, bookmaker_id, bet_type_id, margin, selection
             )
 
             if existing:
@@ -449,11 +453,11 @@ class Database:
                 await conn.execute(
                     """
                     UPDATE current_odds
-                    SET odd1 = $5, odd2 = $6, odd3 = $7, updated_at = NOW()
+                    SET odd1 = $6, odd2 = $7, odd3 = $8, updated_at = NOW()
                     WHERE match_id = $1 AND bookmaker_id = $2
-                      AND bet_type_id = $3 AND margin = $4
+                      AND bet_type_id = $3 AND margin = $4 AND selection = $5
                     """,
-                    match_id, bookmaker_id, bet_type_id, margin,
+                    match_id, bookmaker_id, bet_type_id, margin, selection,
                     odd1, odd2, odd3
                 )
             else:
@@ -461,11 +465,11 @@ class Database:
                 await conn.execute(
                     """
                     INSERT INTO current_odds (
-                        match_id, bookmaker_id, bet_type_id, margin,
+                        match_id, bookmaker_id, bet_type_id, margin, selection,
                         odd1, odd2, odd3
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     """,
-                    match_id, bookmaker_id, bet_type_id, margin,
+                    match_id, bookmaker_id, bet_type_id, margin, selection,
                     odd1, odd2, odd3
                 )
 
@@ -477,9 +481,10 @@ class Database:
         bookmaker_id: int,
         bet_type_id: int,
         odd1: float,
-        odd2: float,
+        odd2: Optional[float] = None,
         odd3: Optional[float] = None,
-        margin: float = 0
+        margin: float = 0,
+        selection: str = ''
     ) -> None:
         """Record odds snapshot for historical tracking."""
         if not settings.enable_odds_history:
@@ -489,11 +494,11 @@ class Database:
             await conn.execute(
                 """
                 INSERT INTO odds_history (
-                    match_id, bookmaker_id, bet_type_id, margin,
+                    match_id, bookmaker_id, bet_type_id, margin, selection,
                     odd1, odd2, odd3
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 """,
-                match_id, bookmaker_id, bet_type_id, margin,
+                match_id, bookmaker_id, bet_type_id, margin, selection,
                 odd1, odd2, odd3
             )
 

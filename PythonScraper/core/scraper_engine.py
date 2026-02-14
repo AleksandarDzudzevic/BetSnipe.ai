@@ -158,7 +158,8 @@ class ScraperEngine:
                         odd1=odds.odd1,
                         odd2=odds.odd2,
                         odd3=odds.odd3,
-                        margin=odds.margin
+                        margin=odds.margin,
+                        selection=odds.selection
                     )
 
                     if changed:
@@ -173,7 +174,8 @@ class ScraperEngine:
                             odd1=odds.odd1,
                             odd2=odds.odd2,
                             odd3=odds.odd3,
-                            margin=odds.margin
+                            margin=odds.margin,
+                            selection=odds.selection
                         )
                 except Exception as e:
                     logger.debug(f"Error upserting odds for match {match_id}: {e}")
@@ -229,6 +231,7 @@ class ScraperEngine:
                         'odd2': odds.odd2,
                         'odd3': odds.odd3,
                         'margin': odds.margin,
+                        'selection': odds.selection,
                     })
 
                 matches_data.append({

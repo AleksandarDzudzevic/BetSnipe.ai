@@ -17,6 +17,10 @@ from .base import BaseScraper, ScrapedMatch, ScrapedOdds
 
 logger = logging.getLogger(__name__)
 
+# Rate limiting: max concurrent requests and delay between requests
+MERIDIAN_MAX_CONCURRENT = 2
+MERIDIAN_REQUEST_DELAY = 0.5  # seconds between requests
+
 # Sport ID mapping (Meridian to internal)
 MERIDIAN_SPORTS = {
     58: 1,   # Football
@@ -37,6 +41,7 @@ class MeridianScraper(BaseScraper):
     def __init__(self):
         super().__init__(bookmaker_id=2, bookmaker_name="Meridian")
         self._auth_token: Optional[str] = None
+        self._rate_semaphore = asyncio.Semaphore(MERIDIAN_MAX_CONCURRENT)
 
     def get_base_url(self) -> str:
         return "https://online.meridianbet.com/betshop/api"
@@ -116,17 +121,16 @@ class MeridianScraper(BaseScraper):
         return await self.fetch_json(url, params=params)
 
     async def fetch_event_markets(self, event_id: int) -> Optional[List[Dict]]:
-        """Fetch markets/odds for an event."""
-        url = f"{self.get_base_url()}/v2/events/{event_id}/markets"
-        params = {"gameGroupId": "all"}
+        """Fetch markets/odds for an event with rate limiting."""
+        async with self._rate_semaphore:
+            url = f"{self.get_base_url()}/v2/events/{event_id}/markets"
 
-        for attempt in range(3):
-            data = await self.fetch_json(url, params=params)
+            data = await self.fetch_json(url)
+            await asyncio.sleep(MERIDIAN_REQUEST_DELAY)
+
             if data:
                 return data.get("payload", [])
-            await asyncio.sleep(0.3)
-
-        return None
+            return None
 
     def parse_football_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
         """Parse football odds from Meridian markets."""
@@ -146,7 +150,7 @@ class MeridianScraper(BaseScraper):
                             odd3=float(selections[2].get("price", 0))
                         ))
 
-            elif market_name == "I Pol. Konačan Ishod":
+            elif market_name in ("I Pol. Konačan Ishod", "Prvo Poluvreme - Konačan Ishod"):
                 for market in market_group.get("markets", []):
                     selections = market.get("selections", [])
                     if len(selections) >= 3:
@@ -157,7 +161,7 @@ class MeridianScraper(BaseScraper):
                             odd3=float(selections[2].get("price", 0))
                         ))
 
-            elif market_name == "II Pol. Konačan Ishod":
+            elif market_name in ("II Pol. Konačan Ishod", "Drugo Poluvreme - Konačan Ishod"):
                 for market in market_group.get("markets", []):
                     selections = market.get("selections", [])
                     if len(selections) >= 3:
@@ -192,7 +196,7 @@ class MeridianScraper(BaseScraper):
                             margin=float(over_under)
                         ))
 
-            elif market_name == "I Pol. Ukupno":
+            elif market_name in ("I Pol. Ukupno", "Prvo Poluvreme - Ukupno Golova"):
                 for market in market_group.get("markets", []):
                     over_under = market.get("overUnder")
                     selections = market.get("selections", [])
@@ -204,7 +208,7 @@ class MeridianScraper(BaseScraper):
                             margin=float(over_under)
                         ))
 
-            elif market_name == "II Pol. Ukupno":
+            elif market_name in ("II Pol. Ukupno", "Drugo Poluvreme - Ukupno Golova"):
                 for market in market_group.get("markets", []):
                     over_under = market.get("overUnder")
                     selections = market.get("selections", [])
@@ -353,7 +357,7 @@ class MeridianScraper(BaseScraper):
         return []
 
     async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all matches for a sport."""
+        """Scrape all matches for a sport with rate-limited market fetching."""
         matches: List[ScrapedMatch] = []
 
         # Ensure we have auth token
@@ -361,8 +365,9 @@ class MeridianScraper(BaseScraper):
             logger.warning("[Meridian] Could not obtain auth token")
             return matches
 
+        # Step 1: Collect all events from league pages
         page = 0
-        event_tasks = []
+        events = []
 
         while True:
             data = await self.fetch_events(sport_id, page)
@@ -384,7 +389,7 @@ class MeridianScraper(BaseScraper):
                     if not event_id or len(rivals) < 2:
                         continue
 
-                    event_tasks.append({
+                    events.append({
                         'event_id': event_id,
                         'team1': rivals[0],
                         'team2': rivals[1],
@@ -394,15 +399,24 @@ class MeridianScraper(BaseScraper):
 
             page += 1
 
-        # Fetch markets for all events
+        logger.info(f"[Meridian] Found {len(events)} events for sport {sport_id}, fetching markets ({MERIDIAN_MAX_CONCURRENT} concurrent, {MERIDIAN_REQUEST_DELAY}s delay)...")
+
+        # Step 2: Fetch markets with rate limiting (semaphore + delay in fetch_event_markets)
         market_tasks = [
             self.fetch_event_markets(evt['event_id'])
-            for evt in event_tasks
+            for evt in events
         ]
         market_results = await asyncio.gather(*market_tasks, return_exceptions=True)
 
-        for evt, market_data in zip(event_tasks, market_results):
-            if isinstance(market_data, Exception) or not market_data:
+        # Step 3: Parse results
+        errors = 0
+        for evt, market_data in zip(events, market_results):
+            if isinstance(market_data, Exception):
+                errors += 1
+                logger.debug(f"[Meridian] Market fetch error for {evt['event_id']}: {market_data}")
+                continue
+            if not market_data:
+                errors += 1
                 continue
 
             try:
@@ -421,6 +435,9 @@ class MeridianScraper(BaseScraper):
                     matches.append(scraped)
 
             except Exception as e:
-                logger.warning(f"[Meridian] Error processing event: {e}")
+                logger.warning(f"[Meridian] Error processing event {evt['event_id']}: {e}")
+
+        if errors:
+            logger.warning(f"[Meridian] {errors}/{len(events)} market fetches failed for sport {sport_id}")
 
         return matches

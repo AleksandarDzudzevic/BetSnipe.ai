@@ -251,18 +251,163 @@ class MozzartScraper(BaseScraper):
 
             return None
 
-    def parse_football_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse football odds from Mozzart match data."""
-        odds_list = []
-        match = match_data.get("match", {})
+    # ==========================================
+    # Football group-based parsing
+    # ==========================================
 
-        if "specialMatchGroupId" in match:
-            return odds_list
+    # Mapping of Mozzart group names to parsing handlers
+    # Each handler returns a list of ScrapedOdds
+    FOOTBALL_GROUP_MAP = {
+        # === Grouped markets (2-3 outcomes, use odd1/odd2/odd3) ===
+        "Konačan ishod":                ("_parse_1x2", 2),
+        "Dupla šansa":                  ("_parse_three_way", 13),   # 1X, 12, X2
+        "Ukupno golova - Par/Nepar":    ("_parse_two_way", 15),     # Par, Nepar -> odd/even
+        "Winner":                       ("_parse_two_way", 14),     # draw no bet
+        "Dupla pobeda":                 ("_parse_two_way", 16),     # both halves winner
+        "Sigurna pobeda":               ("_parse_two_way", 17),     # win to nil
+        "Daje prvi gol":                ("_parse_three_way", 18),   # first goal team
+        "Poluvreme sa više golova":     ("_parse_three_way", 19),   # half with more goals
+        "Prvo poluvreme":               ("_parse_1x2", 3),          # 1X2 first half
+        "Dupla šansa prvo poluvreme":   ("_parse_three_way", 20),   # double chance H1
+        "Winner prvo poluvreme":        ("_parse_two_way", 21),     # draw no bet H1
+        "Drugo poluvreme":              ("_parse_1x2", 4),          # 1X2 second half
+        "Prolazi dalje":                ("_parse_two_way", 22),     # to qualify
+        # === Selection markets (multi-outcome, 1 row per selection) ===
+        "Tačan rezultat":               ("_parse_selection", 23),
+        "Poluvreme - Kraj":             ("_parse_selection", 24),
+        "Ukupno golova na meču":        ("_parse_selection", 25),
+        "Tačan broj golova na meču":    ("_parse_selection", 26),
+        "Tim 1 daje gol":               ("_parse_selection", 27),
+        "Tim 2 daje gol":               ("_parse_selection", 28),
+        "Ukupno golova prvo poluvreme":             ("_parse_selection", 29),
+        "Ukupno golova drugo poluvreme":            ("_parse_selection", 30),
+        "Tim 1 golovi prvo poluvreme":              ("_parse_selection", 31),
+        "Tim 2 golovi prvo poluvreme":              ("_parse_selection", 32),
+        "Tim 1 golovi drugo poluvreme":             ("_parse_selection", 33),
+        "Tim 2 golovi drugo poluvreme":             ("_parse_selection", 34),
+        "Broj golova u prvom i drugom poluvremenu": ("_parse_selection", 35),
+        "Daje prvi gol - Kraj":                     ("_parse_selection", 36),
+        "Poluvreme- Kraj / Dupla šansa":            ("_parse_selection", 37),
+        "Konačan ishod + Golovi":                   ("_parse_selection", 38),
+        "Konačan ishod kombinazzije":               ("_parse_selection", 39),
+        "Konačan ishod + Više golova prvo ili drugo poluvreme": ("_parse_selection", 40),
+        "Dupla šansa + Golovi":                     ("_parse_selection", 41),
+        "Dupla šansa + Više golova prvo ili drugo poluvreme":   ("_parse_selection", 42),
+        "Dupla šansa kombinazzije":                 ("_parse_selection", 43),
+        "Poluvreme - Kraj + Golovi":                ("_parse_selection", 44),
+        "Poluvreme - Kraj kombinazzije":            ("_parse_selection", 45),
+        "Mozzart šansa":                            ("_parse_selection", 47),
+    }
 
-        odds_1x2 = {"1": 0, "X": 0, "2": 0}
-        odds_1x2_h1 = {"1": 0, "X": 0, "2": 0}
-        odds_1x2_h2 = {"1": 0, "X": 0, "2": 0}
-        odds_ggng = {"gg": 0, "ng": 0}
+    def _parse_1x2(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a 1X2 (three-way) group into a single grouped ScrapedOdds."""
+        collected = {}
+        for odd in odds_group.get("odds", []):
+            subgame_name = odd.get("subgame", {}).get("name", "")
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value > 0 and subgame_name in ("1", "X", "2"):
+                collected[subgame_name] = value
+
+        if "1" in collected and "X" in collected and "2" in collected:
+            return [ScrapedOdds(
+                bet_type_id=bet_type_id,
+                odd1=collected["1"], odd2=collected["X"], odd3=collected["2"]
+            )]
+        return []
+
+    def _parse_three_way(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a three-way group (e.g. double chance: 1X, 12, X2) into grouped odds."""
+        values = []
+        for odd in sorted(odds_group.get("odds", []), key=lambda o: o.get("subgame", {}).get("rank", 0)):
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value > 0:
+                values.append(value)
+
+        if len(values) == 3:
+            return [ScrapedOdds(
+                bet_type_id=bet_type_id,
+                odd1=values[0], odd2=values[1], odd3=values[2]
+            )]
+        return []
+
+    def _parse_two_way(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a two-way group into grouped odds."""
+        values = []
+        for odd in sorted(odds_group.get("odds", []), key=lambda o: o.get("subgame", {}).get("rank", 0)):
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value > 0:
+                values.append(value)
+
+        if len(values) == 2:
+            return [ScrapedOdds(
+                bet_type_id=bet_type_id,
+                odd1=values[0], odd2=values[1]
+            )]
+        return []
+
+    def _parse_selection(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a multi-outcome group into selection-based ScrapedOdds (1 row per outcome)."""
+        result = []
+        for odd in odds_group.get("odds", []):
+            subgame_name = odd.get("subgame", {}).get("name", "")
+            if not subgame_name:
+                continue
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value > 0:
+                result.append(ScrapedOdds(
+                    bet_type_id=bet_type_id,
+                    odd1=value,
+                    selection=subgame_name
+                ))
+        return result
+
+    def _parse_btts_group(self, odds_group: Dict) -> List[ScrapedOdds]:
+        """Parse BTTS group — simple GG/NG goes to bet_type 8, combos to 46."""
+        simple = {}
+        combos = []
+
+        for odd in odds_group.get("odds", []):
+            subgame_name = odd.get("subgame", {}).get("name", "")
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value <= 0:
+                continue
+
+            name_lower = subgame_name.lower()
+            if name_lower == "da":
+                simple["gg"] = value
+            elif name_lower == "ne":
+                simple["ng"] = value
+            else:
+                # Combo subgames like "1GG", "2NG", "GG3+", etc.
+                combos.append(ScrapedOdds(
+                    bet_type_id=46, odd1=value, selection=subgame_name
+                ))
+
+        result = []
+        if simple.get("gg") and simple.get("ng"):
+            result.append(ScrapedOdds(
+                bet_type_id=8, odd1=simple["gg"], odd2=simple["ng"]
+            ))
+        result.extend(combos)
+        return result
+
+    def _parse_ou_markets(self, match: Dict) -> List[ScrapedOdds]:
+        """Parse all O/U markets (specialOddValueType=MARGIN) across all groups."""
         total_goals = {}
         total_goals_h1 = {}
         total_goals_h2 = {}
@@ -271,287 +416,390 @@ class MozzartScraper(BaseScraper):
             group_name = odds_group.get("groupName", "").lower()
 
             for odd in odds_group.get("odds", []):
-                game_name = odd.get("game", {}).get("name", "")
-                subgame_name = odd.get("subgame", {}).get("name", "")
                 special_value = odd.get("specialOddValue", "")
                 value_type = odd.get("game", {}).get("specialOddValueType", "")
+                subgame_name = odd.get("subgame", {}).get("name", "")
+
+                if value_type != "MARGIN" or not special_value:
+                    continue
 
                 try:
                     value = float(odd.get("value", 0))
+                    total = float(special_value)
                 except (ValueError, TypeError):
-                    value = 0
+                    continue
 
-                # Full time result
-                if game_name == "Konačan ishod" and "poluvreme" not in group_name:
-                    if subgame_name in ["1", "X", "2"]:
-                        odds_1x2[subgame_name] = value
+                if value <= 0:
+                    continue
 
-                # First half result
-                elif "1. poluvreme" in group_name or game_name == "Prvo poluvreme":
-                    if subgame_name in ["1", "X", "2"]:
-                        odds_1x2_h1[subgame_name] = value
+                if "1. poluvreme" in group_name or "pp" in group_name:
+                    if total not in total_goals_h1:
+                        total_goals_h1[total] = {}
+                    if subgame_name == "manje":
+                        total_goals_h1[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals_h1[total]["over"] = value
+                elif "2. poluvreme" in group_name or "dp" in group_name:
+                    if total not in total_goals_h2:
+                        total_goals_h2[total] = {}
+                    if subgame_name == "manje":
+                        total_goals_h2[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals_h2[total]["over"] = value
+                else:
+                    if total not in total_goals:
+                        total_goals[total] = {}
+                    if subgame_name == "manje":
+                        total_goals[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals[total]["over"] = value
 
-                # Second half result
-                elif "2. poluvreme" in group_name or game_name == "Drugo poluvreme":
-                    if subgame_name in ["1", "X", "2"]:
-                        odds_1x2_h2[subgame_name] = value
-
-                # BTTS
-                elif game_name == "Oba tima daju gol":
-                    if subgame_name == "da":
-                        odds_ggng["gg"] = value
-                    elif subgame_name == "ne":
-                        odds_ggng["ng"] = value
-
-                # Total goals (with MARGIN type)
-                elif value_type == "MARGIN" and special_value:
-                    try:
-                        total = float(special_value)
-                        if "1. poluvreme" in group_name:
-                            if total not in total_goals_h1:
-                                total_goals_h1[total] = {}
-                            if subgame_name == "manje":
-                                total_goals_h1[total]["under"] = value
-                            elif subgame_name == "više":
-                                total_goals_h1[total]["over"] = value
-                        elif "2. poluvreme" in group_name:
-                            if total not in total_goals_h2:
-                                total_goals_h2[total] = {}
-                            if subgame_name == "manje":
-                                total_goals_h2[total]["under"] = value
-                            elif subgame_name == "više":
-                                total_goals_h2[total]["over"] = value
-                        else:
-                            if total not in total_goals:
-                                total_goals[total] = {}
-                            if subgame_name == "manje":
-                                total_goals[total]["under"] = value
-                            elif subgame_name == "više":
-                                total_goals[total]["over"] = value
-                    except (ValueError, TypeError):
-                        continue
-
-        # Build odds list
-        if all(odds_1x2.values()):
-            odds_list.append(ScrapedOdds(
-                bet_type_id=2, odd1=odds_1x2["1"], odd2=odds_1x2["X"], odd3=odds_1x2["2"]
-            ))
-
-        if all(odds_1x2_h1.values()):
-            odds_list.append(ScrapedOdds(
-                bet_type_id=3, odd1=odds_1x2_h1["1"], odd2=odds_1x2_h1["X"], odd3=odds_1x2_h1["2"]
-            ))
-
-        if all(odds_1x2_h2.values()):
-            odds_list.append(ScrapedOdds(
-                bet_type_id=4, odd1=odds_1x2_h2["1"], odd2=odds_1x2_h2["X"], odd3=odds_1x2_h2["2"]
-            ))
-
-        if odds_ggng["gg"] and odds_ggng["ng"]:
-            odds_list.append(ScrapedOdds(
-                bet_type_id=8, odd1=odds_ggng["gg"], odd2=odds_ggng["ng"]
-            ))
-
+        odds_list = []
         for total, t_odds in total_goals.items():
             if "under" in t_odds and "over" in t_odds:
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=5,
-                    odd1=t_odds["under"],
-                    odd2=t_odds["over"],
-                    margin=total
+                    bet_type_id=5, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
                 ))
-
         for total, t_odds in total_goals_h1.items():
             if "under" in t_odds and "over" in t_odds:
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=6,
-                    odd1=t_odds["under"],
-                    odd2=t_odds["over"],
-                    margin=total
+                    bet_type_id=6, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
                 ))
-
         for total, t_odds in total_goals_h2.items():
             if "under" in t_odds and "over" in t_odds:
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=7,
-                    odd1=t_odds["under"],
-                    odd2=t_odds["over"],
-                    margin=total
+                    bet_type_id=7, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
                 ))
-
         return odds_list
 
-    def parse_basketball_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse basketball odds from Mozzart match data."""
+    # ==========================================
+    # Generic helpers for handicap / O/U / combo groups
+    # ==========================================
+
+    def _parse_handicap_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a single handicap group — line read dynamically from specialOddValue.
+        Accepts both '1'/'2' and 'H1'/'H2' subgame naming conventions."""
+        collected = {}
+        margin = None
+        for odd in odds_group.get("odds", []):
+            sv = odd.get("specialOddValue", "")
+            subgame = odd.get("subgame", {}).get("name", "")
+            try:
+                value = float(odd.get("value", 0))
+                if sv:
+                    margin = float(sv)
+            except (ValueError, TypeError):
+                continue
+            if value > 0 and subgame in ("1", "2", "H1", "H2"):
+                key = subgame[-1]  # "H1" -> "1", "H2" -> "2"
+                collected[key] = value
+
+        if "1" in collected and "2" in collected and margin is not None:
+            return [ScrapedOdds(
+                bet_type_id=bet_type_id,
+                odd1=collected["1"], odd2=collected["2"],
+                margin=margin
+            )]
+        return []
+
+    def _parse_ou_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a single O/U group — line read dynamically from specialOddValue."""
+        collected = {}
+        margin = None
+        for odd in odds_group.get("odds", []):
+            sv = odd.get("specialOddValue", "")
+            subgame = odd.get("subgame", {}).get("name", "")
+            try:
+                value = float(odd.get("value", 0))
+                if sv:
+                    margin = float(sv)
+            except (ValueError, TypeError):
+                continue
+            if value > 0:
+                if subgame == "manje":
+                    collected["under"] = value
+                elif subgame == "više":
+                    collected["over"] = value
+
+        if "under" in collected and "over" in collected and margin is not None:
+            return [ScrapedOdds(
+                bet_type_id=bet_type_id,
+                odd1=collected["under"], odd2=collected["over"],
+                margin=margin
+            )]
+        return []
+
+    def _parse_selection_margin_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse a combo group with both selections AND a margin from specialOddValue."""
+        result = []
+        for odd in odds_group.get("odds", []):
+            subgame = odd.get("subgame", {}).get("name", "")
+            sv = odd.get("specialOddValue", "")
+            if not subgame:
+                continue
+            try:
+                value = float(odd.get("value", 0))
+                margin = float(sv) if sv else 0.0
+            except (ValueError, TypeError):
+                continue
+            if value > 0:
+                result.append(ScrapedOdds(
+                    bet_type_id=bet_type_id,
+                    odd1=value,
+                    selection=subgame,
+                    margin=margin
+                ))
+        return result
+
+    def parse_football_odds(self, match_data: Dict) -> List[ScrapedOdds]:
+        """Parse all football odds from Mozzart match data using group-based dispatch."""
         odds_list = []
         match = match_data.get("match", {})
 
         if "specialMatchGroupId" in match:
             return odds_list
 
-        winner_odds = {"1": 0, "2": 0}
-        handicap_odds = {}
-        total_points_odds = {}
+        # 1) Parse O/U markets (MARGIN-based) across all groups first
+        odds_list.extend(self._parse_ou_markets(match))
 
+        # 2) Parse each group via the dispatch map
         for odds_group in match.get("oddsGroup", []):
-            group_name = odds_group.get("groupName", "").lower()
-            if "poluvreme" in group_name:
+            group_name = odds_group.get("groupName", "")
+
+            # Special handling for BTTS (can have both simple and combo subgames)
+            if group_name == "Oba tima daju gol":
+                odds_list.extend(self._parse_btts_group(odds_group))
                 continue
 
-            for odd in odds_group.get("odds", []):
-                game_name = odd.get("game", {}).get("name", "")
-                subgame_name = odd.get("subgame", {}).get("name", "")
-                special_value = odd.get("specialOddValue", "")
-                value_type = odd.get("game", {}).get("specialOddValueType", "")
+            mapping = self.FOOTBALL_GROUP_MAP.get(group_name)
+            if not mapping:
+                continue
 
-                try:
-                    value = float(odd.get("value", 0))
-                except (ValueError, TypeError):
-                    continue
-
-                # Winner
-                if game_name == "Pobednik meča":
-                    if subgame_name == "1":
-                        winner_odds["1"] = value
-                    elif subgame_name == "2":
-                        winner_odds["2"] = value
-
-                # Handicap
-                elif value_type == "HANDICAP" and special_value:
-                    if special_value not in handicap_odds:
-                        handicap_odds[special_value] = {}
-                    if subgame_name == "1":
-                        handicap_odds[special_value]["1"] = value
-                    elif subgame_name == "2":
-                        handicap_odds[special_value]["2"] = value
-
-                # Total Points
-                elif value_type == "MARGIN" and special_value:
-                    try:
-                        points = float(special_value)
-                        if points > 130:
-                            if special_value not in total_points_odds:
-                                total_points_odds[special_value] = {}
-                            if subgame_name == "manje":
-                                total_points_odds[special_value]["under"] = value
-                            elif subgame_name == "više":
-                                total_points_odds[special_value]["over"] = value
-                    except (ValueError, TypeError):
-                        continue
-
-        # Build odds list
-        if winner_odds["1"] and winner_odds["2"]:
-            odds_list.append(ScrapedOdds(
-                bet_type_id=1,
-                odd1=winner_odds["1"],
-                odd2=winner_odds["2"]
-            ))
-
-        for handicap, h_odds in handicap_odds.items():
-            if "1" in h_odds and "2" in h_odds:
-                try:
-                    odds_list.append(ScrapedOdds(
-                        bet_type_id=9,
-                        odd1=h_odds["1"],
-                        odd2=h_odds["2"],
-                        margin=float(handicap)
-                    ))
-                except (ValueError, TypeError):
-                    continue
-
-        for points, t_odds in total_points_odds.items():
-            if "under" in t_odds and "over" in t_odds:
-                try:
-                    odds_list.append(ScrapedOdds(
-                        bet_type_id=10,
-                        odd1=t_odds["under"],
-                        odd2=t_odds["over"],
-                        margin=float(points)
-                    ))
-                except (ValueError, TypeError):
-                    continue
+            handler_name, bet_type_id = mapping
+            handler = getattr(self, handler_name)
+            odds_list.extend(handler(odds_group, bet_type_id))
 
         return odds_list
 
-    def parse_tennis_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse tennis odds from Mozzart match data."""
+    # ==========================================
+    # Basketball group-based parsing
+    # ==========================================
+
+    # Simple groups (no HANDICAP/MARGIN specialOddValueType)
+    BASKETBALL_GROUP_MAP = {
+        "Konačan ishod":                          ("_parse_1x2", 2),
+        "Pobednik meča sa ev. produžecima":       ("_parse_two_way", 1),   # winner incl. OT
+        "Dupla šansa":                            ("_parse_two_way", 13),  # only 2 outcomes in basketball
+        "Prvo poluvreme":                         ("_parse_1x2", 3),
+        "Dupla pobeda":                           ("_parse_two_way", 16),
+        "Dupla šansa prvo poluvreme":             ("_parse_two_way", 20),  # only 2 outcomes
+        "Poluvreme sa više poena":                ("_parse_three_way", 19),  # prvo, drugo, jednako
+        "Poluvreme - kraj":                       ("_parse_selection", 24),  # HT/FT
+        "Četvrtina sa najviše poena":             ("_parse_selection", 54),  # quarter most points
+    }
+
+    # MARGIN-type groups → bet_type_id mapping (line from specialOddValue)
+    BASKETBALL_MARGIN_MAP = {
+        "Ukupno poena na meču":                   10,   # total_points
+        "Ukupno poena Tim 1":                     48,   # team1_total_points
+        "Ukupno poena Tim 2":                     49,   # team2_total_points
+        "Ukupno poena prvo poluvreme":            6,    # total_h1
+        "Ukupno poena prvo poluvreme Tim 1":      51,   # team1_total_h1
+        "Ukupno poena prvo poluvreme Tim 2":      52,   # team2_total_h1
+        "Ukupno poena drugo poluvreme":           7,    # total_h2
+        "Ukupno poena najefikasnija četvrtina":   53,   # most_efficient_quarter_total
+    }
+
+    # Combo groups that have MARGIN + selections
+    BASKETBALL_COMBO_MARGIN_MAP = {
+        "Konačan ishod + Ukupno poena":                       38,  # result_total_goals
+        "Prvo poluvreme + Ukupno poena prvo poluvreme":       55,  # h1_result_total
+    }
+
+    def parse_basketball_odds(self, match_data: Dict) -> List[ScrapedOdds]:
+        """Parse all basketball odds from Mozzart match data using group-based dispatch."""
         odds_list = []
         match = match_data.get("match", {})
 
-        winner_odds = {"1": 0, "2": 0}
-        set1_winner_odds = {"1": 0, "2": 0}
+        if "specialMatchGroupId" in match:
+            return odds_list
 
         for odds_group in match.get("oddsGroup", []):
             group_name = odds_group.get("groupName", "")
 
+            # Detect if this group uses HANDICAP or MARGIN specialOddValueType
+            first_type = ""
             for odd in odds_group.get("odds", []):
-                game_name = odd.get("game", {}).get("name", "")
-                subgame_name = odd.get("subgame", {}).get("name", "")
+                vt = odd.get("game", {}).get("specialOddValueType", "")
+                if vt and vt != "NONE":
+                    first_type = vt
+                    break
 
-                try:
-                    value = float(odd.get("value", 0))
-                except (ValueError, TypeError):
-                    continue
+            if first_type == "HANDICAP":
+                # Handicap — determine full-time vs half based on group name
+                if "poluvreme" in group_name.lower():
+                    odds_list.extend(self._parse_handicap_group(odds_group, 50))
+                else:
+                    odds_list.extend(self._parse_handicap_group(odds_group, 9))
 
-                # Match Winner - can be "Pobednik meča" or "Konačan ishod"
-                if game_name in ["Pobednik meča", "Konačan ishod"] and group_name == "Konačan ishod":
-                    if subgame_name == "1":
-                        winner_odds["1"] = value
-                    elif subgame_name == "2":
-                        winner_odds["2"] = value
+            elif first_type == "MARGIN":
+                # Check combo markets first (they also have MARGIN)
+                combo_bt = self.BASKETBALL_COMBO_MARGIN_MAP.get(group_name)
+                if combo_bt is not None:
+                    odds_list.extend(self._parse_selection_margin_group(odds_group, combo_bt))
+                else:
+                    # Regular O/U market
+                    ou_bt = self.BASKETBALL_MARGIN_MAP.get(group_name)
+                    if ou_bt is not None:
+                        odds_list.extend(self._parse_ou_group(odds_group, ou_bt))
 
-                # First Set Winner - "Prvi set" group
-                elif game_name == "Prvi set" and group_name == "Prvi set":
-                    if subgame_name == "1":
-                        set1_winner_odds["1"] = value
-                    elif subgame_name == "2":
-                        set1_winner_odds["2"] = value
-
-        if winner_odds["1"] and winner_odds["2"]:
-            odds_list.append(ScrapedOdds(
-                bet_type_id=1,
-                odd1=winner_odds["1"],
-                odd2=winner_odds["2"]
-            ))
-
-        if set1_winner_odds["1"] and set1_winner_odds["2"]:
-            odds_list.append(ScrapedOdds(
-                bet_type_id=11,
-                odd1=set1_winner_odds["1"],
-                odd2=set1_winner_odds["2"]
-            ))
+            else:
+                # Simple group — use dispatch map
+                mapping = self.BASKETBALL_GROUP_MAP.get(group_name)
+                if mapping:
+                    handler_name, bet_type_id = mapping
+                    handler = getattr(self, handler_name)
+                    odds_list.extend(handler(odds_group, bet_type_id))
 
         return odds_list
 
-    def parse_hockey_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse hockey odds from Mozzart match data."""
+    # ==========================================
+    # Tennis group-based parsing
+    # ==========================================
+
+    # Simple groups (no HANDICAP/MARGIN specialOddValueType)
+    TENNIS_GROUP_MAP = {
+        "Konačan ishod":                                           ("_parse_two_way", 1),    # winner
+        "Prvi set":                                                ("_parse_two_way", 57),   # first_set_winner
+        "Prvi set - Kraj":                                         ("_parse_selection", 64),  # first_set_match_combo
+        "Tačan broj setova":                                       ("_parse_selection", 65),  # exact_sets
+        "Ukupno gemova - Par/Nepar":                               ("_parse_two_way", 15),   # odd_even
+        "Rangovi gemova prvi set":                                 ("_parse_selection", 66),  # games_range_s1
+        "Ukupno gemova prvi set - Par/Nepar":                      ("_parse_two_way", 59),   # odd_even_s1
+        "Tajbrejk u prvom setu - Da/Ne":                           ("_parse_two_way", 60),   # tiebreak_s1
+        "Rangovi gemova drugi set":                                ("_parse_selection", 67),  # games_range_s2
+        "Ukupno gemova drugi set - Par/Nepar":                     ("_parse_two_way", 61),   # odd_even_s2
+        "Tajbrejk u drugom setu - Da/Ne":                          ("_parse_two_way", 62),   # tiebreak_s2
+        "Pobeda igrača 1 + Gemovi prvi set":                       ("_parse_selection", 69),  # p1_win_games_s1
+        "Pobeda igrača 1 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 70),   # p1_win_odd_even_s1
+        "Pobeda igrača 2 + Gemovi prvi set":                       ("_parse_selection", 71),  # p2_win_games_s1
+        "Pobeda igrača 2 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 72),   # p2_win_odd_even_s1
+        "Konačan ishod + Više gemova - Prvi ili drugi set":        ("_parse_selection", 73),  # winner_set_more_games
+        "Više gemova - Prvi ili drugi set":                        ("_parse_three_way", 63),  # set_with_more_games
+    }
+
+    # MARGIN-type groups → bet_type_id (O/U markets)
+    TENNIS_MARGIN_MAP = {
+        "Ukupno gemova":            5,    # total_over_under
+        "Ukupno gemova u 1. setu":  6,    # total_h1
+        "Ukupno gemova u 2. setu":  7,    # total_h2
+    }
+
+    # Combo groups with MARGIN + selections
+    TENNIS_COMBO_MARGIN_MAP = {
+        "Mozzart kombinazzije":          68,   # winner_total_games
+        "Konačan ishod + Ukupno gemova": 68,   # winner_total_games (alternate name)
+    }
+
+    # HANDICAP groups → bet_type_id
+    TENNIS_HANDICAP_MAP = {
+        "Hendikep setova":           56,   # handicap_sets
+        "Hendikep gemova":           9,    # handicap (main tennis handicap)
+        "Hendikep gemova u 1. setu": 58,   # handicap_games_s1
+    }
+
+    def parse_tennis_odds(self, match_data: Dict) -> List[ScrapedOdds]:
+        """Parse all tennis odds from Mozzart match data using group-based dispatch."""
         odds_list = []
         match = match_data.get("match", {})
 
-        result_odds = {"1": 0, "X": 0, "2": 0}
+        if "specialMatchGroupId" in match:
+            return odds_list
 
         for odds_group in match.get("oddsGroup", []):
-            for odd in odds_group.get("odds", []):
-                game_name = odd.get("game", {}).get("name", "")
-                subgame_name = odd.get("subgame", {}).get("name", "")
+            # Filter out DEACTIVATED odds (template placeholders with value=1)
+            active_odds = [o for o in odds_group.get("odds", [])
+                           if o.get("oddStatus") != "DEACTIVATED"]
+            if not active_odds:
+                continue
+            filtered_group = {**odds_group, "odds": active_odds}
 
-                try:
-                    value = float(odd.get("value", 0))
-                except (ValueError, TypeError):
-                    continue
+            group_name = odds_group.get("groupName", "")
 
-                # 1X2
-                if game_name == "Konačan ishod":
-                    if subgame_name in ["1", "X", "2"]:
-                        result_odds[subgame_name] = value
+            # Detect specialOddValueType from first active odd
+            first_type = ""
+            for odd in active_odds:
+                vt = odd.get("game", {}).get("specialOddValueType", "")
+                if vt and vt != "NONE":
+                    first_type = vt
+                    break
 
-        if all(result_odds.values()):
-            odds_list.append(ScrapedOdds(
-                bet_type_id=2,
-                odd1=result_odds["1"],
-                odd2=result_odds["X"],
-                odd3=result_odds["2"]
-            ))
+            if first_type == "HANDICAP":
+                hc_bt = self.TENNIS_HANDICAP_MAP.get(group_name)
+                if hc_bt is not None:
+                    odds_list.extend(self._parse_handicap_group(filtered_group, hc_bt))
+
+            elif first_type == "MARGIN":
+                # Check combo markets first (they also have MARGIN)
+                combo_bt = self.TENNIS_COMBO_MARGIN_MAP.get(group_name)
+                if combo_bt is not None:
+                    odds_list.extend(self._parse_selection_margin_group(filtered_group, combo_bt))
+                else:
+                    ou_bt = self.TENNIS_MARGIN_MAP.get(group_name)
+                    if ou_bt is not None:
+                        odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
+
+            else:
+                # Simple group — use dispatch map
+                mapping = self.TENNIS_GROUP_MAP.get(group_name)
+                if mapping:
+                    handler_name, bet_type_id = mapping
+                    handler = getattr(self, handler_name)
+                    odds_list.extend(handler(filtered_group, bet_type_id))
+
+        return odds_list
+
+    # ==========================================
+    # Hockey group-based parsing
+    # ==========================================
+
+    # All hockey groups are simple (no HANDICAP/MARGIN specialOddValueType)
+    HOCKEY_GROUP_MAP = {
+        "Konačan ishod":                ("_parse_1x2", 2),          # 1X2
+        "Dupla šansa":                  ("_parse_three_way", 13),   # double chance
+        "Winner":                       ("_parse_two_way", 14),     # draw no bet
+        "Prva trećina":                 ("_parse_1x2", 3),          # first period 1X2
+        "Ukupno golova":                ("_parse_selection", 25),   # total goals range
+        "Konačan ishod + Golovi":       ("_parse_selection", 38),   # result + total goals
+        "Prva trećina + Golovi":        ("_parse_selection", 74),   # first period result + total goals
+        "Prva trećina - Kraj":          ("_parse_selection", 24),   # first period + match result (HT/FT)
+        "Ukupno golova prva trećina":   ("_parse_selection", 29),   # first period goals range
+        "Ukupno golova druga trećina":  ("_parse_selection", 30),   # second period goals range
+    }
+
+    def parse_hockey_odds(self, match_data: Dict) -> List[ScrapedOdds]:
+        """Parse all hockey odds from Mozzart match data using group-based dispatch."""
+        odds_list = []
+        match = match_data.get("match", {})
+
+        if "specialMatchGroupId" in match:
+            return odds_list
+
+        for odds_group in match.get("oddsGroup", []):
+            # Filter out DEACTIVATED odds
+            active_odds = [o for o in odds_group.get("odds", [])
+                           if o.get("oddStatus") != "DEACTIVATED"]
+            if not active_odds:
+                continue
+            filtered_group = {**odds_group, "odds": active_odds}
+
+            group_name = odds_group.get("groupName", "")
+
+            mapping = self.HOCKEY_GROUP_MAP.get(group_name)
+            if mapping:
+                handler_name, bet_type_id = mapping
+                handler = getattr(self, handler_name)
+                odds_list.extend(handler(filtered_group, bet_type_id))
 
         return odds_list
 

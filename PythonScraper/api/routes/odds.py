@@ -30,6 +30,7 @@ class OddsResponse(BaseModel):
     bet_type_id: int
     bet_type_name: str
     margin: float
+    selection: str = ''
     odd1: Optional[float]
     odd2: Optional[float]
     odd3: Optional[float]
@@ -63,6 +64,7 @@ class OddsHistoryEntry(BaseModel):
     bet_type_id: int
     bet_type_name: str
     margin: float
+    selection: str = ''
     odd1: Optional[float]
     odd2: Optional[float]
     odd3: Optional[float]
@@ -164,6 +166,7 @@ async def get_matches(
                 bet_type_id=o['bet_type_id'],
                 bet_type_name=o.get('bet_type_name', ''),
                 margin=float(o.get('margin', 0)),
+                selection=o.get('selection', ''),
                 odd1=float(o['odd1']) if o['odd1'] else None,
                 odd2=float(o['odd2']) if o['odd2'] else None,
                 odd3=float(o['odd3']) if o['odd3'] else None,
@@ -269,6 +272,7 @@ async def get_match_odds_history(
             bet_type_id=h['bet_type_id'],
             bet_type_name=h.get('bet_type_name', ''),
             margin=float(h.get('margin', 0)),
+            selection=h.get('selection', ''),
             odd1=float(h['odd1']) if h['odd1'] else None,
             odd2=float(h['odd2']) if h['odd2'] else None,
             odd3=float(h['odd3']) if h['odd3'] else None,

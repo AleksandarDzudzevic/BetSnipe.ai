@@ -1,1072 +1,1455 @@
 {
-  "all_urls": [
-    "GET https://www.mozzartbet.com/sr/kladjenje/fudbal/utakmica/501891",
-    "GET https://www.mozzartbet.com/404",
-    "GET https://www.mozzartbet.com/sr/404",
-    "GET https://cdn.mozzartbet.com/mozzart/css_v10583/base21.css",
-    "GET https://cdn.mozzartbet.com/public//js/3rd_party/min.date-format.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/client.js",
-    "GET https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/2.0.3/fingerprint2.min.js",
-    "GET https://www.google.com/recaptcha/api.js?onload=vueRecaptchaApiLoaded&render=explicit&hl=sr",
-    "GET https://sdk.privacy-center.org/fcaa6c7c-4f00-4b01-8cda-0601532d7fc2/loader.js?target_type=notice&target=zy6332cR",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaRegular.woff2",
-    "GET https://www.mozzartbet.com/cdn-cgi/challenge-platform/scripts/jsd/main.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vue-awesome-swiper.js",
-    "GET https://sdk.privacy-center.org/sdk/67c5fa575c751d2f70e36fb6d00c441690d8eecb/modern/sdk.67c5fa575c751d2f70e36fb6d00c441690d8eecb.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vee-validate.js",
-    "GET https://www.google.com/recaptcha/api.js?render=explicit",
-    "GET https://www.mozzartbet.com/cdn-cgi/challenge-platform/h/b/scripts/jsd/d251aa49a8a3/main.js?",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vuescroll.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/69.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vue-fullscreen.js",
-    "GET https://www.mozzartbet.com/OneSignalSDKWorker.js",
-    "GET https://www.mozzartbet.com/OneSignalSDKUpdaterWorker.js",
-    "GET https://cdn.onesignal.com/sdks/OneSignalSDK.js",
-    "POST https://www.mozzartbet.com/cdn-cgi/challenge-platform/h/b/jsd/oneshot/d251aa49a8a3/0.6921437015068967:1768781416:2_AT63N73749AQL0YDWjcGGQePd6ueen-w1b0MuJWvo/9c024ca47e68e292",
-    "GET https://cdn.onesignal.com/sdks/OneSignalPageSDKES6.js?v=151606",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/25.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/435.js",
-    "GET https://onesignal.com/api/v1/sync/bb0fd72c-de62-476b-a510-2823baa81db9/web?callback=__jp0",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/defaultVendors~Navigation.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/page404.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/default~BettingCasino~56149af2.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/PinnedHolder.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/Navigation.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/LoginMain.js",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__sr.js",
-    "GET https://www.googletagmanager.com/gtm.js?id=GTM-NGXRLST",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__en.js",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__promotion_navigation.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__ico-404.svg",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/UserBox.js",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaBold.woff2",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/MbetFooter.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/Notifications.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/TutorialModal.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/TutorialLigaPobednika.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/CountryWarning.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/CasinoJackpotsSubscriber.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/RulesModal.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/HelpBox.js",
-    "GET https://www.google.com/recaptcha/api2/anchor?ar=1&k=6LcsXhQaAAAAANoJz6N6mO23NA7CLmaSwIwEpIcF&co=aHR0cHM6Ly93d3cubW96emFydGJldC5jb206NDQz&hl=sr&v=PoyoqOPhxBO7pBk68S4YbpHZ&size=invisible&anchor-ms=20000&execute-ms=30000&cb=6uk12nififq8",
-    "GET https://cdn.mozzartbet.com/public/img2023/desktop_logo_v2.svg",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/UberPinnedStyles.js",
-    "GET https://www.mozzartbet.com/generate-user-id",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__sr.js",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/visa.svg",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaSemibold.woff2",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/alta-pay.svg",
-    "POST https://www.mozzartbet.com/maintenanceCheck",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-apple.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/mastercard.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-android.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/dtm.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__arrow-right.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/visa.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsb.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/ips.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/dinacard.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/um.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/asistent.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/maestro.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/banktransfer.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/moj-kiosk.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/avoucher.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/payspot.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/post.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsc.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/new_site_betting_partner-min_v4.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/spinepay.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsa.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/idcheck.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/tf.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/ibia.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-huawei.svg",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/styles__ltr.css",
-    "GET https://betting-publisher-rs.mozzartio.com/betting-publisher/ws-broker/info?name=0_16745651&t=1768783423124",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/NotificationsSubscriber.js",
-    "GET https://formbricks.mozzartbet.com/js/formbricks.umd.cjs",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/corner.svg",
-    "POST https://www.mozzartbet.com/_mfp",
-    "GET https://cdn.mxpnl.com/libs/mixpanel-js-wrapper.min.js",
-    "GET https://static.ads-twitter.com/uwt.js",
-    "GET https://www.gstatic.com/recaptcha/api2/logo_48.png",
-    "GET https://formbricks.mozzartbet.com/api/v1/client/cm1hxgdra0008hbaodehyqqnl/environment",
-    "GET https://www.googletagmanager.com/gtag/js?id=G-PHMZPND8CR&cx=c&gtm=4e61e1",
-    "GET https://connect.facebook.net/en_US/fbevents.js",
-    "GET https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js",
-    "GET https://tm.ads.sportradar.com/dist/tag-manager.js?id=STM-AAAAOD",
-    "GET https://www.google.com/recaptcha/api2/webworker.js?hl=sr&v=PoyoqOPhxBO7pBk68S4YbpHZ",
-    "GET https://www.googletagmanager.com/static/service_worker/6150/sw_iframe.html?origin=https%3A%2F%2Fwww.mozzartbet.com",
-    "GET https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D1QDQ3JC77U9OS2TQLR0&lib=ttq",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__sr.js",
-    "GET https://connect.facebook.net/signals/config/1669736240003630?v=2.9.250&r=stable&domain=www.mozzartbet.com&hme=842ba5a67bc11ec88742f1d93fdc2338abd91b60fc0531689cc660af96e193d9&ex_m=94%2C156%2C134%2C20%2C66%2C67%2C127%2C62%2C42%2C128%2C71%2C61%2C10%2C141%2C80%2C15%2C93%2C122%2C115%2C69%2C72%2C121%2C138%2C102%2C143%2C7%2C3%2C4%2C6%2C5%2C2%2C81%2C91%2C144%2C223%2C167%2C56%2C225%2C226%2C49%2C182%2C27%2C68%2C231%2C230%2C170%2C29%2C55%2C9%2C58%2C87%2C88%2C89%2C95%2C118%2C28%2C26%2C120%2C117%2C116%2C135%2C70%2C137%2C136%2C44%2C54%2C111%2C14%2C140%2C39%2C212%2C214%2C177%2C23%2C24%2C25%2C17%2C18%2C38%2C34%2C36%2C35%2C76%2C82%2C86%2C100%2C126%2C129%2C40%2C101%2C21%2C19%2C107%2C63%2C32%2C131%2C130%2C132%2C123%2C22%2C31%2C53%2C99%2C139%2C64%2C16%2C133%2C104%2C75%2C30%2C192%2C163%2C282%2C210%2C154%2C195%2C188%2C164%2C97%2C119%2C74%2C109%2C48%2C41%2C43%2C103%2C108%2C114%2C52%2C59%2C113%2C47%2C50%2C46%2C90%2C142%2C0%2C112%2C13%2C110%2C11%2C1%2C51%2C83%2C57%2C60%2C106%2C79%2C78%2C145%2C146%2C84%2C85%2C8%2C92%2C45%2C124%2C77%2C73%2C65%2C105%2C96%2C37%2C125%2C33%2C98%2C12%2C147",
-    "GET https://connect.facebook.net/signals/config/2047839608658123?v=2.9.250&r=stable&domain=www.mozzartbet.com&hme=842ba5a67bc11ec88742f1d93fdc2338abd91b60fc0531689cc660af96e193d9&ex_m=94%2C156%2C134%2C20%2C66%2C67%2C127%2C62%2C42%2C128%2C71%2C61%2C10%2C141%2C80%2C15%2C93%2C122%2C115%2C69%2C72%2C121%2C138%2C102%2C143%2C7%2C3%2C4%2C6%2C5%2C2%2C81%2C91%2C144%2C223%2C167%2C56%2C225%2C226%2C49%2C182%2C27%2C68%2C231%2C230%2C170%2C29%2C55%2C9%2C58%2C87%2C88%2C89%2C95%2C118%2C28%2C26%2C120%2C117%2C116%2C135%2C70%2C137%2C136%2C44%2C54%2C111%2C14%2C140%2C39%2C212%2C214%2C177%2C23%2C24%2C25%2C17%2C18%2C38%2C34%2C36%2C35%2C76%2C82%2C86%2C100%2C126%2C129%2C40%2C101%2C21%2C19%2C107%2C63%2C32%2C131%2C130%2C132%2C123%2C22%2C31%2C53%2C99%2C139%2C64%2C16%2C133%2C104%2C75%2C30%2C192%2C163%2C282%2C210%2C154%2C195%2C188%2C164%2C97%2C119%2C74%2C109%2C48%2C41%2C43%2C103%2C108%2C114%2C52%2C59%2C113%2C47%2C50%2C46%2C90%2C142%2C0%2C112%2C13%2C110%2C11%2C1%2C51%2C83%2C57%2C60%2C106%2C79%2C78%2C145%2C146%2C84%2C85%2C8%2C92%2C45%2C124%2C77%2C73%2C65%2C105%2C96%2C37%2C125%2C33%2C98%2C12%2C147%2C238%2C237%2C239%2C244%2C245%2C246%2C242%2C233%2C169%2C171%2C218%2C284%2C211%2C208%2C232%2C234%2C228%2C157%2C202%2C184%2C165%2C281%2C151%2C162%2C173%2C158%2C190%2C261%2C260%2C257%2C224%2C258%2C259%2C148%2C204%2C251%2C150%2C178%2C200",
-    "GET https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3iUBGEe.woff2",
-    "GET https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
-    "POST https://stats.g.doubleclick.net/g/collect?v=2&tid=G-PHMZPND8CR&cid=559516402.1768783423&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=103116026~103200004~104527906~104528501~104684208~104684211~105391253~115938465~115938468~115985661~116744867~117041587",
-    "GET https://analytics.tiktok.com/i18n/pixel/static/main.MWE1NWJkYjgyMQ.js",
-    "POST https://analytics.google.com/g/collect?v=2&tid=G-PHMZPND8CR&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820&_p=1768783422572&_gaz=1&gcd=13l3l3l3l1l1&npa=0&dma=0&cid=559516402.1768783423&ul=en-us&sr=1920x1080&uaa=x86&uab=64&uafvl=HeadlessChrome%3B143.0.7499.4%7CChromium%3B143.0.7499.4%7CNot%2520A(Brand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0&are=1&frm=0&pscdl=noapi&_prs=ok&_eu=AAAAAGA&_s=1&tag_exp=103116026~103200004~104527906~104528501~104684208~104684211~105391253~115938465~115938468~115985661~116744867~117041587&dl=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&cu=RSD&sid=1768783423&sct=1&seg=0&dt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&en=page_view&_fv=1&_nsi=1&_ss=2&tfd=1167",
-    "GET https://www.google.rs/ads/ga-audiences?v=1&t=sr&slf_rd=1&_r=4&tid=G-PHMZPND8CR&cid=559516402.1768783423&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820&aip=1&dma=0&gcd=13l3l3l3l1l1&npa=0&frm=0&tag_exp=103116026~103200004~104527906~104528501~104684208~104684211~105391253~115938465~115938468~115985661~116744867~117041587&z=320351707",
-    "GET https://t.co/1/i/adsct?bci=4&dv=Europe%2FBudapest%26en-US%26Google%20Inc.%26Win32%26255%261920%261080%2628%2624%261920%261080%260%26na&eci=3&event=%7B%7D&event_id=350ff737-8d87-4b42-96d2-f83a1e6cfe19&integration=gtm&p_id=Twitter&p_user_id=0&pl_id=7af04336-16fb-419c-b548-1ab49a58439c&pt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&tw_document_href=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&tw_iframe_status=0&txn_id=nycee&type=javascript&version=2.3.35",
-    "GET https://analytics.tiktok.com/i18n/pixel/static/identify_b46e7c41.js",
-    "GET https://analytics.twitter.com/1/i/adsct?bci=4&dv=Europe%2FBudapest%26en-US%26Google%20Inc.%26Win32%26255%261920%261080%2628%2624%261920%261080%260%26na&eci=3&event=%7B%7D&event_id=350ff737-8d87-4b42-96d2-f83a1e6cfe19&integration=gtm&p_id=Twitter&p_user_id=0&pl_id=7af04336-16fb-419c-b548-1ab49a58439c&pt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&tw_document_href=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&tw_iframe_status=0&txn_id=nycee&type=javascript&version=2.3.35",
-    "POST https://www.google.com/ccm/collect?frm=0&tid=AW-855932212&en=page_view&dl=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&scrsrc=www.googletagmanager.com&rnd=491008080.1768783423&dt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&auid=130570767.1768783423&navt=n&npa=0&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820xec&gcd=13l3l3l3l1l1&dma=0&tag_exp=103116026~103200004~104527906~104528501~104684208~104684211~105391253~115938465~115938468~115985661~116744867~117041587&tft=1768783423317&tfd=1143&apve=1&apvf=f",
-    "POST https://www.google.com/measurement/conversion?random=1768783423336&cv=11&tid=G-PHMZPND8CR&fst=1768783423336&fmt=8&en=session_start&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820xec&gcd=13l3l3l3l1l1&dma=0&tag_exp=103116026~103200004~104527906~104528501~104684208~104684211~105391253~115938465~115938468~115985661~116744867~117041587&u_w=1920&u_h=1080&url=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&gacid=559516402.1768783423&frm=0&tiba=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&currency_code=RSD&npa=0&pscdl=noapi&auid=130570767.1768783423&uaa=x86&uab=64&uafvl=HeadlessChrome%3B143.0.7499.4%7CChromium%3B143.0.7499.4%7CNot%2520A(Brand%3B24.0.0.0&uamb=0&uam=&uap=Windows&uapv=19.0.0&uaw=0",
-    "POST https://analytics.tiktok.com/api/v2/pixel",
-    "POST https://analytics.tiktok.com/api/v2/pixel",
-    "GET https://tracker.ads.sportradar.com/dist/tracker.js",
-    "GET https://tracker.ads.sportradar.com/dist//sp-3.8.0.js",
-    "GET https://a.sportradarserving.com/pixel?type=js&aid=1428&id=5106",
-    "POST https://analytics.tiktok.com/api/v2/pixel/act",
-    "POST https://analytics-ipv6.tiktokw.us/ipv6/enrich_ipv6",
-    "GET https://a.sportradarserving.com/ul_cb/pixel?type=js&aid=1428&id=5106",
-    "GET https://x.bidswitch.net/sync?dsp_id=409&expires=14&user_group=2&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&cb=880a6e37-3859-4121-8276-a2809ef9fcc8",
-    "GET https://x.bidswitch.net/sync?dsp_id=409&expires=14&user_group=2&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&cb=039b8fdb-0522-4cfb-a2e6-eebb89db6e2b",
-    "GET https://x.bidswitch.net/syncd?dsp_id=409&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&user_group=2&redir=%2F%2Feu.sportradarserving.com%2Fbsw_sync%3Fbsw_uid%3D%24%7BBSW_UID%7D",
-    "GET https://x.bidswitch.net/sync?dsp_id=409&expires=14&user_group=2&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&cb=0eb5bc9e-c04d-4f94-9432-3d1e131e895f",
-    "GET https://x.bidswitch.net/ul_cb/syncd?dsp_id=409&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&user_group=2&redir=%2F%2Feu.sportradarserving.com%2Fbsw_sync%3Fbsw_uid%3D%24%7BBSW_UID%7D",
-    "GET https://x.bidswitch.net/ul_cb/sync?dsp_id=409&expires=14&user_group=2&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&cb=039b8fdb-0522-4cfb-a2e6-eebb89db6e2b",
-    "GET https://x.bidswitch.net/ul_cb/sync?dsp_id=409&expires=14&user_group=2&user_id=c9ba165d-dfda-496d-86cf-6bfcc209bbc8&cb=880a6e37-3859-4121-8276-a2809ef9fcc8",
-    "GET https://eu.sportradarserving.com/bsw_sync?bsw_uid=aee49a5b-3f26-402e-b454-c4f0dda4ef3c",
-    "GET https://rtb-csync.smartadserver.com/redir/?partnerid=31&partneruserid=aee49a5b-3f26-402e-b454-c4f0dda4ef3c&gdpr=&gdpr_consent=",
-    "GET https://ad.360yield.com/match?publisher_dsp_id=191&external_user_id=&gdpr=&gdpr_consent=",
-    "GET https://yield-op-idsync.live.streamtheworld.com/pixel.gif?partner=bsw&uid=aee49a5b-3f26-402e-b454-c4f0dda4ef3c&stn=&gdpr=&gdpr_consent=&gdpr_pd=&us_privacy=",
-    "GET https://ad.360yield.com/ul_cb/match?publisher_dsp_id=191&external_user_id=&gdpr=&gdpr_consent=",
-    "GET https://s.mozzartbet.com/s.js",
-    "GET https://hexagon-analytics.com/images/676272.gif?bk=3e1317fcab&r=793919905&v=119&cs=UTF-8&h=www.mozzartbet.com&l=en-US&S=815f6a67be074b4c87399e37687d5025&uu=b249eb1c-25fd-426d-8b5f-d1b8ccd397da&t=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&u=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&ua=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F143.0.7499.4%20Safari%2F537.36&nm=0&mh=d41d8cd98f00b204e9800998ecf8427e&np=0&ph=d41d8cd98f00b204e9800998ecf8427e&sh=1080&sw=1920&cd=24&p=Win32&to=-60&d=60&ce=true&tp=0&ol=true&pr=Gecko&ps=20030107&vd=Google%20Inc.&hc=28&je=false&ss=true&ls=true&in=true&db=false&tl=false&tr=false&ts=false&tb=false&ab=false&cf=f412e2f96e22af16809ee75235b57270&sri=0&pf=11&inc=true&bn=Chrome&fph=d41d8cd98f00b204e9800998ecf8427e&fsh=1080&fsw=1920&fcd=24&fp=Win32&ftp=0&fhc=28&fss=true&fls=true&fin=true&fvch=418711b9360f0ff97a5476ce480683b2&fad=124.04347527516074&fdm=8&fvf=&fcg=srgb&ffc=false&fm=0&fc=0&frm=false&fhdr=false&fmf=1b4539be02333d14ce0a07c372e6a7d4&fa=255&fte=false&fts=false&fce=true&fpdf=false&fl=cce16c45e622d9ceae4b626c9353ecec&ft=Europe/Budapest&pfe=7&z=z",
-    "GET https://www.mozzartbet.com/sr/kladjenje/fudbal",
-    "GET https://www.google.com/recaptcha/api.js?onload=vueRecaptchaApiLoaded&render=explicit&hl=sr",
-    "GET https://cdnjs.cloudflare.com/ajax/libs/fingerprintjs2/2.0.3/fingerprint2.min.js",
-    "GET https://cdn.mozzartbet.com/public//js/3rd_party/min.date-format.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/client.js",
-    "GET https://cdn.mozzartbet.com/mozzart/css_v10583/base21.css",
-    "GET https://sdk.privacy-center.org/fcaa6c7c-4f00-4b01-8cda-0601532d7fc2/loader.js?target_type=notice&target=zy6332cR",
-    "GET https://www.google.com/recaptcha/api.js?render=explicit",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vue-fullscreen.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vuescroll.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vue-awesome-swiper.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/vendors~vee-validate.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/69.js",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaRegular.woff2",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaSemibold.woff2",
-    "GET https://cdn.mozzartbet.com/public/fonts/ProximaNovaBold.woff2",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/25.js",
-    "GET https://sdk.privacy-center.org/sdk/67c5fa575c751d2f70e36fb6d00c441690d8eecb/modern/sdk.67c5fa575c751d2f70e36fb6d00c441690d8eecb.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/435.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/page404.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/defaultVendors~Navigation.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/default~BettingCasino~56149af2.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/LoginMain.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/Navigation.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/PinnedHolder.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/MbetFooter.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/Notifications.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/CasinoJackpotsSubscriber.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/UserBox.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/TutorialModal.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/TutorialLigaPobednika.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/RulesModal.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/CountryWarning.js",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/UberPinnedStyles.js",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__ico-404.svg",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/HelpBox.js",
-    "GET https://cdn.mozzartbet.com/public/img2023/desktop_logo_v2.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__promotion_navigation.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/visa.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/maestro.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/mastercard.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/dinacard.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/payspot.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/banktransfer.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/post.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/um.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/asistent.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/avoucher.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/moj-kiosk.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/alta-pay.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/ips.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/spinepay.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/dtm.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/corner.svg",
-    "GET https://cdn.mozzartbet.com/public//img2021/payment/tf.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/visa.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/idcheck.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsa.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsb.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/sgsc.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/payment/sgs/ibia.svg",
-    "GET https://cdn.mozzartbet.com/public/img2021/new_site_betting_partner-min_v4.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__arrow-right.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-apple.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-android.svg",
-    "GET https://cdn.mozzartbet.com/public/img2023/svgs/svg__logo-huawei.svg",
-    "GET https://cdn.mozzartbet.com/mozzart/v10583/NotificationsSubscriber.js",
-    "POST https://www.mozzartbet.com/maintenanceCheck",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__en.js",
-    "GET https://www.googletagmanager.com/gtm.js?id=GTM-NGXRLST",
-    "GET https://cdn.onesignal.com/sdks/OneSignalSDK.js",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__sr.js",
-    "GET https://betting-publisher-rs.mozzartio.com/betting-publisher/ws-broker/info?name=0_16745651&t=1768783428495",
-    "GET https://www.googletagmanager.com/gtag/js?id=G-PHMZPND8CR&cx=c&gtm=4e61e1",
-    "GET https://cdn.mxpnl.com/libs/mixpanel-js-wrapper.min.js",
-    "GET https://connect.facebook.net/en_US/fbevents.js",
-    "GET https://formbricks.mozzartbet.com/js/formbricks.umd.cjs",
-    "GET https://tm.ads.sportradar.com/dist/tag-manager.js?id=STM-AAAAOD",
-    "GET https://cdn.onesignal.com/sdks/OneSignalPageSDKES6.js?v=151606",
-    "GET https://static.ads-twitter.com/uwt.js",
-    "GET https://www.googletagmanager.com/static/service_worker/6150/sw_iframe.html?origin=https%3A%2F%2Fwww.mozzartbet.com",
-    "GET https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js",
-    "GET https://connect.facebook.net/signals/config/1669736240003630?v=2.9.250&r=stable&domain=www.mozzartbet.com&hme=842ba5a67bc11ec88742f1d93fdc2338abd91b60fc0531689cc660af96e193d9&ex_m=94%2C156%2C134%2C20%2C66%2C67%2C127%2C62%2C42%2C128%2C71%2C61%2C10%2C141%2C80%2C15%2C93%2C122%2C115%2C69%2C72%2C121%2C138%2C102%2C143%2C7%2C3%2C4%2C6%2C5%2C2%2C81%2C91%2C144%2C223%2C167%2C56%2C225%2C226%2C49%2C182%2C27%2C68%2C231%2C230%2C170%2C29%2C55%2C9%2C58%2C87%2C88%2C89%2C95%2C118%2C28%2C26%2C120%2C117%2C116%2C135%2C70%2C137%2C136%2C44%2C54%2C111%2C14%2C140%2C39%2C212%2C214%2C177%2C23%2C24%2C25%2C17%2C18%2C38%2C34%2C36%2C35%2C76%2C82%2C86%2C100%2C126%2C129%2C40%2C101%2C21%2C19%2C107%2C63%2C32%2C131%2C130%2C132%2C123%2C22%2C31%2C53%2C99%2C139%2C64%2C16%2C133%2C104%2C75%2C30%2C192%2C163%2C282%2C210%2C154%2C195%2C188%2C164%2C97%2C119%2C74%2C109%2C48%2C41%2C43%2C103%2C108%2C114%2C52%2C59%2C113%2C47%2C50%2C46%2C90%2C142%2C0%2C112%2C13%2C110%2C11%2C1%2C51%2C83%2C57%2C60%2C106%2C79%2C78%2C145%2C146%2C84%2C85%2C8%2C92%2C45%2C124%2C77%2C73%2C65%2C105%2C96%2C37%2C125%2C33%2C98%2C12%2C147",
-    "GET https://www.mozzartbet.com/OneSignalSDKWorker.js",
-    "GET https://www.mozzartbet.com/OneSignalSDKUpdaterWorker.js",
-    "GET https://tracker.ads.sportradar.com/dist/tracker.js",
-    "POST https://www.mozzartbet.com/_mfp",
-    "GET https://onesignal.com/api/v1/sync/bb0fd72c-de62-476b-a510-2823baa81db9/web?callback=__jp0",
-    "GET https://connect.facebook.net/signals/config/2047839608658123?v=2.9.250&r=stable&domain=www.mozzartbet.com&hme=842ba5a67bc11ec88742f1d93fdc2338abd91b60fc0531689cc660af96e193d9&ex_m=94%2C156%2C134%2C20%2C66%2C67%2C127%2C62%2C42%2C128%2C71%2C61%2C10%2C141%2C80%2C15%2C93%2C122%2C115%2C69%2C72%2C121%2C138%2C102%2C143%2C7%2C3%2C4%2C6%2C5%2C2%2C81%2C91%2C144%2C223%2C167%2C56%2C225%2C226%2C49%2C182%2C27%2C68%2C231%2C230%2C170%2C29%2C55%2C9%2C58%2C87%2C88%2C89%2C95%2C118%2C28%2C26%2C120%2C117%2C116%2C135%2C70%2C137%2C136%2C44%2C54%2C111%2C14%2C140%2C39%2C212%2C214%2C177%2C23%2C24%2C25%2C17%2C18%2C38%2C34%2C36%2C35%2C76%2C82%2C86%2C100%2C126%2C129%2C40%2C101%2C21%2C19%2C107%2C63%2C32%2C131%2C130%2C132%2C123%2C22%2C31%2C53%2C99%2C139%2C64%2C16%2C133%2C104%2C75%2C30%2C192%2C163%2C282%2C210%2C154%2C195%2C188%2C164%2C97%2C119%2C74%2C109%2C48%2C41%2C43%2C103%2C108%2C114%2C52%2C59%2C113%2C47%2C50%2C46%2C90%2C142%2C0%2C112%2C13%2C110%2C11%2C1%2C51%2C83%2C57%2C60%2C106%2C79%2C78%2C145%2C146%2C84%2C85%2C8%2C92%2C45%2C124%2C77%2C73%2C65%2C105%2C96%2C37%2C125%2C33%2C98%2C12%2C147%2C238%2C237%2C239%2C244%2C245%2C246%2C242%2C233%2C169%2C171%2C218%2C284%2C211%2C208%2C232%2C234%2C228%2C157%2C202%2C184%2C165%2C281%2C151%2C162%2C173%2C158%2C190%2C261%2C260%2C257%2C224%2C258%2C259%2C148%2C204%2C251%2C150%2C178%2C200",
-    "GET https://tracker.ads.sportradar.com/dist//sp-3.8.0.js",
-    "GET https://www.google.com/recaptcha/api2/anchor?ar=1&k=6LcsXhQaAAAAANoJz6N6mO23NA7CLmaSwIwEpIcF&co=aHR0cHM6Ly93d3cubW96emFydGJldC5jb206NDQz&hl=en&v=PoyoqOPhxBO7pBk68S4YbpHZ&size=invisible&anchor-ms=20000&execute-ms=30000&cb=wzjyumq971f5",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/styles__ltr.css",
-    "POST https://www.google.com/ccm/collect?frm=0&tid=AW-855932212&en=page_view&dl=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&scrsrc=www.googletagmanager.com&rnd=294311404.1768783429&dt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&auid=130570767.1768783423&navt=n&npa=0&gtm=45je61e1v894695619z876727820za20gzb76727820zd76727820xec&gcd=13l3l3l3l1l1&dma=0&tag_exp=103116026~103200004~104527906~104528500~104684208~104684211~105391253~115938466~115938469~117041588&tft=1768783428555&tfd=257&apve=1&apvf=f",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__en.js",
-    "GET https://a.sportradarserving.com/pixel?type=js&aid=1428&id=5106",
-    "GET https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3iUBGEe.woff2",
-    "GET https://fonts.gstatic.com/s/roboto/v48/KFO7CnqEu92Fr1ME7kSn66aGLdTylUAMa3yUBA.woff2",
-    "GET https://www.gstatic.com/recaptcha/api2/logo_48.png",
-    "GET https://analytics.tiktok.com/i18n/pixel/events.js?sdkid=D1QDQ3JC77U9OS2TQLR0&lib=ttq",
-    "GET https://analytics.tiktok.com/i18n/pixel/static/main.MWE1NWJkYjgyMQ.js",
-    "GET https://analytics.tiktok.com/i18n/pixel/static/identify_b46e7c41.js",
-    "GET https://www.google.com/recaptcha/api2/webworker.js?hl=en&v=PoyoqOPhxBO7pBk68S4YbpHZ",
-    "GET https://analytics.twitter.com/1/i/adsct?bci=4&dv=Europe%2FBudapest%26en-US%26Google%20Inc.%26Win32%26255%261920%261080%2628%2624%261920%261080%260%26na&eci=3&event=%7B%7D&event_id=e322f927-4264-4265-9fa1-5c09ea68c360&integration=gtm&p_id=Twitter&p_user_id=0&pl_id=95a662bd-3071-4233-b7ea-48c86be9c981&pt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&tw_document_href=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&tw_iframe_status=0&txn_id=nycee&type=javascript&version=2.3.35",
-    "GET https://www.gstatic.com/recaptcha/releases/PoyoqOPhxBO7pBk68S4YbpHZ/recaptcha__en.js",
-    "GET https://t.co/1/i/adsct?bci=4&dv=Europe%2FBudapest%26en-US%26Google%20Inc.%26Win32%26255%261920%261080%2628%2624%261920%261080%260%26na&eci=3&event=%7B%7D&event_id=e322f927-4264-4265-9fa1-5c09ea68c360&integration=gtm&p_id=Twitter&p_user_id=0&pl_id=95a662bd-3071-4233-b7ea-48c86be9c981&pt=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&tw_document_href=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&tw_iframe_status=0&txn_id=nycee&type=javascript&version=2.3.35",
-    "GET https://s.mozzartbet.com/s.js",
-    "POST https://analytics.tiktok.com/api/v2/pixel",
-    "POST https://analytics.tiktok.com/api/v2/pixel",
-    "GET https://hexagon-analytics.com/images/127268.gif?bk=3e1317fcab&r=58162848&v=119&cs=UTF-8&h=www.mozzartbet.com&l=en-US&S=815f6a67be074b4c87399e37687d5025&uu=b249eb1c-25fd-426d-8b5f-d1b8ccd397da&t=Mozzart%20%7C%20404%20Greska%20-%20Stranica%20nije%20pronadjena%20%7C%20Mozzartbet&u=https%3A%2F%2Fwww.mozzartbet.com%2Fsr%2F404&ua=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20HeadlessChrome%2F143.0.7499.4%20Safari%2F537.36&nm=0&mh=d41d8cd98f00b204e9800998ecf8427e&np=0&ph=d41d8cd98f00b204e9800998ecf8427e&sh=1080&sw=1920&cd=24&p=Win32&to=-60&d=60&ce=true&tp=0&ol=true&pr=Gecko&ps=20030107&vd=Google%20Inc.&hc=28&je=false&ss=true&ls=true&in=true&db=false&tl=false&tr=false&ts=false&tb=false&ab=false&cf=f412e2f96e22af16809ee75235b57270&sri=0&pf=6&inc=true&bn=Chrome&fph=d41d8cd98f00b204e9800998ecf8427e&fsh=1080&fsw=1920&fcd=24&fp=Win32&ftp=0&fhc=28&fss=true&fls=true&fin=true&fvch=418711b9360f0ff97a5476ce480683b2&fad=124.04347527516074&fdm=8&fvf=&fcg=srgb&ffc=false&fm=0&fc=0&frm=false&fhdr=false&fmf=1b4539be02333d14ce0a07c372e6a7d4&fa=255&fte=false&fts=false&fce=true&fpdf=false&fl=cce16c45e622d9ceae4b626c9353ecec&ft=Europe/Budapest&pfe=5&z=z",
-    "POST https://analytics.tiktok.com/api/v2/pixel/act"
-  ],
-  "json_responses": [
-    {
-      "url": "https://www.mozzartbet.com/maintenanceCheck",
-      "method": "POST",
-      "status": 200,
-      "body": {
-        "message": ""
-      }
-    },
-    {
-      "url": "https://betting-publisher-rs.mozzartio.com/betting-publisher/ws-broker/info?name=0_16745651&t=1768783423124",
-      "method": "GET",
-      "status": 200,
-      "body": {
-        "entropy": -1643327992,
-        "origins": [
-          "*:*"
-        ],
-        "cookie_needed": true,
-        "websocket": true
-      }
-    },
-    {
-      "url": "https://www.mozzartbet.com/_mfp",
-      "method": "POST",
-      "status": 200,
-      "body": {
-        "error": false,
-        "message": "OK"
-      }
-    },
-    {
-      "url": "https://formbricks.mozzartbet.com/api/v1/client/cm1hxgdra0008hbaodehyqqnl/environment",
-      "method": "GET",
-      "status": 200,
-      "body": {
-        "data": {
-          "data": {
-            "surveys": [
-              {
-                "id": "cmj2r9pjc08ddmw014kjxc74b",
-                "welcomeCard": {
-                  "enabled": true,
-                  "fileUrl": "https://formbricks.mozzartbet.com/storage/cm1hxgdra0008hbaodehyqqnl/public/desktop_logo_v2--fid--b020326b-b8d2-4ce2-b86d-9b876f9747ad.webp",
-                  "headline": {
-                    "default": "<p class=\"fb-editor-paragraph\"><b><strong class=\"fb-editor-text-bold\" style=\"\">Interesuje nas tvoje mišljenje!</strong></b></p>"
-                  },
-                  "subheader": {
-                    "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Popuni anketu za takmičenje </span><b><strong class=\"fb-editor-text-bold\" style=\"\">Iza svakog ćoška vreba i sa lenda i sa veba</strong></b><span style=\"\">  i dobijaš &nbsp;50 besplatnih spinova na igri Mozzart Joker provajdera Endorphina</span></p>"
-                  },
-                  "buttonLabel": {
-                    "default": "Pokreni anketu"
-                  },
-                  "timeToFinish": true,
-                  "showResponseCount": true
-                },
-                "name": "Casino - Anketa - Decembar 2025",
-                "questions": [],
-                "blocks": [
-                  {
-                    "id": "mntuldloxmuxn073vtn3ae2o",
-                    "name": "Block 1",
-                    "logic": [
-                      {
-                        "id": "glu77tz4gi0tqmt08gm6isdh",
-                        "actions": [
-                          {
-                            "id": "rf78wq9wpcpdjwhckptgeg4g",
-                            "target": "q4rbdtj3n7q38xiah5gqlesc",
-                            "objective": "jumpToBlock"
-                          }
-                        ],
-                        "conditions": {
-                          "id": "mibqsq65s8fncd3mgi82fga5",
-                          "connector": "and",
-                          "conditions": [
-                            {
-                              "id": "mssy8jn7canpl20pcamic6g8",
-                              "operator": "equals",
-                              "leftOperand": {
-                                "type": "element",
-                                "value": "rcyq2rl4529xzx5aahiu9ukm"
-                              },
-                              "rightOperand": {
-                                "type": "static",
-                                "value": "zad6idutmvxpzmilg1ntecz0"
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ],
-                    "elements": [
-                      {
-                        "id": "rcyq2rl4529xzx5aahiu9ukm",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "xasiwwdvr8is2nt7utlgqayb",
-                            "label": {
-                              "default": "Da"
-                            }
-                          },
-                          {
-                            "id": "zad6idutmvxpzmilg1ntecz0",
-                            "label": {
-                              "default": "Ne"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Da li znaš da je u toku takmičenje na onlajn kazinu i aparatima </span><b><strong class=\"fb-editor-text-bold\" style=\"\">\"Iza svakog ćoška vreba i sa lenda i sa veba\"</strong></b><span style=\"\">?</span></p>"
+    "match": {
+        "id": 587950,
+        "filter": {
+            "matchId": 587950,
+            "pageSize": 50,
+            "currentPage": 0,
+            "matchTypeId": 0,
+            "orderType": "BY_COMPETITION",
+            "loadPriorityTemplateGamesOnly": true,
+            "loadAllTemplateGames": false,
+            "packGamesGroupBySport": false,
+            "medium": "ANDROID",
+            "loadExtendedOffer": false,
+            "packGroupsInMatch": true,
+            "sportsLoad": true,
+            "uberOffer": true
+        },
+        "sport": {
+            "id": 4,
+            "name": "Hokej",
+            "rank": 13
+        },
+        "competition": {
+            "id": 4647,
+            "name": "KHL ",
+            "originId": 2784
+        },
+        "matchNumber": 19439,
+        "startTime": 1771079400000,
+        "betStatus": "STARTED",
+        "status": {
+            "id": 0,
+            "name": "Nije počeo"
+        },
+        "home": {
+            "id": 22280,
+            "name": "Sochi"
+        },
+        "visitor": {
+            "id": 22447,
+            "name": "Lokomotiv Yaroslav "
+        },
+        "oddsGroup": [
+            {
+                "id": 150401275,
+                "groupId": "67ada233f4a1566b58beb512",
+                "groupName": "Konačan ishod",
+                "odds": [
+                    {
+                        "id": 150401275,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1",
+                            "shortName": "1",
+                            "description": "Soči će pobediti na meču",
+                            "fullId": 1004001001,
+                            "rank": 1,
+                            "originFullId": 1004017001
                         },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
+                        "game": {
+                            "id": 1,
+                            "name": "Konačan ishod",
+                            "rank": 1,
+                            "parameterName": ""
+                        },
+                        "value": 7.2,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3ef39ea817e8baa4c8e5faecfdf11ae46c7514fd"
                     },
-                    "backButtonLabel": {
-                      "default": "Nayad"
-                    }
-                  },
-                  {
-                    "id": "w3fkr7l6iaeuoz81xebynsy2",
-                    "name": "Block 2",
-                    "elements": [
-                      {
-                        "id": "i4qsv5yb5o60pvj8r0mr7gty",
-                        "type": "multipleChoiceMulti",
-                        "choices": [
-                          {
-                            "id": "g51d6f5915l4zfvctwz9qs9v",
-                            "label": {
-                              "default": "Na sajtu MozzartBet"
-                            }
-                          },
-                          {
-                            "id": "zghc1fgqwadu1i01z3ktz2cr",
-                            "label": {
-                              "default": "Na portalu Mozzart Sport"
-                            }
-                          },
-                          {
-                            "id": "vgtu0u8ywe9eud2r6imxh1cd",
-                            "label": {
-                              "default": "Putem banera/reklama na nekim drugim sajtovima/aplikacijama"
-                            }
-                          },
-                          {
-                            "id": "dbgz9s7t3masil3iidx3dpk6",
-                            "label": {
-                              "default": "Preko društvenih mreža (Facebook, Instagram, Twitter, YouTube, TikTok)"
-                            }
-                          },
-                          {
-                            "id": "tjrhwagvs0a0hf1nqnp2jdgb",
-                            "label": {
-                              "default": "Putem TV reklama"
-                            }
-                          },
-                          {
-                            "id": "cy2rwogappu8ax5h89kb1wcj",
-                            "label": {
-                              "default": "Na bilbordima"
-                            }
-                          },
-                          {
-                            "id": "k1oocvtdliu3xx8hfnlla9fi",
-                            "label": {
-                              "default": "Preko radija"
-                            }
-                          },
-                          {
-                            "id": "jv6mcazeyxb2nkogtl74qrup",
-                            "label": {
-                              "default": "Preko njuzletera"
-                            }
-                          },
-                          {
-                            "id": "qr2wkxiiow5pzbpwvixwe7eh",
-                            "label": {
-                              "default": "SMS"
-                            }
-                          },
-                          {
-                            "id": "v9clyww6xyez7hthx9iy65d7",
-                            "label": {
-                              "default": "Viber"
-                            }
-                          },
-                          {
-                            "id": "v38r4azkjs028zq6wc6ju3yd",
-                            "label": {
-                              "default": "Push notifikacija"
-                            }
-                          },
-                          {
-                            "id": "fsfmn1e7tlitjpuyo61k16ak",
-                            "label": {
-                              "default": "Na uplatnom mestu od operatera"
-                            }
-                          },
-                          {
-                            "id": "fuo4q6gtu4e9d74t5tygsmz1",
-                            "label": {
-                              "default": "Preko prijatelja/poznanika"
-                            }
-                          },
-                          {
-                            "id": "ot85wkqd0oq4qjjntknlbwcz",
-                            "label": {
-                              "default": "Preko MozzAppa"
-                            }
-                          },
-                          {
-                            "id": "other",
-                            "label": {
-                              "default": "Ostalo"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Kako si saznao/la za takmičenje \"Iza svakog ćoška vreba\"? Označi sve opcije na kojima si video/videla nešto vezano za ovo takmičenje.</span></p>"
+                    {
+                        "id": 150401284,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "X",
+                            "shortName": "X",
+                            "description": "Meč će se završiti nerešenim rezultatom",
+                            "fullId": 1004001002,
+                            "rank": 2,
+                            "originFullId": 1004017002
                         },
-                        "required": true,
-                        "shuffleOption": "none",
-                        "otherOptionPlaceholder": {
-                          "default": "Navedi ovde"
-                        }
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
+                        "game": {
+                            "id": 1,
+                            "name": "Konačan ishod",
+                            "rank": 1,
+                            "parameterName": ""
+                        },
+                        "value": 4.85,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3ef39ea817e8baa4c8e5faecfdf11ae46c7514fd"
                     },
-                    "backButtonLabel": {
-                      "default": "Nazad"
+                    {
+                        "id": 150401283,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2",
+                            "shortName": "2",
+                            "description": "Lokomotiv Jaroslav će pobediti na meču",
+                            "fullId": 1004001003,
+                            "rank": 3,
+                            "originFullId": 1004017003
+                        },
+                        "game": {
+                            "id": 1,
+                            "name": "Konačan ishod",
+                            "rank": 1,
+                            "parameterName": ""
+                        },
+                        "value": 1.35,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3ef39ea817e8baa4c8e5faecfdf11ae46c7514fd"
                     }
-                  },
-                  {
-                    "id": "mlm6zv43bveii1cny20u8frz",
-                    "name": "Block 3",
-                    "logic": [
-                      {
-                        "id": "jlg6ts9r436sge9je6o6gedo",
-                        "actions": [
-                          {
-                            "id": "hi9d4z1ri402muytkmfwd9ab",
-                            "target": "eyzgoejpfva1jawc7x4b996k",
-                            "objective": "jumpToBlock"
-                          }
-                        ],
-                        "conditions": {
-                          "id": "yljbgdhjzumchgxjm5i9xl7q",
-                          "connector": "or",
-                          "conditions": [
-                            {
-                              "id": "zj73ci9c37mpx97rrlz6qwdu",
-                              "operator": "equalsOneOf",
-                              "leftOperand": {
-                                "type": "element",
-                                "value": "f51bzuvxj0qk0hvbynymwffh"
-                              },
-                              "rightOperand": {
-                                "type": "static",
-                                "value": [
-                                  "qh7sd9zahhzz9qn2kdbvlwfc",
-                                  "iksmz0nwrlgcy58r13autw0b"
-                                ]
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ],
-                    "elements": [
-                      {
-                        "id": "f51bzuvxj0qk0hvbynymwffh",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "s24m2l2m9e4c9lneth1f95ak",
-                            "label": {
-                              "default": "Da"
-                            }
-                          },
-                          {
-                            "id": "qh7sd9zahhzz9qn2kdbvlwfc",
-                            "label": {
-                              "default": "Ne"
-                            }
-                          },
-                          {
-                            "id": "iksmz0nwrlgcy58r13autw0b",
-                            "label": {
-                              "default": "Ne znam"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Da li učestvuješ u takmičenju na onlajn kazinu i aparatima \"Iza svakog ćoška vreba\"?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "yd979slc0ga0je9r94vcolcf",
-                    "name": "Block 4",
-                    "elements": [
-                      {
-                        "id": "qbwjj7zy8ozfpxngiyzddhjf",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "vqz8unhwkbcnjz0gtnrkqhty",
-                            "label": {
-                              "default": "Aparati"
-                            }
-                          },
-                          {
-                            "id": "jvd0l9oc1j9x7g92odwpjksg",
-                            "label": {
-                              "default": "Onlajn kazino"
-                            }
-                          },
-                          {
-                            "id": "y18pmrfn8iy85vglhamib9a3",
-                            "label": {
-                              "default": "Oba"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Na kom proizvodu učestvuješ na takmičenju?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "wltq3s0ffwnahez0i9wlmtgh",
-                    "name": "Block 5",
-                    "logic": [
-                      {
-                        "id": "gdqr99977s5k09ujthjj5hab",
-                        "actions": [
-                          {
-                            "id": "pvsa3ckirr2rt7p3bksx9660",
-                            "target": "uqi67hjklwarwr1qwwl054zq",
-                            "objective": "jumpToBlock"
-                          }
-                        ],
-                        "conditions": {
-                          "id": "pt338w5oftfqbjkknfzj8n0z",
-                          "connector": "and",
-                          "conditions": [
-                            {
-                              "id": "ht1lqkjocauuufk7976ejfk8",
-                              "operator": "isSubmitted",
-                              "leftOperand": {
-                                "type": "element",
-                                "value": "wee2cb8zmmymxhaxfvk6qk2w"
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ],
-                    "elements": [
-                      {
-                        "id": "wee2cb8zmmymxhaxfvk6qk2w",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "ei5a1wa28gmu9a6qnaadym5z",
-                            "label": {
-                              "default": "Da"
-                            }
-                          },
-                          {
-                            "id": "s4lwkzgj11jw66hz3owrvq62",
-                            "label": {
-                              "default": "Ne"
-                            }
-                          },
-                          {
-                            "id": "uvd9cupfhgri7f9042yritio",
-                            "label": {
-                              "default": "Nisam obraćao/obraćala pažnju"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Da li ti je jasan koncept takmičenja - da najveći broj poena možeš skupiti igrajući i na Land-u i na Web-u i da ti to donosi prednost u odnosu na igrače koji igraju samo jedan proizvod?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "eyzgoejpfva1jawc7x4b996k",
-                    "name": "Block 6",
-                    "elements": [
-                      {
-                        "id": "sxqwlgmq05xf5uhjmpksdeln",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "w07e7sxng3vrqt9jx96iw0cf",
-                            "label": {
-                              "default": "Ne zanimaju me takmičenja"
-                            }
-                          },
-                          {
-                            "id": "xvidy401zpyu8qyw3e5ky9on",
-                            "label": {
-                              "default": "Nisu mi jasna pravila"
-                            }
-                          },
-                          {
-                            "id": "o1ehm5sbpk7d5u7rylrw6x5o",
-                            "label": {
-                              "default": "Nisu mi privlačne nagrade"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Zašto ne učestvuješ na takmičenju?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "q4rbdtj3n7q38xiah5gqlesc",
-                    "name": "Block 7",
-                    "elements": [
-                      {
-                        "id": "amlv593ai0y0mzwjcdll0jv6",
-                        "type": "multipleChoiceMulti",
-                        "choices": [
-                          {
-                            "id": "xt6ey81i60aptycz3qqgbdo3",
-                            "label": {
-                              "default": "Sajt ili aplikacija"
-                            }
-                          },
-                          {
-                            "id": "v0pvfs5awzqyzmrkb7d0tfgc",
-                            "label": {
-                              "default": "Društvene mreže"
-                            }
-                          },
-                          {
-                            "id": "aciuv5h3papsp1o9dnhuqj5i",
-                            "label": {
-                              "default": "Newsletter"
-                            }
-                          },
-                          {
-                            "id": "of3df7ny3i3u8zw52hvgsfqh",
-                            "label": {
-                              "default": "Push notifikacija"
-                            }
-                          },
-                          {
-                            "id": "ui8utkdzimgefxvy15fao4fz",
-                            "label": {
-                              "default": "Ne informišem se aktivno, ne zanimaju me promocije"
-                            }
-                          },
-                          {
-                            "id": "other",
-                            "label": {
-                              "default": "Ostalo"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Na koji način voliš da se informišeš o aktuelnim promocijama kladionica?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none",
-                        "otherOptionPlaceholder": {
-                          "default": "Navedi ovde"
-                        }
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "kxm9ry00is1dbq3pmcznrb2a",
-                    "name": "Block 8",
-                    "logic": [
-                      {
-                        "id": "y6bq8drrrg8tebh4q049t7zq",
-                        "actions": [
-                          {
-                            "id": "jdfv6er2wgferpg7b83tjyey",
-                            "target": "zffs7o41f2iq61ulnys6bt84",
-                            "objective": "jumpToBlock"
-                          }
-                        ],
-                        "conditions": {
-                          "id": "plly0r0ra39nchtkxzxtgo5z",
-                          "connector": "and",
-                          "conditions": [
-                            {
-                              "id": "w424itm4vgsjn5f7tgayvauh",
-                              "operator": "isSubmitted",
-                              "leftOperand": {
-                                "type": "element",
-                                "value": "nc783cbayi1j79431fy9ts8g"
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ],
-                    "elements": [
-                      {
-                        "id": "nc783cbayi1j79431fy9ts8g",
-                        "type": "multipleChoiceSingle",
-                        "choices": [
-                          {
-                            "id": "f56lybc5d7zcg87de9t2sbg6",
-                            "label": {
-                              "default": "Da"
-                            }
-                          },
-                          {
-                            "id": "xain4aj34hprq9o64wl6dcan",
-                            "label": {
-                              "default": "Ne"
-                            }
-                          }
-                        ],
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Da li ste zainteresovani da vam pošaljemo detalje promocije?</span></p>"
-                        },
-                        "required": true,
-                        "shuffleOption": "none"
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  },
-                  {
-                    "id": "uqi67hjklwarwr1qwwl054zq",
-                    "name": "Block 9",
-                    "elements": [
-                      {
-                        "id": "obapkx76m53pu9lixn21tyls",
-                        "type": "rating",
-                        "range": 5,
-                        "scale": "number",
-                        "headline": {
-                          "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Oceni takmičenje </span><b><strong class=\"fb-editor-text-bold\" style=\"\">Iza svakog ćoška vreba</strong></b><span style=\"\"> na skali od 1 do 5:</span></p>"
-                        },
-                        "required": true,
-                        "lowerLabel": {
-                          "default": "Ne dopada mi se uopšte"
-                        },
-                        "upperLabel": {
-                          "default": "Jako mi se dopada"
-                        },
-                        "isColorCodingEnabled": true
-                      }
-                    ],
-                    "buttonLabel": {
-                      "default": "Dalje"
-                    },
-                    "backButtonLabel": {
-                      "default": "Nazad"
-                    }
-                  }
                 ],
-                "variables": [],
-                "type": "app",
-                "showLanguageSwitch": null,
-                "languages": [],
-                "endings": [
-                  {
-                    "id": "zffs7o41f2iq61ulnys6bt84",
-                    "type": "endScreen",
-                    "headline": {
-                      "default": "<p class=\"fb-editor-paragraph\"><b><strong class=\"fb-editor-text-bold\" style=\"\">Hvala!</strong></b></p>"
-                    },
-                    "subheader": {
-                      "default": "<p class=\"fb-editor-paragraph\"><span style=\"\">Hvala ti na izdvojenom vremenu.</span></p>"
-                    }
-                  }
-                ],
-                "autoClose": null,
-                "styling": null,
-                "status": "inProgress",
-                "recaptcha": {
-                  "enabled": false,
-                  "threshold": 0.1
-                },
-                "segment": {
-                  "id": "cmjbewrq60epwmw01ac2jaywx",
-                  "createdAt": "2025-12-18T12:24:05.983Z",
-                  "updatedAt": "2025-12-18T13:00:13.993Z",
-                  "title": "Kazino Anketa - Iza svakog coska vreba - Decembar 2025",
-                  "description": "",
-                  "isPrivate": false,
-                  "filters": [
+                "specialOddValue": "",
+                "rank": 1
+            },
+            {
+                "id": 150401236,
+                "groupId": "67ada3b769989e7218b01c78",
+                "groupName": "Ukupno golova",
+                "odds": [
                     {
-                      "id": "obz8mqitpleshbo120yjrw1s",
-                      "resource": {
-                        "id": "kpl1sgwacz1pzwhlmubvu11a",
-                        "root": {
-                          "type": "segment",
-                          "segmentId": "cmjbewrq60epwmw01ac2jaywx"
+                        "id": 150401236,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "0-4",
+                            "shortName": "0-4",
+                            "description": "Zbir golova na meču će biti najviše 4",
+                            "fullId": 1004009002,
+                            "rank": 1,
+                            "originFullId": 1004003026
                         },
-                        "value": "cmjbewrq60epwmw01ac2jaywx",
-                        "qualifier": {
-                          "operator": "userIsIn"
-                        }
-                      },
-                      "connector": null
+                        "game": {
+                            "id": 9,
+                            "name": "Ukupno golova",
+                            "rank": 2,
+                            "parameterName": ""
+                        },
+                        "value": 2.3,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "b2eba2381b3bfbba98de217a9c8d46901e524cda"
+                    },
+                    {
+                        "id": 150401234,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "0-5",
+                            "shortName": "0-5",
+                            "description": "Zbir golova na meču će biti najviše 5",
+                            "fullId": 1004009002,
+                            "rank": 2,
+                            "originFullId": 1004003023
+                        },
+                        "game": {
+                            "id": 9,
+                            "name": "Ukupno golova",
+                            "rank": 2,
+                            "parameterName": ""
+                        },
+                        "value": 1.7,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "a3f233aab60cb39c4e0ed1560d47198ef9a671c2"
+                    },
+                    {
+                        "id": 150401235,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "5+",
+                            "shortName": "5+",
+                            "description": "Zbir golova na meču će biti najmanje 5",
+                            "fullId": 1004009001,
+                            "rank": 3,
+                            "originFullId": 1004003007
+                        },
+                        "game": {
+                            "id": 9,
+                            "name": "Ukupno golova",
+                            "rank": 2,
+                            "parameterName": ""
+                        },
+                        "value": 1.55,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "b2eba2381b3bfbba98de217a9c8d46901e524cda"
+                    },
+                    {
+                        "id": 150401232,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "6+",
+                            "shortName": "6+",
+                            "description": "Zbir golova na meču će biti najmanje 6",
+                            "fullId": 1004009001,
+                            "rank": 4,
+                            "originFullId": 1004003017
+                        },
+                        "game": {
+                            "id": 9,
+                            "name": "Ukupno golova",
+                            "rank": 2,
+                            "parameterName": ""
+                        },
+                        "value": 2.03,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "a3f233aab60cb39c4e0ed1560d47198ef9a671c2"
                     }
-                  ],
-                  "environmentId": "cm1hxgdra0008hbaodehyqqnl",
-                  "surveys": [
-                    "cmj2r9pjc08ddmw014kjxc74b"
-                  ]
-                },
-                "recontactDays": null,
-                "displayLimit": null,
-                "displayOption": "displayOnce",
-                "hiddenFields": {
-                  "enabled": true,
-                  "fieldIds": []
-                },
-                "isBackButtonHidden": false,
-                "triggers": [
-                  {
-                    "actionClass": {
-                      "name": "/kazino"
-                    }
-                  }
                 ],
-                "displayPercentage": null,
-                "delay": 5,
-                "projectOverwrites": null
-              }
-            ],
-            "actionClasses": [
-              {
-                "id": "cm1jfbjss000xhbaolu8suv3o",
-                "type": "noCode",
-                "name": "/aparati",
-                "key": null,
-                "noCodeConfig": {
-                  "type": "pageView",
-                  "urlFilters": [
+                "specialOddValue": "",
+                "rank": 2
+            },
+            {
+                "id": 150401281,
+                "groupId": "67ada29469989e7218b01c77",
+                "groupName": "Dupla šansa",
+                "odds": [
                     {
-                      "rule": "contains",
-                      "value": "automati"
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "cm1jfomz80010hbaopmt9vft8",
-                "type": "noCode",
-                "name": "50% Scroll",
-                "key": null,
-                "noCodeConfig": {
-                  "type": "fiftyPercentScroll",
-                  "urlFilters": []
-                }
-              },
-              {
-                "id": "cmh4s4a3q1ni5sz01o86cui2p",
-                "type": "noCode",
-                "name": "Page View - Igraj Odgovorno",
-                "key": null,
-                "noCodeConfig": {
-                  "type": "pageView",
-                  "urlFilters": [
+                        "id": 150401281,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1X",
+                            "shortName": "1X",
+                            "description": "Soči će pobediti ili će se meč završiti nerešenim rezultatom",
+                            "fullId": 1004002001,
+                            "rank": 1,
+                            "originFullId": 1004002001
+                        },
+                        "game": {
+                            "id": 2,
+                            "name": "Dupla šansa",
+                            "rank": 3,
+                            "parameterName": ""
+                        },
+                        "value": 2.9,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "98e2b439ead92cc83732f486096c51a03b722b95"
+                    },
                     {
-                      "rule": "contains",
-                      "value": "igraj-odgovorno"
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "cmjbesnrj0epumw01fcravrv6",
-                "type": "noCode",
-                "name": "/kazino",
-                "key": null,
-                "noCodeConfig": {
-                  "type": "pageView",
-                  "urlFilters": [
+                        "id": 150401280,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": " 12",
+                            "shortName": "12",
+                            "description": "Soči ili Lokomotiv Jaroslav će pobediti na meču",
+                            "fullId": 1004002002,
+                            "rank": 2,
+                            "originFullId": 1004002002
+                        },
+                        "game": {
+                            "id": 2,
+                            "name": "Dupla šansa",
+                            "rank": 3,
+                            "parameterName": ""
+                        },
+                        "value": 1.14,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "98e2b439ead92cc83732f486096c51a03b722b95"
+                    },
                     {
-                      "rule": "startsWith",
-                      "value": "https://www.mozzartbet.com/sr/kazino/"
+                        "id": 150401282,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": " X2",
+                            "shortName": "X2",
+                            "description": "Lokomotiv Jaroslav će pobediti ili će se meč završiti nerešenim rezultatom",
+                            "fullId": 1004002003,
+                            "rank": 3,
+                            "originFullId": 1004002003
+                        },
+                        "game": {
+                            "id": 2,
+                            "name": "Dupla šansa",
+                            "rank": 3,
+                            "parameterName": ""
+                        },
+                        "value": 1.06,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "98e2b439ead92cc83732f486096c51a03b722b95"
                     }
-                  ]
-                }
-              }
-            ],
-            "project": {
-              "id": "cm1hxgdqd0003hbao7llykeh7",
-              "recontactDays": 7,
-              "clickOutsideClose": true,
-              "darkOverlay": true,
-              "placement": "center",
-              "inAppSurveyBranding": false,
-              "styling": {
-                "roundness": 11,
-                "background": {
-                  "bg": "#280071",
-                  "bgType": "color",
-                  "brightness": 100
-                },
-                "brandColor": {
-                  "light": "#FDB913"
-                },
-                "inputColor": {
-                  "light": "#ffffff"
-                },
-                "isLogoHidden": false,
-                "questionColor": {
-                  "light": "#2b2524"
-                },
-                "cardArrangement": {
-                  "appSurveys": "simple",
-                  "linkSurveys": "simple"
-                },
-                "cardBorderColor": {
-                  "light": "#f8fafc"
-                },
-                "hideProgressBar": false,
-                "inputBorderColor": {
-                  "light": "#cbd5e1"
-                },
-                "isDarkModeEnabled": false,
-                "allowStyleOverwrite": true,
-                "cardBackgroundColor": {
-                  "light": "#ffffff"
-                }
-              }
+                ],
+                "specialOddValue": "",
+                "rank": 3
+            },
+            {
+                "id": 150401253,
+                "groupId": "67ada766f4a1566b58beb513",
+                "groupName": "Konačan ishod + Golovi",
+                "odds": [
+                    {
+                        "id": 150401253,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1&0-4",
+                            "shortName": "1 & manje",
+                            "description": "Soči će pobediti i zbir golova na meču će biti najviše 4",
+                            "fullId": 1004010001,
+                            "rank": 1,
+                            "originFullId": 1004574001
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 16.5,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "64ed886c98458becad858d1ab10ddb01d1c2fb07"
+                    },
+                    {
+                        "id": 150401254,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1&0-5",
+                            "shortName": "1 & manje",
+                            "description": "Soči će pobediti i zbir golova na meču će biti najviše 5",
+                            "fullId": 1004010001,
+                            "rank": 2,
+                            "originFullId": 1004574002
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 12.2,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e53f50cd8876174fcebc3a09234249b799b8376"
+                    },
+                    {
+                        "id": 150401256,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 4,
+                            "name": "1&5+",
+                            "shortName": "1 & više",
+                            "description": "Soči će pobediti i zbir golova na meču će biti najmanje 5",
+                            "fullId": 1004010004,
+                            "rank": 3,
+                            "originFullId": 1004574003
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 11.1,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "64ed886c98458becad858d1ab10ddb01d1c2fb07"
+                    },
+                    {
+                        "id": 150401257,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 4,
+                            "name": "1&6+",
+                            "shortName": "1 & više",
+                            "description": "Soči će pobediti i zbir golova na meču će biti najmanje 6",
+                            "fullId": 1004010004,
+                            "rank": 4,
+                            "originFullId": 1004574004
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 14.6,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e53f50cd8876174fcebc3a09234249b799b8376"
+                    },
+                    {
+                        "id": 150401233,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 5,
+                            "name": "X&6+",
+                            "shortName": "X & više",
+                            "description": "Meč će se završiti nerešenim rezultatom i zbir golova na meču će biti najmanje 6",
+                            "fullId": 1004010005,
+                            "rank": 5,
+                            "originFullId": 1004574022
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 9.8,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e53f50cd8876174fcebc3a09234249b799b8376"
+                    },
+                    {
+                        "id": 150401262,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2&0-4",
+                            "shortName": "2 & manje",
+                            "description": "Lokomotiv Jaroslav će pobediti i zbir golova na meču će biti najviše 4",
+                            "fullId": 1004010003,
+                            "rank": 6,
+                            "originFullId": 1004574011
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 3.1,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "64ed886c98458becad858d1ab10ddb01d1c2fb07"
+                    },
+                    {
+                        "id": 150401263,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2&0-5",
+                            "shortName": "2 & manje",
+                            "description": "Lokomotiv Jaroslav će pobediti i zbir golova na meču će biti najviše 5",
+                            "fullId": 1004010003,
+                            "rank": 7,
+                            "originFullId": 1004574012
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 2.3,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e53f50cd8876174fcebc3a09234249b799b8376"
+                    },
+                    {
+                        "id": 150401264,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 6,
+                            "name": "2&5+",
+                            "shortName": "2 & više",
+                            "description": "Lokomotiv Jaroslav će pobediti i zbir golova na meču će biti najmanje 5",
+                            "fullId": 1004010006,
+                            "rank": 8,
+                            "originFullId": 1004574013
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 2.09,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "64ed886c98458becad858d1ab10ddb01d1c2fb07"
+                    },
+                    {
+                        "id": 150401265,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 6,
+                            "name": "2&6+",
+                            "shortName": "2 & više",
+                            "description": "Lokomotiv Jaroslav će pobediti i zbir golova na meču će biti najmanje 6",
+                            "fullId": 1004010006,
+                            "rank": 9,
+                            "originFullId": 1004574014
+                        },
+                        "game": {
+                            "id": 10,
+                            "name": "Konačan ishod + Golovi",
+                            "rank": 4,
+                            "parameterName": ""
+                        },
+                        "value": 2.7,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e53f50cd8876174fcebc3a09234249b799b8376"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 4
+            },
+            {
+                "id": 150401287,
+                "groupId": "67ada2bacfb73b48fec34bc8",
+                "groupName": "Winner",
+                "odds": [
+                    {
+                        "id": 150401287,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1",
+                            "shortName": "1",
+                            "description": "Soči će pobediti u regularnom vremenu a u slučaju nerešenog rezultata obračunava se kvota 1",
+                            "fullId": 1004170001,
+                            "rank": 1,
+                            "originFullId": 1004026001
+                        },
+                        "game": {
+                            "id": 170,
+                            "name": "Winner",
+                            "rank": 5,
+                            "parameterName": ""
+                        },
+                        "value": 5.7,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "ecdcc5bc43c8320e7b30f82ac5d829bad5b364f9"
+                    },
+                    {
+                        "id": 150401288,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "2",
+                            "shortName": "2",
+                            "description": "Lokomotiv Jaroslav će pobediti u regularnom vremenu a u slučaju nerešenog rezultata obračunava se kvota 1",
+                            "fullId": 1004170002,
+                            "rank": 2,
+                            "originFullId": 1004026002
+                        },
+                        "game": {
+                            "id": 170,
+                            "name": "Winner",
+                            "rank": 5,
+                            "parameterName": ""
+                        },
+                        "value": 1.09,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "ecdcc5bc43c8320e7b30f82ac5d829bad5b364f9"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 5
+            },
+            {
+                "id": 150401258,
+                "groupId": "67b2df3dd9c77d20e690f348",
+                "groupName": "Prva trećina + Golovi",
+                "odds": [
+                    {
+                        "id": 150401258,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1&0-4",
+                            "description": "Soči će pobediti u prvoj trećini i zbir golova na meču će biti najviše 4",
+                            "fullId": 1004154001,
+                            "rank": 1,
+                            "originFullId": 1004574007
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 11,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "5ca72fbfe01b1955697b34994a3c4aff0812723f"
+                    },
+                    {
+                        "id": 150401260,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "1&5+",
+                            "description": "Soči će pobediti u prvoj trećini i zbir golova na mecu će biti najmanje 5",
+                            "fullId": 1004154002,
+                            "rank": 2,
+                            "originFullId": 1004574009
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 7.4,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "5ca72fbfe01b1955697b34994a3c4aff0812723f"
+                    },
+                    {
+                        "id": 150401266,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2&0-4",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini i zbir golova na meču će biti najviše 4",
+                            "fullId": 1004154003,
+                            "rank": 3,
+                            "originFullId": 1004574017
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 4,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "5ca72fbfe01b1955697b34994a3c4aff0812723f"
+                    },
+                    {
+                        "id": 150401268,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 4,
+                            "name": "2&5+",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini i zbir golova na meču će biti najmanje 5",
+                            "fullId": 1004154004,
+                            "rank": 4,
+                            "originFullId": 1004574019
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 2.7,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "5ca72fbfe01b1955697b34994a3c4aff0812723f"
+                    },
+                    {
+                        "id": 150401259,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1&0-5",
+                            "description": "Soči će pobediti u prvoj trećini i zbir golova na meču će biti najviše 5",
+                            "fullId": 1004154001,
+                            "rank": 5,
+                            "originFullId": 1004574008
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 8.1,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e1ee7b08cccd4ca72b077331f17ba2bc5d80090"
+                    },
+                    {
+                        "id": 150401261,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "1&6+",
+                            "description": "Soči će pobediti u prvoj trećini i zbir golova na mecu će biti najmanje 6",
+                            "fullId": 1004154002,
+                            "rank": 6,
+                            "originFullId": 1004574010
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 9.7,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e1ee7b08cccd4ca72b077331f17ba2bc5d80090"
+                    },
+                    {
+                        "id": 150401267,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2&0-5",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini i zbir golova na meču će biti najviše 5",
+                            "fullId": 1004154003,
+                            "rank": 7,
+                            "originFullId": 1004574018
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 2.95,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e1ee7b08cccd4ca72b077331f17ba2bc5d80090"
+                    },
+                    {
+                        "id": 150401269,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 4,
+                            "name": "2&6+",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini i zbir golova na meču će biti najmanje 6",
+                            "fullId": 1004154004,
+                            "rank": 8,
+                            "originFullId": 1004574020
+                        },
+                        "game": {
+                            "id": 154,
+                            "name": "Prva trećina + Golovi",
+                            "rank": 6,
+                            "parameterName": ""
+                        },
+                        "value": 3.55,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "9e1ee7b08cccd4ca72b077331f17ba2bc5d80090"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 6
+            },
+            {
+                "id": 150401276,
+                "groupId": "67ade92ecfb73b48fec34bcf",
+                "groupName": "Prva trećina - Kraj",
+                "odds": [
+                    {
+                        "id": 150401276,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1-1",
+                            "shortName": "1-1",
+                            "description": "Soči će pobediti u prvoj trećini i na kraju meča",
+                            "fullId": 1004008001,
+                            "rank": 1,
+                            "originFullId": 1004137001
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 13,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401278,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "1-X",
+                            "shortName": "1-X",
+                            "description": "Soči će pobediti u prvoj trećini a meč će se završiti nerešenim rezultatom",
+                            "fullId": 1004008002,
+                            "rank": 2,
+                            "originFullId": 1004137002
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 15,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401277,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "1-2",
+                            "shortName": "1-2",
+                            "description": "Soči će pobediti u prvoj trećini a Lokomotiv Jaroslav će pobediti na kraju meča",
+                            "fullId": 1004008003,
+                            "rank": 3,
+                            "originFullId": 1004137003
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 11,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401270,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 4,
+                            "name": "X-1",
+                            "shortName": "X-1",
+                            "description": "Prva trećina će se završiti nerešenim rezultatom a Soči će pobediti na kraju meča",
+                            "fullId": 1004008004,
+                            "rank": 4,
+                            "originFullId": 1004137004
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 16,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 1004008005,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1004008005,
+                            "name": "X-X",
+                            "shortName": "X-X",
+                            "description": "Prva trećina će se završiti nerešenim rezultatom i meč će se završiti nerešenim rezultatom",
+                            "fullId": 1004008005,
+                            "rank": 5,
+                            "fullTranslation": [
+                                {
+                                    "id": 3209,
+                                    "languageCode": "sr",
+                                    "name": "X-X",
+                                    "shortName": "X-X",
+                                    "description": "Prva trećina će se završiti nerešenim rezultatom i meč će se završiti nerešenim rezultatom"
+                                }
+                            ]
+                        },
+                        "game": {
+                            "id": 1004008005,
+                            "name": "Prva trećina - Kraj",
+                            "shortName": "Prva trećina - Kraj",
+                            "specialOddValueType": "NONE"
+                        },
+                        "value": 1,
+                        "priority": false,
+                        "oddStatus": "DEACTIVATED",
+                        "bindable": false
+                    },
+                    {
+                        "id": 150401272,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 6,
+                            "name": "X-2",
+                            "shortName": "X-2",
+                            "description": "Prva trećina će se završiti nerešenim rezultatom a Lokomotiv Jaroslav će pobediti na kraju meča",
+                            "fullId": 1004008006,
+                            "rank": 6,
+                            "originFullId": 1004137006
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 4.4,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401273,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 7,
+                            "name": "2-1",
+                            "shortName": "2-1",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini a Soči će pobediti na kraju meča",
+                            "fullId": 1004008007,
+                            "rank": 7,
+                            "originFullId": 1004137007
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 38,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401289,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 8,
+                            "name": "2-X",
+                            "shortName": "2-X",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini a meč će se završiti nerešenim rezultatom",
+                            "fullId": 1004008008,
+                            "rank": 8,
+                            "originFullId": 1004137008
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 18,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    },
+                    {
+                        "id": 150401279,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 9,
+                            "name": "2-2",
+                            "shortName": "2-2",
+                            "description": "Lokomotiv Jaroslav će pobediti u prvoj trećini i na kraju meča",
+                            "fullId": 1004008009,
+                            "rank": 9,
+                            "originFullId": 1004137009
+                        },
+                        "game": {
+                            "id": 8,
+                            "name": "Prva trećina - Kraj",
+                            "rank": 7,
+                            "parameterName": ""
+                        },
+                        "value": 1.95,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "0dac4c68a8daf731959bcff9ceccd3e44e28b064"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 7
+            },
+            {
+                "id": 150401285,
+                "groupId": "67ade9c9cfb73b48fec34bd0",
+                "groupName": "Prva trećina",
+                "odds": [
+                    {
+                        "id": 150401285,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1",
+                            "shortName": "1",
+                            "description": "Soči će pobediti u 1. trećini",
+                            "fullId": 1004006001,
+                            "rank": 1,
+                            "originFullId": 1004023001
+                        },
+                        "game": {
+                            "id": 6,
+                            "name": "Prva trećina",
+                            "rank": 8,
+                            "parameterName": ""
+                        },
+                        "value": 4.8,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3006039b34e40de9fdbb395bfd525c292172fb18"
+                    },
+                    {
+                        "id": 150401271,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "X",
+                            "shortName": "X",
+                            "description": "1. trećina će se završiti nerešenim rezultatom",
+                            "fullId": 1004006002,
+                            "rank": 2,
+                            "originFullId": 1004023002
+                        },
+                        "game": {
+                            "id": 6,
+                            "name": "Prva trećina",
+                            "rank": 8,
+                            "parameterName": ""
+                        },
+                        "value": 2.95,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3006039b34e40de9fdbb395bfd525c292172fb18"
+                    },
+                    {
+                        "id": 150401286,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 3,
+                            "name": "2",
+                            "shortName": "2",
+                            "description": "Lokomotiv Jaroslav će pobediti u 1. trećini",
+                            "fullId": 1004006003,
+                            "rank": 3,
+                            "originFullId": 1004023003
+                        },
+                        "game": {
+                            "id": 6,
+                            "name": "Prva trećina",
+                            "rank": 8,
+                            "parameterName": ""
+                        },
+                        "value": 1.75,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "3006039b34e40de9fdbb395bfd525c292172fb18"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 8
+            },
+            {
+                "id": 150401237,
+                "groupId": "67cfed54e6edc4544fe110e6",
+                "groupName": "Ukupno golova prva trećina",
+                "odds": [
+                    {
+                        "id": 150401237,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0",
+                            "shortName": "0",
+                            "description": "Prva trećina će se završiti bez golova",
+                            "fullId": 1004111001,
+                            "rank": 1,
+                            "originFullId": 1004572001
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 4.2,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "7e018e2794cdc16b7e92f78c2d5456270d0937d5"
+                    },
+                    {
+                        "id": 150401238,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0-1",
+                            "shortName": "0-1",
+                            "description": "Zbir golova u 1. trećini će biti najviše 1",
+                            "fullId": 1004111001,
+                            "rank": 2,
+                            "originFullId": 1004572002
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 1.72,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "fb8c09bd3e2e0ca870ba9bc64a2806878e386612"
+                    },
+                    {
+                        "id": 150401239,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0-2",
+                            "shortName": "0-2",
+                            "description": "Zbir golova u 1. trećini će biti najviše 2",
+                            "fullId": 1004111001,
+                            "rank": 3,
+                            "originFullId": 1004572003
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 1.18,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "f7280d90322bed92a2a80c2b815c0beea7dfba1d"
+                    },
+                    {
+                        "id": 150401240,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "1+",
+                            "shortName": "1+",
+                            "description": "Zbir golova u 1. trećini će biti najmanje 1",
+                            "fullId": 1004111002,
+                            "rank": 4,
+                            "originFullId": 1004572004
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 1.18,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "7e018e2794cdc16b7e92f78c2d5456270d0937d5"
+                    },
+                    {
+                        "id": 150401241,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "2+",
+                            "shortName": "2+",
+                            "description": "Zbir golova u 1. trećini će biti najmanje 2",
+                            "fullId": 1004111002,
+                            "rank": 5,
+                            "originFullId": 1004572005
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 2,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "fb8c09bd3e2e0ca870ba9bc64a2806878e386612"
+                    },
+                    {
+                        "id": 150401242,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "3+",
+                            "shortName": "3+",
+                            "description": "Zbir golova u 1. trećini će biti najmanje 3",
+                            "fullId": 1004111002,
+                            "rank": 6,
+                            "originFullId": 1004572006
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 4.3,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "f7280d90322bed92a2a80c2b815c0beea7dfba1d"
+                    },
+                    {
+                        "id": 150401243,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1-2",
+                            "description": "Zbir golova u prvoj trećini će biti 1 ili 2",
+                            "fullId": 1004027001,
+                            "rank": 7,
+                            "originFullId": 1004572007
+                        },
+                        "game": {
+                            "id": 27,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 1.55,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "299885d8aff3268a061696a133abc4711a0f497f"
+                    },
+                    {
+                        "id": 150401244,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "2-3",
+                            "description": "Zbir golova u prvoj trećini će biti 2 ili 3",
+                            "fullId": 1004027002,
+                            "rank": 8,
+                            "originFullId": 1004572008
+                        },
+                        "game": {
+                            "id": 27,
+                            "name": "Ukupno golova prva trećina",
+                            "rank": 9,
+                            "parameterName": ""
+                        },
+                        "value": 2.35,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "299885d8aff3268a061696a133abc4711a0f497f"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 9
+            },
+            {
+                "id": 150401245,
+                "groupId": "67cfed7ee6edc4544fe110e7",
+                "groupName": "Ukupno golova druga trećina",
+                "odds": [
+                    {
+                        "id": 150401245,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0",
+                            "shortName": "0",
+                            "description": "Druga trećina će se završiti bez golova",
+                            "fullId": 1004111001,
+                            "rank": 1,
+                            "originFullId": 1004573001
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 5.8,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "47df8eec435e1b3aa0be6fe16237f4a2299552b1"
+                    },
+                    {
+                        "id": 150401246,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0-1",
+                            "shortName": "0-1",
+                            "description": "Zbir golova u 2. trećini će biti najviše 1",
+                            "fullId": 1004111001,
+                            "rank": 2,
+                            "originFullId": 1004573002
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 2.11,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "d80a82ed8df9e61c7117b51adf96269ab8d205fb"
+                    },
+                    {
+                        "id": 150401247,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "0-2",
+                            "shortName": "0-2",
+                            "description": "Zbir golova u 2. trećini će biti najviše 2",
+                            "fullId": 1004111001,
+                            "rank": 3,
+                            "originFullId": 1004573003
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 1.3,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "f054d08688b1c82fbe78026c612206609c0502e4"
+                    },
+                    {
+                        "id": 150401248,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "1+",
+                            "shortName": "1+",
+                            "description": "Zbir golova u 2. trećini će biti najmanje 1",
+                            "fullId": 1004111002,
+                            "rank": 4,
+                            "originFullId": 1004573004
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 1.1,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "47df8eec435e1b3aa0be6fe16237f4a2299552b1"
+                    },
+                    {
+                        "id": 150401249,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "2+",
+                            "shortName": "2+",
+                            "description": "Zbir golova u 2. trećini će biti najmanje 2",
+                            "fullId": 1004111002,
+                            "rank": 5,
+                            "originFullId": 1004573005
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 1.65,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "d80a82ed8df9e61c7117b51adf96269ab8d205fb"
+                    },
+                    {
+                        "id": 150401250,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "3+",
+                            "shortName": "3+",
+                            "description": "Zbir golova u 2. trećini će biti najmanje 3",
+                            "fullId": 1004111002,
+                            "rank": 6,
+                            "originFullId": 1004573006
+                        },
+                        "game": {
+                            "id": 111,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 3.2,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "f054d08688b1c82fbe78026c612206609c0502e4"
+                    },
+                    {
+                        "id": 150401251,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 1,
+                            "name": "1-2",
+                            "description": "Zbir golova u drugoj trećini ce biti 1 ili 2",
+                            "fullId": 1004028001,
+                            "rank": 7,
+                            "originFullId": 1004573007
+                        },
+                        "game": {
+                            "id": 28,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 1.65,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "8f31f971de0a745b4ca2efc850a91f851d997fb5"
+                    },
+                    {
+                        "id": 150401252,
+                        "specialOddValue": "",
+                        "subgame": {
+                            "id": 2,
+                            "name": "2-3",
+                            "description": "Zbir golova u drugoj trećini ce biti 2 ili 3",
+                            "fullId": 1004028002,
+                            "rank": 8,
+                            "originFullId": 1004573008
+                        },
+                        "game": {
+                            "id": 28,
+                            "name": "Ukupno golova druga trećina",
+                            "rank": 10,
+                            "parameterName": ""
+                        },
+                        "value": 2.15,
+                        "oddStatus": "ACTIVE",
+                        "bindable": false,
+                        "paramsHash": "8f31f971de0a745b4ca2efc850a91f851d997fb5"
+                    }
+                ],
+                "specialOddValue": "",
+                "rank": 10
             }
-          },
-          "expiresAt": "2026-01-19T01:43:43.149Z"
-        }
-      }
-    },
-    {
-      "url": "https://www.mozzartbet.com/maintenanceCheck",
-      "method": "POST",
-      "status": 200,
-      "body": {
-        "message": ""
-      }
-    },
-    {
-      "url": "https://betting-publisher-rs.mozzartio.com/betting-publisher/ws-broker/info?name=0_16745651&t=1768783428495",
-      "method": "GET",
-      "status": 200,
-      "body": {
-        "entropy": -1815771416,
-        "origins": [
-          "*:*"
         ],
-        "cookie_needed": true,
-        "websocket": true
-      }
-    },
-    {
-      "url": "https://www.mozzartbet.com/_mfp",
-      "method": "POST",
-      "status": 200,
-      "body": {
-        "error": false,
-        "message": "OK"
-      }
+        "changeTime": 1771060409114,
+        "totalOddsCount": 56,
+        "matchTypeId": 0,
+        "originMatchId": 9519291,
+        "originInfo": {
+            "preMatchId": 9519291,
+            "lbMatchId": 61812058
+        },
+        "streamInfo": {
+            "playByPlayid": "61812058"
+        }
     }
-  ]
 }
