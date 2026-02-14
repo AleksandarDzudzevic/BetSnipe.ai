@@ -63,7 +63,7 @@ class MozzartScraper(BaseScraper):
 
     def __init__(self):
         super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
-        self._semaphore = asyncio.Semaphore(3)  # Limit concurrent requests
+        self._semaphore = asyncio.Semaphore(8)  # Limit concurrent requests
         self._playwright = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
@@ -863,67 +863,77 @@ class MozzartScraper(BaseScraper):
 
             logger.debug(f"[Mozzart] Found {len(leagues)} leagues for sport {sport_id}")
 
-            for league_id, league_name in leagues:
+            # Phase 1: Fetch all league match IDs in parallel
+            league_tasks = [self.fetch_match_ids(sport_id, lid) for lid, _ in leagues]
+            league_results = await asyncio.gather(*league_tasks, return_exceptions=True)
+
+            # Collect all (match_id, league_name) pairs
+            all_match_info = []  # list of (match_id, league_name)
+            for (league_id, league_name), result in zip(leagues, league_results):
+                if isinstance(result, Exception):
+                    logger.warning(f"[Mozzart] Error fetching league {league_name}: {result}")
+                    continue
+                for mid in (result or []):
+                    all_match_info.append((mid, league_name))
+
+            if not all_match_info:
+                return matches
+
+            logger.debug(f"[Mozzart] Fetching {len(all_match_info)} match details for sport {sport_id}")
+
+            # Phase 2: Fetch all match details in one big parallel batch
+            detail_tasks = [self.fetch_match_details(mid, sport_id, 0) for mid, _ in all_match_info]
+            detail_results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+
+            # Phase 3: Process all results
+            for (match_id, league_name), result in zip(all_match_info, detail_results):
                 try:
-                    match_ids = await self.fetch_match_ids(sport_id, league_id)
-                    if not match_ids:
+                    if isinstance(result, Exception):
+                        logger.warning(f"[Mozzart] Error fetching match {match_id}: {result}")
                         continue
 
-                    # Fetch all match details concurrently (semaphore limits to 3 at a time)
-                    tasks = [self.fetch_match_details(mid, sport_id, league_id) for mid in match_ids]
-                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    match_data = result
+                    if not match_data:
+                        continue
 
-                    for match_id, result in zip(match_ids, results):
-                        try:
-                            if isinstance(result, Exception):
-                                logger.warning(f"[Mozzart] Error fetching match {match_id}: {result}")
-                                continue
+                    match = match_data.get("match", {})
 
-                            match_data = result
-                            if not match_data:
-                                continue
+                    # Skip special matches
+                    if "specialMatchGroupId" in match:
+                        continue
 
-                            match = match_data.get("match", {})
+                    home = match.get("home", {}).get("name")
+                    away = match.get("visitor", {}).get("name")
 
-                            # Skip special matches
-                            if "specialMatchGroupId" in match:
-                                continue
+                    if not home or not away:
+                        continue
 
-                            home = match.get("home", {}).get("name")
-                            away = match.get("visitor", {}).get("name")
+                    # Deduplicate
+                    match_key = f"{home}_{away}"
+                    if match_key in processed_matches:
+                        continue
+                    processed_matches.add(match_key)
 
-                            if not home or not away:
-                                continue
+                    start_time = self.parse_timestamp(match.get("startTime"))
+                    if not start_time:
+                        continue
 
-                            # Deduplicate
-                            match_key = f"{home}_{away}"
-                            if match_key in processed_matches:
-                                continue
-                            processed_matches.add(match_key)
+                    scraped = ScrapedMatch(
+                        team1=home,
+                        team2=away,
+                        sport_id=sport_id,
+                        start_time=start_time,
+                        league_name=league_name,
+                        external_id=str(match.get("id")),
+                    )
 
-                            start_time = self.parse_timestamp(match.get("startTime"))
-                            if not start_time:
-                                continue
+                    scraped.odds = self.parse_odds(match_data, sport_id)
 
-                            scraped = ScrapedMatch(
-                                team1=home,
-                                team2=away,
-                                sport_id=sport_id,
-                                start_time=start_time,
-                                league_name=league_name,
-                                external_id=str(match.get("id")),
-                            )
-
-                            scraped.odds = self.parse_odds(match_data, sport_id)
-
-                            if scraped.odds:
-                                matches.append(scraped)
-
-                        except Exception as e:
-                            logger.warning(f"[Mozzart] Error processing match {match_id}: {e}")
+                    if scraped.odds:
+                        matches.append(scraped)
 
                 except Exception as e:
-                    logger.warning(f"[Mozzart] Error processing league {league_name}: {e}")
+                    logger.warning(f"[Mozzart] Error processing match {match_id}: {e}")
 
         except Exception as e:
             logger.error(f"[Mozzart] Error scraping sport {sport_id}: {e}")
