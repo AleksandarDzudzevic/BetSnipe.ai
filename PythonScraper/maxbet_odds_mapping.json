@@ -1,0 +1,157 @@
+{
+  "2": {
+    "group": "Konačan ishod",
+    "label": "X",
+    "value": "3.85"
+  },
+  "51784": {
+    "group": "GG - NG",
+    "label": "ng",
+    "value": "2.35"
+  },
+  "402": {
+    "group": "GG - NG",
+    "label": "NG1",
+    "value": "1.23"
+  },
+  "812": {
+    "group": "Ukupno golova 90' (top tipovi)",
+    "label": "ug 0-2",
+    "value": "2.25"
+  },
+  "53334": {
+    "group": "Ukupno golova 90' (top tipovi)",
+    "label": "ug 2-3",
+    "value": "2.12"
+  },
+  "204": {
+    "group": "Ukupno golova 90' (top tipovi)",
+    "label": "ug 3+",
+    "value": "1.65"
+  },
+  "852": {
+    "group": "Ukupno golova 90' (top tipovi)",
+    "label": "ug 4+",
+    "value": "2.65"
+  },
+  "55575": {
+    "group": "Top kombinacije golova",
+    "label": "1P0-2&2P0-2",
+    "value": "1.45"
+  },
+  "801": {
+    "group": "Top kombinacije golova",
+    "label": "1&1P1+&2P1+",
+    "value": "2.75"
+  },
+  "53337": {
+    "group": "Top kombinacije golova",
+    "label": "1P1-2&2P1-2",
+    "value": "2.75"
+  },
+  "50700": {
+    "group": "Top kombinacije golova",
+    "label": "1P1-2&4+",
+    "value": "4.35"
+  },
+  "777": {
+    "group": "Top kombinacije golova",
+    "label": "1P2+&4+",
+    "value": "3.75"
+  },
+  "7": {
+    "group": "Dupla šansa",
+    "label": "1X",
+    "value": "1.27"
+  },
+  "8": {
+    "group": "Dupla šansa",
+    "label": "12",
+    "value": "1.27"
+  },
+  "419": {
+    "group": "Drugo poluvreme",
+    "label": "2P1",
+    "value": "2.25"
+  },
+  "53346": {
+    "group": "Drugo poluvreme",
+    "label": "2PX",
+    "value": "2.75"
+  },
+  "237": {
+    "group": "Drugo poluvreme",
+    "label": "2P2",
+    "value": "3.75"
+  },
+  "50692": {
+    "group": "Dupla šansa prvo poluvreme",
+    "label": "P1X",
+    "value": "1.23"
+  },
+  "56531": {
+    "group": "Dupla šansa prvo poluvreme",
+    "label": "PX2",
+    "value": "1.53"
+  },
+  "608": {
+    "group": "Dupla šansa drugo poluvreme",
+    "label": "2P1X",
+    "value": "1.26"
+  },
+  "609": {
+    "group": "Dupla šansa drugo poluvreme",
+    "label": "2P12",
+    "value": "1.45"
+  },
+  "54035": {
+    "group": "Poluvreme - Kraj",
+    "label": "1-X",
+    "value": "15.0"
+  },
+  "50392": {
+    "group": "Poluvreme - Kraj",
+    "label": "1-2",
+    "value": "40.0"
+  },
+  "846": {
+    "group": "Poluvreme - Kraj",
+    "label": "X-2",
+    "value": "9.25"
+  },
+  "50395": {
+    "group": "Poluvreme - Kraj",
+    "label": "2-1",
+    "value": "23.0"
+  },
+  "50280": {
+    "group": "Poluvreme - Kraj",
+    "label": "2-X",
+    "value": "15.0"
+  },
+  "532": {
+    "group": "Poluvreme - Kraj",
+    "label": "NE 1-1",
+    "value": "1.38"
+  },
+  "472": {
+    "group": "Poluvreme - Kraj",
+    "label": "NE 2-2",
+    "value": "1.11"
+  },
+  "817": {
+    "group": "Poluvreme - Kraj",
+    "label": "NE X-1",
+    "value": "1.16"
+  },
+  "380": {
+    "group": "Poluvreme - Kraj",
+    "label": "NE X-X",
+    "value": "1.12"
+  },
+  "821": {
+    "group": "Poluvreme - Kraj",
+    "label": "NE X-2",
+    "value": "1.06"
+  }
+}
