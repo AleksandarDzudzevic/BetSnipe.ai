@@ -101,7 +101,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-key
 
 Key tables in Supabase:
 - `matches` - Deduplicated matches with unique constraint on (team1_normalized, team2_normalized, sport_id, start_time)
-- `current_odds` - Latest odds with PK (match_id, bookmaker_id, bet_type_id, margin)
+- `current_odds` - Latest odds with PK (match_id, bookmaker_id, bet_type_id, margin, selection)
 - `arbitrage_opportunities` - Detected arbitrage with profit %, stakes
 - `odds_history` - Historical odds for trend analysis
 
@@ -127,6 +127,16 @@ WS   /ws              # Main real-time feed
 WS   /ws/odds         # Odds updates only
 WS   /ws/arbitrage    # Arbitrage alerts only
 ```
+
+## Temporary Test Scripts
+
+Use `PythonScraper/claude_test/` for any temporary test, diagnostic, or dump scripts. This folder is gitignored — create and delete files freely without cluttering the repo.
+
+## Slash Commands
+
+- `/audit <sport_id>` — Run cross-bookmaker audit (1=Football, 2=Basketball, etc.)
+- `/test-scraper <name> [sport_id]` — Test a single scraper without database
+- `/expand <bookmaker>` — Guided expansion of a bookmaker's market coverage
 
 ## Performance Optimizations
 

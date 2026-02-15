@@ -215,6 +215,63 @@ BET_TYPES = {
     73: {"name": "winner_set_more_games", "description": "Winner + set with more games",   "outcomes": 1},
     # === Hockey-specific markets ===
     74: {"name": "h1_result_total_goals", "description": "H1/P1 result + total goals",   "outcomes": 1},
+    # === H2 variant markets ===
+    75: {"name": "double_chance_h2",      "description": "Second half double chance",       "outcomes": 3},
+    76: {"name": "draw_no_bet_h2",        "description": "Second half draw no bet",         "outcomes": 2},
+    77: {"name": "odd_even_h1",           "description": "First half odd/even",             "outcomes": 2},
+    78: {"name": "odd_even_h2",           "description": "Second half odd/even",            "outcomes": 2},
+    79: {"name": "correct_score_h1",      "description": "First half correct score",        "outcomes": 1},
+    80: {"name": "handicap_h1_3way",      "description": "First half 3-way handicap",       "outcomes": 3},
+    81: {"name": "team1_total_h2",        "description": "Team 1 second half total O/U",    "outcomes": 2},
+    82: {"name": "team2_total_h2",        "description": "Team 2 second half total O/U",    "outcomes": 2},
+    # === Corner markets ===
+    83: {"name": "corner_1x2",            "description": "Corner 1X2",                      "outcomes": 3},
+    84: {"name": "corner_total",          "description": "Total corners O/U",               "outcomes": 2},
+    85: {"name": "corner_handicap",       "description": "Corner handicap",                 "outcomes": 2},
+    86: {"name": "corner_odd_even",       "description": "Corners odd/even",                "outcomes": 2},
+    87: {"name": "card_1x2",             "description": "Card 1X2",                        "outcomes": 3},
+    88: {"name": "card_total",            "description": "Total cards O/U",                 "outcomes": 2},
+    # === Other standard markets ===
+    89: {"name": "last_goal",             "description": "Last goal team",                  "outcomes": 2},
+    90: {"name": "red_card",              "description": "Red card on match yes/no",        "outcomes": 2},
+    91: {"name": "penalty_awarded",       "description": "Penalty awarded yes/no",          "outcomes": 2},
+    92: {"name": "penalty_scored",        "description": "Penalty scored yes/no",           "outcomes": 2},
+    # === H1 corner/card markets ===
+    93: {"name": "corner_1x2_h1",         "description": "H1 corner 1X2",                  "outcomes": 3},
+    94: {"name": "corner_total_h1",       "description": "H1 total corners O/U",           "outcomes": 2},
+    95: {"name": "corner_handicap_h1",    "description": "H1 corner handicap",             "outcomes": 2},
+    96: {"name": "corner_odd_even_h1",    "description": "H1 corners odd/even",            "outcomes": 2},
+    97: {"name": "card_1x2_h1",          "description": "H1 card 1X2",                    "outcomes": 3},
+    98: {"name": "card_total_h1",         "description": "H1 total cards O/U",             "outcomes": 2},
+    # === Additional standard markets ===
+    99:  {"name": "double_win_nil",       "description": "Both halves win to nil",          "outcomes": 2},
+    100: {"name": "first_goal_h1",        "description": "H1 first goal team",             "outcomes": 3},
+    101: {"name": "first_goal_h2",        "description": "H2 first goal team",             "outcomes": 3},
+    102: {"name": "win_from_behind",      "description": "Win from behind",                "outcomes": 2},
+    103: {"name": "team1_wins_half",      "description": "Team 1 wins at least one half",  "outcomes": 2},
+    104: {"name": "team2_wins_half",      "description": "Team 2 wins at least one half",  "outcomes": 2},
+    105: {"name": "first_corner",         "description": "First corner team",              "outcomes": 3},
+    106: {"name": "first_card",           "description": "First card team",                "outcomes": 3},
+    # === Corner/card range selection markets ===
+    107: {"name": "corner_range",         "description": "Corner count range",             "outcomes": 1},
+    108: {"name": "card_range",           "description": "Card count range",               "outcomes": 1},
+    109: {"name": "team1_corner_range",   "description": "Team 1 corner range",            "outcomes": 1},
+    110: {"name": "team2_corner_range",   "description": "Team 2 corner range",            "outcomes": 1},
+    111: {"name": "team1_card_range",     "description": "Team 1 card range",              "outcomes": 1},
+    112: {"name": "team2_card_range",     "description": "Team 2 card range",              "outcomes": 1},
+    # === Combo/special selection markets ===
+    113: {"name": "ht_ft_not",            "description": "HT/FT NOT result",               "outcomes": 1},
+    114: {"name": "or_combinations",      "description": "OR market combinations",         "outcomes": 1},
+    115: {"name": "btts_half_combo",      "description": "BTTS + half with more goals",    "outcomes": 1},
+    116: {"name": "dc_half_combo",        "description": "DC + half with more goals",      "outcomes": 1},
+    117: {"name": "correct_score_anytime","description": "Correct score at any time",      "outcomes": 1},
+    118: {"name": "correct_score_combo",  "description": "Correct score group combos",     "outcomes": 1},
+    119: {"name": "team1_half_combo",     "description": "Team 1 H1&H2 goal combos",      "outcomes": 1},
+    120: {"name": "team2_half_combo",     "description": "Team 2 H1&H2 goal combos",      "outcomes": 1},
+    121: {"name": "win_margin",           "description": "Win by exact margin",            "outcomes": 1},
+    122: {"name": "first_goal_total",     "description": "First goal team + total goals",  "outcomes": 1},
+    123: {"name": "ht_result_btts",       "description": "HT result + BTTS combo",         "outcomes": 1},
+    124: {"name": "ht_ft_or_combo",       "description": "HT/FT OR combinations",          "outcomes": 1},
 }
 
 

@@ -63,7 +63,7 @@ class MozzartScraper(BaseScraper):
 
     def __init__(self):
         super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
-        self._semaphore = asyncio.Semaphore(8)  # Limit concurrent requests
+        self._semaphore = asyncio.Semaphore(6)  # Limit concurrent requests
         self._playwright = None
         self._browser: Optional[Browser] = None
         self._context: Optional[BrowserContext] = None
@@ -272,8 +272,16 @@ class MozzartScraper(BaseScraper):
         "Winner prvo poluvreme":        ("_parse_two_way", 21),     # draw no bet H1
         "Drugo poluvreme":              ("_parse_1x2", 4),          # 1X2 second half
         "Prolazi dalje":                ("_parse_two_way", 22),     # to qualify
+        "Dupla šansa drugo poluvreme":  ("_parse_three_way", 75),   # double chance H2
+        "Winner drugo poluvreme":       ("_parse_two_way", 76),     # draw no bet H2
+        "Ukupno golova - Par/Nepar prvo poluvreme":  ("_parse_two_way", 77),  # odd/even H1
+        "Ukupno golova prvo poluvreme - Par/Nepar":  ("_parse_two_way", 77),  # odd/even H1 (alt name)
+        "Ukupno golova - Par/Nepar drugo poluvreme": ("_parse_two_way", 78),  # odd/even H2
+        "Ukupno golova drugo poluvreme - Par/Nepar": ("_parse_two_way", 78),  # odd/even H2 (alt name)
         # === Selection markets (multi-outcome, 1 row per selection) ===
         "Tačan rezultat":               ("_parse_selection", 23),
+        "Tačan rezultat prvog poluvremena":  ("_parse_selection", 79),  # H1 correct score
+        "Tačan rezultat I poluvreme":       ("_parse_selection", 79),  # H1 CS (alt name)
         "Poluvreme - Kraj":             ("_parse_selection", 24),
         "Ukupno golova na meču":        ("_parse_selection", 25),
         "Tačan broj golova na meču":    ("_parse_selection", 26),
@@ -416,6 +424,9 @@ class MozzartScraper(BaseScraper):
             group_name = odds_group.get("groupName", "").lower()
 
             for odd in odds_group.get("odds", []):
+                # Skip DEACTIVATED odds
+                if odd.get("oddStatus") == "DEACTIVATED":
+                    continue
                 special_value = odd.get("specialOddValue", "")
                 value_type = odd.get("game", {}).get("specialOddValueType", "")
                 subgame_name = odd.get("subgame", {}).get("name", "")
@@ -564,20 +575,44 @@ class MozzartScraper(BaseScraper):
 
         # 2) Parse each group via the dispatch map
         for odds_group in match.get("oddsGroup", []):
+            # Filter out DEACTIVATED odds (template placeholders with value=1)
+            active_odds = [o for o in odds_group.get("odds", [])
+                           if o.get("oddStatus") != "DEACTIVATED"]
+            if not active_odds:
+                continue
+            filtered_group = {**odds_group, "odds": active_odds}
+
             group_name = odds_group.get("groupName", "")
+
+            # Detect specialOddValueType from first active odd
+            first_type = ""
+            for odd in active_odds:
+                vt = odd.get("game", {}).get("specialOddValueType", "")
+                if vt and vt != "NONE":
+                    first_type = vt
+                    break
+
+            # Handle HANDICAP groups
+            if first_type == "HANDICAP":
+                if "poluvreme" in group_name.lower():
+                    odds_list.extend(self._parse_handicap_group(filtered_group, 50))
+                else:
+                    odds_list.extend(self._parse_handicap_group(filtered_group, 9))
+                continue
 
             # Special handling for BTTS (can have both simple and combo subgames)
             if group_name == "Oba tima daju gol":
-                odds_list.extend(self._parse_btts_group(odds_group))
+                odds_list.extend(self._parse_btts_group(filtered_group))
                 continue
 
             mapping = self.FOOTBALL_GROUP_MAP.get(group_name)
             if not mapping:
+                logger.debug(f"[Mozzart] Unmapped football group: '{group_name}'")
                 continue
 
             handler_name, bet_type_id = mapping
             handler = getattr(self, handler_name)
-            odds_list.extend(handler(odds_group, bet_type_id))
+            odds_list.extend(handler(filtered_group, bet_type_id))
 
         return odds_list
 
@@ -625,11 +660,18 @@ class MozzartScraper(BaseScraper):
             return odds_list
 
         for odds_group in match.get("oddsGroup", []):
+            # Filter out DEACTIVATED odds (template placeholders with value=1)
+            active_odds = [o for o in odds_group.get("odds", [])
+                           if o.get("oddStatus") != "DEACTIVATED"]
+            if not active_odds:
+                continue
+            filtered_group = {**odds_group, "odds": active_odds}
+
             group_name = odds_group.get("groupName", "")
 
             # Detect if this group uses HANDICAP or MARGIN specialOddValueType
             first_type = ""
-            for odd in odds_group.get("odds", []):
+            for odd in active_odds:
                 vt = odd.get("game", {}).get("specialOddValueType", "")
                 if vt and vt != "NONE":
                     first_type = vt
@@ -638,20 +680,20 @@ class MozzartScraper(BaseScraper):
             if first_type == "HANDICAP":
                 # Handicap — determine full-time vs half based on group name
                 if "poluvreme" in group_name.lower():
-                    odds_list.extend(self._parse_handicap_group(odds_group, 50))
+                    odds_list.extend(self._parse_handicap_group(filtered_group, 50))
                 else:
-                    odds_list.extend(self._parse_handicap_group(odds_group, 9))
+                    odds_list.extend(self._parse_handicap_group(filtered_group, 9))
 
             elif first_type == "MARGIN":
                 # Check combo markets first (they also have MARGIN)
                 combo_bt = self.BASKETBALL_COMBO_MARGIN_MAP.get(group_name)
                 if combo_bt is not None:
-                    odds_list.extend(self._parse_selection_margin_group(odds_group, combo_bt))
+                    odds_list.extend(self._parse_selection_margin_group(filtered_group, combo_bt))
                 else:
                     # Regular O/U market
                     ou_bt = self.BASKETBALL_MARGIN_MAP.get(group_name)
                     if ou_bt is not None:
-                        odds_list.extend(self._parse_ou_group(odds_group, ou_bt))
+                        odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
 
             else:
                 # Simple group — use dispatch map
@@ -659,7 +701,9 @@ class MozzartScraper(BaseScraper):
                 if mapping:
                     handler_name, bet_type_id = mapping
                     handler = getattr(self, handler_name)
-                    odds_list.extend(handler(odds_group, bet_type_id))
+                    odds_list.extend(handler(filtered_group, bet_type_id))
+                else:
+                    logger.debug(f"[Mozzart] Unmapped basketball group: '{group_name}'")
 
         return odds_list
 
@@ -756,6 +800,8 @@ class MozzartScraper(BaseScraper):
                     handler_name, bet_type_id = mapping
                     handler = getattr(self, handler_name)
                     odds_list.extend(handler(filtered_group, bet_type_id))
+                else:
+                    logger.debug(f"[Mozzart] Unmapped tennis group: '{group_name}'")
 
         return odds_list
 
@@ -777,6 +823,12 @@ class MozzartScraper(BaseScraper):
         "Ukupno golova druga trećina":  ("_parse_selection", 30),   # second period goals range
     }
 
+    # MARGIN-type hockey groups → bet_type_id (O/U markets)
+    HOCKEY_MARGIN_MAP = {
+        "Ukupno golova":                5,    # total_over_under
+        "Ukupno golova prva trećina":   6,    # total P1
+    }
+
     def parse_hockey_odds(self, match_data: Dict) -> List[ScrapedOdds]:
         """Parse all hockey odds from Mozzart match data using group-based dispatch."""
         odds_list = []
@@ -795,11 +847,28 @@ class MozzartScraper(BaseScraper):
 
             group_name = odds_group.get("groupName", "")
 
-            mapping = self.HOCKEY_GROUP_MAP.get(group_name)
-            if mapping:
-                handler_name, bet_type_id = mapping
-                handler = getattr(self, handler_name)
-                odds_list.extend(handler(filtered_group, bet_type_id))
+            # Detect specialOddValueType from first active odd
+            first_type = ""
+            for odd in active_odds:
+                vt = odd.get("game", {}).get("specialOddValueType", "")
+                if vt and vt != "NONE":
+                    first_type = vt
+                    break
+
+            if first_type == "HANDICAP":
+                odds_list.extend(self._parse_handicap_group(filtered_group, 9))
+            elif first_type == "MARGIN":
+                ou_bt = self.HOCKEY_MARGIN_MAP.get(group_name)
+                if ou_bt is not None:
+                    odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
+            else:
+                mapping = self.HOCKEY_GROUP_MAP.get(group_name)
+                if mapping:
+                    handler_name, bet_type_id = mapping
+                    handler = getattr(self, handler_name)
+                    odds_list.extend(handler(filtered_group, bet_type_id))
+                else:
+                    logger.debug(f"[Mozzart] Unmapped hockey group: '{group_name}'")
 
         return odds_list
 

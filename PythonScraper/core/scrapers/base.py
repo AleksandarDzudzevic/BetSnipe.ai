@@ -150,10 +150,23 @@ class BaseScraper(ABC):
                 self._error_count += 1
             else:
                 all_matches.extend(result)
-                logger.debug(f"[{self.bookmaker_name}] Sport {sport_id}: {len(result)} matches")
+                if result:
+                    total_odds = sum(len(m.odds) for m in result)
+                    avg = total_odds / len(result)
+                    logger.debug(
+                        f"[{self.bookmaker_name}] Sport {sport_id}: "
+                        f"{len(result)} matches, {total_odds} odds "
+                        f"({avg:.0f} avg/match)"
+                    )
+                else:
+                    logger.debug(f"[{self.bookmaker_name}] Sport {sport_id}: 0 matches")
 
         self._last_scrape = datetime.now(timezone.utc)
-        logger.info(f"[{self.bookmaker_name}] Total: {len(all_matches)} matches")
+        total_odds = sum(len(m.odds) for m in all_matches)
+        logger.info(
+            f"[{self.bookmaker_name}] Total: {len(all_matches)} matches, "
+            f"{total_odds} odds"
+        )
 
         return all_matches
 

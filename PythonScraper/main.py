@@ -433,10 +433,6 @@ def main():
     # Check for single bookmaker mode
     selected_scraper = get_selected_scraper(args)
 
-    # Force debug logging for single bookmaker mode
-    if selected_scraper:
-        args.debug = True
-
     if args.debug:
         settings.log_level = 'DEBUG'
 
