@@ -59,6 +59,7 @@ class ArbitrageDetector:
     Supports:
     - Two-way arbitrage (e.g., tennis winner, over/under)
     - Three-way arbitrage (e.g., football 1X2)
+    - Selection-based N-way arbitrage (e.g., correct score, HT/FT)
     """
 
     def __init__(self, min_profit: Optional[float] = None):
@@ -199,6 +200,69 @@ class ArbitrageDetector:
 
         return profit_pct, best_odds, stakes
 
+    def calculate_selection_arbitrage(
+        self,
+        selections: Dict[str, List[Tuple[int, str, float]]]
+    ) -> Optional[Tuple[float, List[Dict], List[float]]]:
+        """
+        Calculate N-way arbitrage for selection-based markets.
+
+        Each selection (e.g. "1:0", "2/1") is one mutually exclusive outcome.
+        For each selection, multiple bookmakers offer odd1. We pick the best
+        odd per selection, then check if sum(1/best_odd) < 1.
+
+        Args:
+            selections: {selection_key: [(bookmaker_id, bookmaker_name, odd1), ...]}
+                        Only selections with 2+ bookmakers should be included.
+
+        Returns:
+            Tuple of (profit_percentage, best_odds, stakes) or None if no arbitrage
+        """
+        if len(selections) < 2:
+            return None
+
+        # Find best odd1 per selection
+        best_per_selection = {}
+        for sel, bookmaker_odds in selections.items():
+            best = max(bookmaker_odds, key=lambda x: x[2] if x[2] else 0)
+            if not best[2] or best[2] <= 1:
+                continue
+            best_per_selection[sel] = best
+
+        if len(best_per_selection) < 2:
+            return None
+
+        # Calculate implied probabilities
+        total_prob = sum(1.0 / best[2] for best in best_per_selection.values())
+
+        if total_prob >= 1:
+            return None
+
+        profit_pct = ((1 / total_prob) - 1) * 100
+
+        if profit_pct < self.min_profit:
+            return None
+
+        # Calculate optimal stakes for 100 unit total bet
+        total_stake = 100
+        best_odds = []
+        stakes = []
+
+        for sel in sorted(best_per_selection.keys()):
+            bm_id, bm_name, odd = best_per_selection[sel]
+            prob = 1.0 / odd
+            stake = (prob / total_prob) * total_stake
+
+            best_odds.append({
+                'bookmaker_id': bm_id,
+                'bookmaker_name': bm_name,
+                'outcome': sel,
+                'odd': odd
+            })
+            stakes.append(stake)
+
+        return profit_pct, best_odds, stakes
+
     def generate_arb_hash(
         self,
         match_id: int,
@@ -255,17 +319,46 @@ class ArbitrageDetector:
                 odds_groups[key] = []
             odds_groups[key].append(odd)
 
+        # Collect selection-based odds for regrouping by (bet_type_id, margin)
+        selection_markets: Dict[Tuple[int, float], Dict[str, List[Tuple[int, str, float]]]] = {}
+
         # Check each group for arbitrage
         for (bet_type_id, margin, selection), group_odds in odds_groups.items():
             if len(group_odds) < 2:
+                # For selection markets, single-bookmaker selections are still
+                # collected but filtered later by the 2+ bookmaker requirement
+                bet_type = BET_TYPES.get(bet_type_id, {})
+                if bet_type.get('outcomes', 2) == 1:
+                    market_key = (bet_type_id, margin)
+                    if market_key not in selection_markets:
+                        selection_markets[market_key] = {}
+                    if selection not in selection_markets[market_key]:
+                        selection_markets[market_key][selection] = []
+                    for o in group_odds:
+                        if o['odd1']:
+                            bm_name = o.get('bookmaker_name', BOOKMAKERS.get(o['bookmaker_id'], {}).get('name', 'Unknown'))
+                            selection_markets[market_key][selection].append(
+                                (o['bookmaker_id'], bm_name, float(o['odd1']))
+                            )
                 continue
 
             bet_type = BET_TYPES.get(bet_type_id, {})
 
-            # Skip selection-based markets (outcomes=1) for now —
-            # arbitrage detection for these requires comparing ALL selections
+            # Selection-based markets: collect odds for regrouping
             if bet_type.get('outcomes', 2) == 1:
+                market_key = (bet_type_id, margin)
+                if market_key not in selection_markets:
+                    selection_markets[market_key] = {}
+                if selection not in selection_markets[market_key]:
+                    selection_markets[market_key][selection] = []
+                for o in group_odds:
+                    if o['odd1']:
+                        bm_name = o.get('bookmaker_name', BOOKMAKERS.get(o['bookmaker_id'], {}).get('name', 'Unknown'))
+                        selection_markets[market_key][selection].append(
+                            (o['bookmaker_id'], bm_name, float(o['odd1']))
+                        )
                 continue
+
             is_three_way = bet_type.get('outcomes', 2) == 3
 
             if is_three_way:
@@ -319,6 +412,48 @@ class ArbitrageDetector:
                     stakes=stakes,
                     arb_hash=arb_hash,
                     is_two_way=not is_three_way
+                )
+
+                opportunities.append(opportunity)
+
+        # Process selection-based markets (outcomes=1)
+        # Each (bet_type_id, margin) group has multiple selections forming
+        # a mutually exclusive set of outcomes
+        for (bet_type_id, margin), sel_odds in selection_markets.items():
+            # Only include selections offered by 2+ bookmakers
+            filtered = {
+                sel: odds_list
+                for sel, odds_list in sel_odds.items()
+                if len(set(o[0] for o in odds_list)) >= 2
+            }
+
+            if len(filtered) < 2:
+                continue
+
+            result = self.calculate_selection_arbitrage(filtered)
+
+            if result:
+                profit_pct, best_odds, stakes = result
+                bet_type = BET_TYPES.get(bet_type_id, {})
+
+                arb_hash = self.generate_arb_hash(
+                    match_id, bet_type_id, margin, best_odds, profit_pct
+                )
+
+                opportunity = ArbitrageOpportunity(
+                    match_id=match_id,
+                    team1=match_data.get('team1', ''),
+                    team2=match_data.get('team2', ''),
+                    sport_id=match_data.get('sport_id', 0),
+                    start_time=match_data.get('start_time'),
+                    bet_type_id=bet_type_id,
+                    bet_type_name=bet_type.get('name', 'Unknown'),
+                    margin=margin,
+                    profit_percentage=profit_pct,
+                    best_odds=best_odds,
+                    stakes=stakes,
+                    arb_hash=arb_hash,
+                    is_two_way=False
                 )
 
                 opportunities.append(opportunity)
