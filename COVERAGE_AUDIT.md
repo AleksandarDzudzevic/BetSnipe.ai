@@ -2,7 +2,7 @@
 
 **Date**: 2026-02-15
 **Method**: Live API scraping via `audit_scrapers.py`
-**Scrapers tested**: Admiral, Soccerbet, MaxBet, SuperBet, Merkur, TopBet (Mozzart excluded — requires Playwright)
+**Scrapers tested**: Admiral, Soccerbet, MaxBet, SuperBet, Merkur, TopBet, BalkanBet (Mozzart excluded — requires Playwright)
 
 ---
 
@@ -18,11 +18,13 @@
 | SuperBet  | 1,407   | 494,157    | 351.2     | 43        |
 | Merkur    | 453     | 202,259    | 446.5     | 55        |
 | TopBet    | 456     | 53,145     | 116.5     | 16        |
+| BalkanBet | 786     | 385,179    | 490.0     | 46        |
 
 **Key observations:**
 - **Admiral** leads in bet type diversity (91 types) — only scraper with corners, cards, penalties
 - **Soccerbet** leads in avg odds per match (664.4) — deepest combo market coverage
 - **SuperBet** has the most matches (1,407) and improved avg/match (351.2) after combo market expansion
+- **BalkanBet** added Feb 2026: strong coverage (490 avg/match, 46 types) via NSoft distribution API
 - **TopBet** is far behind (116.5 avg/match, 16 types) — overview-only mode captures basics
 
 ### Basketball (Sport ID=2)
@@ -175,57 +177,71 @@ TopBet's goal range selections differ from other bookmakers for some ranges. `0-
 
 Coverage indicates number of odds across all matches. `--` = not mapped.
 
-| Bet Type | Name | Admiral | MaxBet | Merkur | Soccerbet | SuperBet | TopBet |
-|----------|------|---------|--------|--------|-----------|----------|--------|
-| bt2 | 1X2 | 414 | 653 | 453 | 539 | 1,407 | 456 |
-| bt3 | H1 1X2 | 414 | 653 | 358 | 532 | 915 | -- |
-| bt4 | H2 1X2 | 414 | 653 | 356 | 532 | 915 | -- |
-| bt5 | Total O/U | 2,102 | 3,160 | 2,128 | 2,142 | 6,782 | -- |
-| bt6 | H1 Total | 1,155 | 1,913 | 1,073 | 1,585 | 3,781 | -- |
-| bt7 | H2 Total | 1,238 | 1,932 | 1,050 | 1,596 | 3,781 | -- |
-| bt8 | BTTS | 414 | 644 | 430 | 539 | 1,309 | 455 |
-| bt9 | Handicap | 1,401 | 1,923 | 439 | -- | 4,273 | -- |
-| bt13 | Double Chance | 405 | 633 | 434 | 526 | 1,404 | -- |
-| bt14 | Draw No Bet | 397 | 631 | 421 | 533 | 1,392 | -- |
-| bt15 | Odd/Even | 392 | 644 | 336 | 523 | 1,312 | -- |
-| bt16 | Double Win | 392 | 644 | 355 | 521 | -- | -- |
-| bt17 | Win to Nil | 380 | 644 | 355 | 523 | -- | -- |
-| bt18 | First Goal | 413 | 644 | 334 | -- | 793 | -- |
-| bt19 | Half More Goals | 392 | 644 | 358 | 532 | 912 | -- |
-| bt20 | H1 DC | 389 | 631 | 331 | 412 | 915 | -- |
-| bt21 | H1 DNB | 380 | 643 | 334 | 517 | 521 | -- |
-| bt23 | Correct Score | 10,117 | 14,704 | 7,641 | 13,075 | 33,825 | -- |
-| bt24 | HT/FT | 3,726 | 5,796 | 3,222 | 4,788 | 11,655 | 3,740 |
-| bt25 | Goal Range | 11,088 | 9,784 | 6,463 | 8,571 | 13,815 | 4,445 |
-| bt26 | Exact Goals | 2,639 | 3,196 | 1,670 | 2,695 | 4,186 | -- |
-| bt27 | Team 1 Goals | 4,695 | 11,801 | 7,030 | 10,354 | 2,108 | 4,142 |
-| bt28 | Team 2 Goals | 4,695 | 11,754 | 7,031 | 10,303 | 2,108 | 3,937 |
-| bt35 | Goals H1&H2 | 23,012 | 31,491 | 17,369 | 26,564 | -- | 4,462 |
-| bt36 | First Goal+Result | -- | -- | -- | -- | 5,484 | -- |
-| bt37 | HT/FT DC | 7,793 | 17,388 | 9,017 | 14,061 | 8,235 | -- |
-| bt38 | Result+Total | 24,748 | 34,480 | 18,836 | 34,739 | 42,038 | 4,446 |
-| bt41 | DC+Total | 27,360 | 28,323 | 15,135 | 25,057 | 43,260 | 4,358 |
-| bt42 | DC+Half Goals | -- | -- | -- | -- | 5,478 | -- |
-| bt44 | HT/FT+Total | 29,359 | 47,324 | 23,806 | 55,230 | 103,410 | 4,046 |
-| bt46 | BTTS Combo | 11,673 | 27,150 | 16,575 | 25,068 | 37,111 | 4,166 |
-| bt48 | Team1 Total | 1,297 | 644 | 430 | -- | 4,270 | -- |
-| bt49 | Team2 Total | 1,138 | 644 | 430 | -- | 4,229 | -- |
-| bt75 | H2 DC | 390 | 631 | 331 | 412 | 915 | -- |
-| bt76 | H2 DNB | 380 | 643 | 334 | 515 | 521 | -- |
-| bt77 | H1 O/E | 380 | -- | -- | -- | 521 | -- |
-| bt78 | H2 O/E | 380 | -- | -- | -- | -- | -- |
-| bt79 | H1 CS | 3,588 | 8,290 | 4,304 | 8,336 | 5,920 | -- |
-| bt113 | HT/FT NOT | 1,770 | 2,939 | 1,555 | 2,541 | -- | -- |
-| bt114 | OR Combos | 6,574 | 7,712 | 4,062 | 11,692 | 16,890 | -- |
-| bt119 | Team1 H1&H2 | 5,610 | 6,471 | 4,257 | 7,704 | -- | -- |
-| bt120 | Team2 H1&H2 | 5,347 | 6,020 | 4,078 | 7,630 | -- | -- |
-| bt121 | Win Margin | 780 | 3,864 | 2,004 | 3,790 | -- | -- |
-| bt123 | HT Result+BTTS | 2,916 | 3,864 | 2,004 | 3,126 | 3,126 | -- |
-| bt124 | HT/FT OR | 3,136 | 5,152 | 3,006 | 4,775 | 2,814 | -- |
+| Bet Type | Name | Admiral | MaxBet | Merkur | Soccerbet | SuperBet | TopBet | BalkanBet |
+|----------|------|---------|--------|--------|-----------|----------|--------|-----------|
+| bt2 | 1X2 | 414 | 653 | 453 | 539 | 1,407 | 456 | 786 |
+| bt3 | H1 1X2 | 414 | 653 | 358 | 532 | 915 | -- | 784 |
+| bt4 | H2 1X2 | 414 | 653 | 356 | 532 | 915 | -- | 767 |
+| bt5 | Total O/U | 2,102 | 3,160 | 2,128 | 2,142 | 6,782 | -- | -- |
+| bt6 | H1 Total | 1,155 | 1,913 | 1,073 | 1,585 | 3,781 | -- | -- |
+| bt7 | H2 Total | 1,238 | 1,932 | 1,050 | 1,596 | 3,781 | -- | -- |
+| bt8 | BTTS | 414 | 644 | 430 | 539 | 1,309 | 455 | 764 |
+| bt9 | Handicap | 1,401 | 1,923 | 439 | -- | 4,273 | -- | 1,310 |
+| bt13 | Double Chance | 405 | 633 | 434 | 526 | 1,404 | -- | 760 |
+| bt14 | Draw No Bet | 397 | 631 | 421 | 533 | 1,392 | -- | 607 |
+| bt15 | Odd/Even | 392 | 644 | 336 | 523 | 1,312 | -- | 192 |
+| bt16 | Double Win | 392 | 644 | 355 | 521 | -- | -- | 621 |
+| bt17 | Win to Nil | 380 | 644 | 355 | 523 | -- | -- | 621 |
+| bt18 | First Goal | 413 | 644 | 334 | -- | 793 | -- | 542 |
+| bt19 | Half More Goals | 392 | 644 | 358 | 532 | 912 | -- | 784 |
+| bt20 | H1 DC | 389 | 631 | 331 | 412 | 915 | -- | 619 |
+| bt21 | H1 DNB | 380 | 643 | 334 | 517 | 521 | -- | -- |
+| bt23 | Correct Score | 10,117 | 14,704 | 7,641 | 13,075 | 33,825 | -- | 7,800 |
+| bt24 | HT/FT | 3,726 | 5,796 | 3,222 | 4,788 | 11,655 | 3,740 | 9,816 |
+| bt25 | Goal Range | 11,088 | 9,784 | 6,463 | 8,571 | 13,815 | 4,445 | 28,572 |
+| bt26 | Exact Goals | 2,639 | 3,196 | 1,670 | 2,695 | 4,186 | -- | -- |
+| bt27 | Team 1 Goals | 4,695 | 11,801 | 7,030 | 10,354 | 2,108 | 4,142 | 8,135 |
+| bt28 | Team 2 Goals | 4,695 | 11,754 | 7,031 | 10,303 | 2,108 | 3,937 | 8,040 |
+| bt29 | H1 Goal Range | -- | -- | -- | -- | -- | -- | 9,988 |
+| bt30 | H2 Goal Range | -- | -- | -- | -- | -- | -- | 10,039 |
+| bt31 | Team1 Goals H1 | -- | -- | -- | -- | -- | -- | 4,576 |
+| bt32 | Team2 Goals H1 | -- | -- | -- | -- | -- | -- | 4,450 |
+| bt33 | Team1 Goals H2 | -- | -- | -- | -- | -- | -- | 4,608 |
+| bt34 | Team2 Goals H2 | -- | -- | -- | -- | -- | -- | 4,575 |
+| bt35 | Goals H1&H2 | 23,012 | 31,491 | 17,369 | 26,564 | -- | 4,462 | 46,018 |
+| bt36 | First Goal+Result | -- | -- | -- | -- | 5,484 | -- | 3,794 |
+| bt37 | HT/FT DC | 7,793 | 17,388 | 9,017 | 14,061 | 8,235 | -- | -- |
+| bt38 | Result+Total | 24,748 | 34,480 | 18,836 | 34,739 | 42,038 | 4,446 | 38,970 |
+| bt39 | Result Combo | -- | -- | -- | -- | -- | -- | 11,178 |
+| bt40 | Result+Half Goals | -- | -- | -- | -- | -- | -- | 1,902 |
+| bt41 | DC+Total | 27,360 | 28,323 | 15,135 | 25,057 | 43,260 | 4,358 | 32,799 |
+| bt42 | DC+Half Goals | -- | -- | -- | -- | 5,478 | -- | 2,853 |
+| bt43 | DC Combo | -- | -- | -- | -- | -- | -- | 14,895 |
+| bt44 | HT/FT+Total | 29,359 | 47,324 | 23,806 | 55,230 | 103,410 | 4,046 | 37,260 |
+| bt45 | HT/FT Combo | -- | -- | -- | -- | -- | -- | 4,968 |
+| bt46 | BTTS Combo | 11,673 | 27,150 | 16,575 | 25,068 | 37,111 | 4,166 | 45,950 |
+| bt48 | Team1 Total | 1,297 | 644 | 430 | -- | 4,270 | -- | -- |
+| bt49 | Team2 Total | 1,138 | 644 | 430 | -- | 4,229 | -- | -- |
+| bt75 | H2 DC | 390 | 631 | 331 | 412 | 915 | -- | -- |
+| bt76 | H2 DNB | 380 | 643 | 334 | 515 | 521 | -- | -- |
+| bt77 | H1 O/E | 380 | -- | -- | -- | 521 | -- | 192 |
+| bt78 | H2 O/E | 380 | -- | -- | -- | -- | -- | 192 |
+| bt79 | H1 CS | 3,588 | 8,290 | 4,304 | 8,336 | 5,920 | -- | 1,536 |
+| bt80 | EU Handicap 3-way | -- | -- | -- | -- | -- | -- | 1,188 |
+| bt89 | Last Goal | -- | -- | -- | -- | -- | -- | 192 |
+| bt100 | First Goal H1 | -- | -- | -- | -- | -- | -- | 192 |
+| bt113 | HT/FT NOT | 1,770 | 2,939 | 1,555 | 2,541 | -- | -- | -- |
+| bt114 | OR Combos | 6,574 | 7,712 | 4,062 | 11,692 | 16,890 | -- | 7,920 |
+| bt118 | CS Combo | -- | -- | -- | -- | -- | -- | 1,464 |
+| bt119 | Team1 H1&H2 | 5,610 | 6,471 | 4,257 | 7,704 | -- | -- | 4,149 |
+| bt120 | Team2 H1&H2 | 5,347 | 6,020 | 4,078 | 7,630 | -- | -- | 4,149 |
+| bt121 | Win Margin | 780 | 3,864 | 2,004 | 3,790 | -- | -- | -- |
+| bt123 | HT Result+BTTS | 2,916 | 3,864 | 2,004 | 3,126 | 3,126 | -- | -- |
+| bt124 | HT/FT OR | 3,136 | 5,152 | 3,006 | 4,775 | 2,814 | -- | 13,662 |
 
-| bt84 | Corner Total | Admiral | -- | -- | -- | SuperBet | -- |
-| bt88 | Card Total | Admiral | -- | -- | -- | SuperBet | -- |
-| bt94 | H1 Corner Total | Admiral | -- | -- | -- | SuperBet | -- |
+| bt84 | Corner Total | Admiral | -- | -- | -- | SuperBet | -- | -- |
+| bt88 | Card Total | Admiral | -- | -- | -- | SuperBet | -- | -- |
+| bt94 | H1 Corner Total | Admiral | -- | -- | -- | SuperBet | -- | -- |
 
 **Admiral-only markets** (most corners, cards, penalties): bt83, bt85-87, bt89-98, bt105-112 — limited cross-bookmaker comparison (SuperBet now covers bt84, bt88, bt94).
 
@@ -377,3 +393,4 @@ python audit_scrapers.py --sport 1 --dump
 5. ~~**Admiral exact goals remapping**~~ (P3) — **DONE** (Fix 7: bt25→bt26, 2,639 odds)
 6. ~~**Soccerbet missing markets**~~ (P2) — **CLOSED** (API doesn't support param markets; bt18 was already mapped)
 7. ~~**TopBet coverage expansion**~~ (P2) — **CLOSED** (low ROI: 500x API calls for markets covered elsewhere)
+8. ~~**Add BalkanBet scraper**~~ — **DONE** (Feb 2026: 786 matches, 385K odds, 46 bet types, 490 avg/match)

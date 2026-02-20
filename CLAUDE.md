@@ -71,6 +71,7 @@ ScraperEngine (core/scraper_engine.py)
 | Superbet | 6 | aiohttp | ✅ Active |
 | Merkur | 7 | aiohttp | ✅ Active |
 | Topbet | 10 | aiohttp | ✅ Active |
+| BalkanBet | 12 | aiohttp | ✅ Active |
 | Meridian | 2 | - | ❌ Disabled |
 
 ## ID Mappings
@@ -145,7 +146,7 @@ Use `PythonScraper/claude_test/` for any temporary test, diagnostic, or dump scr
 2. **Deduplication** - Matches and odds deduplicated before insert to avoid conflicts
 3. **Connection pool** - 50 connections for concurrent operations
 4. **Composite indexes** - `idx_matches_bulk_lookup` for fast lookups
-5. **Concurrent scraping** - All 7 bookmakers scraped in parallel
+5. **Concurrent scraping** - All 8 bookmakers scraped in parallel
 
 ## Mobile App (MobileApp/)
 
