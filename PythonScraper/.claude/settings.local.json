@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:online.meridianbet.com)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(# Try both ticket service URLs with the ticket code TICKET=\"\"890D-QJ1HHB\"\" # V3 endpoint curl -s \"\"https://prod-superbet-betting.freetls.fastly.net/tickets/presentation-api/v3/SB_RS/tickets/$TICKET\"\" -H \"\"Accept: application/json\"\" | python3 -m json.tool)"
+    ]
+  }
+}
