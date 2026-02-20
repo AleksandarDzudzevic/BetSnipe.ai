@@ -118,6 +118,7 @@ BOOKMAKERS = {
     9: {"name": "lvbet", "display": "LVBet", "enabled": False},
     10: {"name": "topbet", "display": "TopBet", "enabled": True},
     11: {"name": "pinnacle", "display": "Pinnacle", "enabled": False},
+    12: {"name": "balkanbet", "display": "BalkanBet", "enabled": True},
 }
 
 # Sport configuration

@@ -53,7 +53,7 @@ ScraperEngine (core/scraper_engine.py)
     │   └── asyncpg connection pool (50 connections)
     │
     ├── Detects arbitrage → ArbitrageDetector (core/arbitrage.py)
-    │   └── Runs after each scrape cycle, checks all matches
+    │   └── Runs after each scrape cycle, checks all 124 bet types
     │
     └── Broadcasts updates → WebSocket (api/websocket.py)
                           → Telegram (telegram_utils.py)
@@ -77,10 +77,11 @@ ScraperEngine (core/scraper_engine.py)
 
 **Sports**: Football (1), Basketball (2), Tennis (3), Hockey (4), Table Tennis (5)
 
-**Bet Types**:
-- 12/Winner (1), 1X2 (2), 1X2_H1 (3), 1X2_H2 (4)
-- Total O/U (5), Total H1 (6), Total H2 (7)
-- BTTS (8), Handicap (9), Total Points (10)
+**Bet Types** (124 total, IDs 1-124):
+- 2-way (outcomes=2): O/U, BTTS, yes/no markets — odd1 vs odd2
+- 3-way (outcomes=3): 1X2 markets — odd1 vs oddX vs odd2
+- Selection-based (outcomes=1): correct score, HT/FT, combos — each row has a selection key, odd1 only
+- See `core/config.py` BET_TYPES for full list
 
 ## Key Configuration (.env)
 

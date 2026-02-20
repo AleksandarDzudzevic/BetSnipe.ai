@@ -31,6 +31,7 @@ from core.scrapers.superbet import SuperbetScraper
 from core.scrapers.merkur import MerkurScraper
 from core.scrapers.topbet import TopbetScraper
 from core.scrapers.mozzart import MozzartScraper
+from core.scrapers.balkanbet import BalkanBetScraper
 from core.arbitrage import ArbitrageDetector, ArbitrageOpportunity
 from telegram_utils import TelegramNotifier
 
@@ -52,6 +53,7 @@ SCRAPERS = {
     'superbet': SuperbetScraper,
     'merkur': MerkurScraper,
     'topbet': TopbetScraper,
+    'balkanbet': BalkanBetScraper,
 }
 
 SPORTS = {

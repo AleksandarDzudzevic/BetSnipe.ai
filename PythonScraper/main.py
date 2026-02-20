@@ -370,6 +370,7 @@ async def run_scraper_only():
     from core.scrapers.superbet import SuperbetScraper
     from core.scrapers.merkur import MerkurScraper
     from core.scrapers.topbet import TopbetScraper
+    from core.scrapers.balkanbet import BalkanBetScraper
 
     logger = logging.getLogger(__name__)
 
@@ -387,6 +388,7 @@ async def run_scraper_only():
     engine.register_scraper(SuperbetScraper())
     engine.register_scraper(MerkurScraper())
     engine.register_scraper(TopbetScraper())
+    engine.register_scraper(BalkanBetScraper())
 
     # Optional Telegram notifications
     if settings.enable_telegram and settings.telegram_bot_token:
