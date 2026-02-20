@@ -96,8 +96,10 @@ async def test_scraper(scraper_name: str, sport_id: int = None):
                     logger.info(f"        Start: {match.start_time}")
                     logger.info(f"        Odds: {len(match.odds)} bet types")
                     for odd in match.odds[:2]:
-                        logger.info(f"          Type {odd.bet_type_id}: {odd.odd1:.2f} / {odd.odd2:.2f}" +
-                                   (f" / {odd.odd3:.2f}" if odd.odd3 else ""))
+                        parts = [f"{odd.odd1:.2f}"] if odd.odd1 else []
+                        if odd.odd2 is not None: parts.append(f"{odd.odd2:.2f}")
+                        if odd.odd3 is not None: parts.append(f"{odd.odd3:.2f}")
+                        logger.info(f"          Type {odd.bet_type_id}: {' / '.join(parts)}")
 
                 if len(matches) > 3:
                     logger.info(f"      ... and {len(matches) - 3} more matches")
