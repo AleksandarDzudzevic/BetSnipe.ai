@@ -6,7 +6,7 @@ Two-step approach:
   1. Overview API: fetch all match IDs for a sport (with basic inline odds)
   2. Detail API: fetch full odds per match (all markets)
 
-Football only for now (sportId=18 in BalkanBet).
+Supports: Football (18), Basketball (36), Tennis (78), Hockey (21).
 """
 
 import asyncio
@@ -29,6 +29,9 @@ COMPANY_UUID = "4f54c6aa-82a9-475d-bf0e-dc02ded89225"
 # BalkanBet sportId → internal sport ID
 SPORT_MAPPING = {
     18: 1,   # Football
+    36: 2,   # Basketball
+    78: 3,   # Tennis
+    21: 4,   # Hockey
 }
 INTERNAL_TO_BB = {v: k for k, v in SPORT_MAPPING.items()}
 
@@ -134,6 +137,117 @@ FOOTBALL_MAP = {
 
     # === HT/FT OR combos ===
     2252: (124, 'sel_or'),    # POLUVREME-KRAJ ILI UKUPNO GOLOVA
+}
+
+# ============================================================================
+# BASKETBALL MAP (BalkanBet sportId=36 → internal sport_id=2)
+# ============================================================================
+
+BASKETBALL_MAP = {
+    # === Core result markets ===
+    60:   (1, '2way'),       # POBEDNIK UKLJ. PRODUŽETKE (Winner incl. OT)
+    30:   (2, '3way'),       # KONAČAN ISHOD REGULARAN TOK (1X2 regulation)
+    42:   (3, '3way'),       # PRVO POLUVREME (H1 1X2)
+    51:   (4, '3way'),       # DRUGO POLUVREME (H2 1X2)
+    33:   (14, '2way'),      # X VRAĆA ULOG (DNB)
+    45:   (21, '2way'),      # PRVO POLUVREME X VRAĆA ULOG (H1 DNB)
+    54:   (76, '2way'),      # DRUGO POLUVREME X VRAĆA ULOG (H2 DNB)
+    66:   (15, '2way'),      # NEPAR/PAR UKLJ PRODUŽETKE (Odd/Even)
+    48:   (77, '2way'),      # PRVO POLUVREME NEPAR/PAR (H1 Odd/Even)
+    57:   (78, '2way'),      # DRUGO POLUVREME NEPAR/PAR (H2 Odd/Even)
+
+    # === HT/FT ===
+    39:   (24, 'sel_htft'),  # POLUVREME - KRAJ (HT/FT)
+
+    # === Handicap markets ===
+    524:  (9, 'ah'),         # HENDIKEP UKLJ PRODUŽETKE (Asian HC)
+    512:  (50, 'ah'),        # PRVO POLUVREME HENDIKEP (H1 HC)
+
+    # === O/U markets ===
+    530:  (10, 'ou'),        # UKUPNO POENA UKLJ PRODUŽETKE (Total points O/U)
+    515:  (6, 'ou'),         # PRVO POLUVREME UKUPNO POENA (H1 total O/U)
+    521:  (7, 'ou'),         # DRUGO POLUVREME UKUPNO POENA (H2 total O/U)
+    539:  (48, 'ou'),        # DOMAĆIN UKUPNO POENA (Team1 total O/U)
+    542:  (49, 'ou'),        # GOST UKUPNO POENA (Team2 total O/U)
+    3480: (51, 'ou'),        # 1. POLUVREME DOMAĆIN UKUPNO POENA (Team1 H1 total)
+    3483: (52, 'ou'),        # 1. POLUVREME GOST UKUPNO POENA (Team2 H1 total)
+    5144: (53, 'ou'),        # BR.POENA NAJEFIKASNIJE ČETVRTINE (Most efficient Q total)
+
+    # === Combo markets ===
+    551:  (38, 'sel_ou'),    # POBEDNIK I UKUPNO POENA (Winner + total combo)
+    4791: (55, 'sel_ou'),    # PRVO POLUVREME I UK.POENA (H1 result + H1 total)
+}
+
+# ============================================================================
+# TENNIS MAP (BalkanBet sportId=78 → internal sport_id=3)
+# ============================================================================
+
+TENNIS_MAP = {
+    # === Core result markets ===
+    1955: (1, '2way'),       # KONAČAN ISHOD (Match winner)
+    2012: (57, '2way'),      # PRVI SET (S1 winner)
+
+    # === Handicap markets ===
+    342:  (9, 'ah'),         # HENDIKEP GEMOVI (Game handicap)
+    1958: (56, 'ah'),        # HENDIKEP SETOVA (Set handicap)
+
+    # === O/U markets ===
+    348:  (5, 'ou'),         # UKUPNO GEMOVA (Total games O/U)
+    351:  (48, 'ou'),        # IGRAČ 1 UKUPNO GEMOVA (P1 total games)
+    354:  (49, 'ou'),        # IGRAČ 2 UKUPNO GEMOVA (P2 total games)
+
+    # === Selection markets ===
+    1964: (64, 'sel_htft'),  # PRVI SET - KRAJ (S1+match result combo)
+    2033: (65, 'sel_score'), # TAČAN REZULTAT MEČA (Exact set score)
+    2015: (66, 'sel'),       # PRVI SET GEMOVI (S1 games range)
+    2009: (67, 'sel'),       # DRUGI SET GEMOVI (S2 games range)
+
+    # === Combo markets ===
+    3162: (68, 'sel_ou'),    # POBEDNIK I UKUPNO GEMOVA (Winner + total games)
+}
+
+# ============================================================================
+# HOCKEY MAP (BalkanBet sportId=21 → internal sport_id=4)
+# ============================================================================
+
+HOCKEY_MAP = {
+    # === Core result markets ===
+    989:  (1, '2way'),       # POBEDNIK UKLJ PRODUŽETKE I PENALE (Winner incl OT)
+    141:  (2, '3way'),       # KONAČAN ISHOD (1X2 regulation)
+    1745: (3, '3way'),       # PRVA TREĆINA (P1 1X2)
+    1748: (4, '3way'),       # DRUGA TREĆINA (P2 1X2)
+    147:  (13, '3way'),      # DUPLA ŠANSA (Double Chance)
+    1808: (20, '3way'),      # PRVA TREĆINA DUPLA ŠANSA (P1 DC)
+    150:  (14, '2way'),      # X VRAĆA ULOG (DNB)
+    1790: (21, '2way'),      # PRVA TREĆINA X VRAĆA ULOG (P1 DNB)
+    159:  (15, '2way'),      # NEPAR/PAR (Odd/Even)
+    1799: (77, '2way'),      # PRVA TREĆINA NEPAR/PAR (P1 Odd/Even)
+    971:  (8, 'btts'),       # OBA TIMA DAJU GOL (BTTS)
+    1742: (18, '3way_fg'),   # PRVI DAJE GOL (First goal)
+    144:  (89, '3way_fg'),   # POSLEDNJI GOL (Last goal)
+
+    # === Handicap markets ===
+    617:  (9, 'ah'),         # HENDIKEP (Asian HC)
+
+    # === O/U markets ===
+    968:  (5, 'ou'),         # UKUPNO GOLOVA (Total goals O/U)
+    620:  (48, 'ou'),        # DOMAĆIN UKUPNO GOLOVA (Team1 total O/U)
+    623:  (49, 'ou'),        # GOST UKUPNO GOLOVA (Team2 total O/U)
+    2746: (6, 'ou'),         # PRVA TREĆINA UKUPNO GOLOVA (P1 total O/U)
+
+    # === Correct score ===
+    1556: (23, 'sel_score'), # TAČAN REZULTAT (Correct score)
+
+    # === Combo markets ===
+    626:  (38, 'sel_ou'),    # KONAČAN ISHOD I UKUPNO GOLOVA (Result + total)
+}
+
+# Map from sport_id to market map
+SPORT_MAPS = {
+    1: FOOTBALL_MAP,
+    2: BASKETBALL_MAP,
+    3: TENNIS_MAP,
+    4: HOCKEY_MAP,
 }
 
 # ============================================================================
@@ -548,6 +662,53 @@ def _normalize_or_part(p: str, bt: int) -> str:
     return p
 
 
+def _normalize_tennis_games(name: str) -> Optional[str]:
+    """Normalize tennis set games range selection.
+
+    Strip set prefix ("I ", "II "), skip odd/even outcomes.
+    "I 6-7" → "6-7", "I 8+" → "8+", "I Par" → None
+    """
+    n = name.strip()
+    # Strip set prefix
+    n = re.sub(r'^I{1,2}\s+', '', n)
+    # Skip odd/even outcomes (not game ranges)
+    if n.lower() in ('par', 'nepar'):
+        return None
+    return n
+
+
+def _normalize_ou_combo(name: str) -> str:
+    """Normalize O/U combo selection.
+
+    "1&Manje" → "1&U", "X&Više" → "X&O"
+    "I1 & I manje" → "1&U", "I2 & I više" → "2&O"
+    """
+    n = name.strip()
+
+    # Split by &
+    parts = n.split('&')
+    if len(parts) != 2:
+        return n
+
+    result_part = parts[0].strip()
+    ou_part = parts[1].strip()
+
+    # Normalize result part: strip period prefix (I, II) and spaces
+    result_part = re.sub(r'^I{1,2}\s*', '', result_part)
+
+    # Normalize O/U part: strip period prefix, then Manje → U, Više → O
+    ou_part_clean = re.sub(r'^I{1,2}\s*', '', ou_part)
+    ou_lower = ou_part_clean.lower()
+    if 'manje' in ou_lower:
+        ou_norm = 'U'
+    elif 'više' in ou_lower or 'vise' in ou_lower:
+        ou_norm = 'O'
+    else:
+        ou_norm = ou_part_clean  # fallback
+
+    return f"{result_part}&{ou_norm}"
+
+
 def _normalize_or_selection(name: str, bt: int = 0) -> str:
     """Normalize OR combination selections.
 
@@ -587,7 +748,7 @@ class BalkanBetScraper(BaseScraper):
         return BASE_URL
 
     def get_supported_sports(self) -> List[int]:
-        return [1]  # Football only for now
+        return [1, 2, 3, 4]  # Football, Basketball, Tennis, Hockey
 
     def get_headers(self) -> Dict[str, str]:
         return {
@@ -597,7 +758,7 @@ class BalkanBetScraper(BaseScraper):
         }
 
     async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all football matches from BalkanBet."""
+        """Scrape all matches for a sport from BalkanBet."""
         bb_sport_id = INTERNAL_TO_BB.get(sport_id)
         if bb_sport_id is None:
             logger.warning(f"[balkanbet] Unsupported sport_id: {sport_id}")
@@ -713,7 +874,7 @@ class BalkanBetScraper(BaseScraper):
             for market in markets:
                 if not market.get('active'):
                     continue
-                self._parse_market(market, match)
+                self._parse_market(market, match, sport_id)
 
             return match if match.odds else None
 
@@ -792,48 +953,13 @@ class BalkanBetScraper(BaseScraper):
 
     def _parse_asian_handicap(
         self, outcomes: List[Dict], special_values: List,
-        match: ScrapedMatch
+        bt: int, match: ScrapedMatch
     ) -> None:
         """Parse Asian handicap market.
 
         specialValues contains the margin (e.g. "-0.5", "0", "-1").
-        BalkanBet convention: negative = home gives handicap (standard convention).
-        Outcome "AH 1 -0.5" = home with -0.5, "AH 2 0.5" = away with +0.5.
-        Our standard: positive margin = home advantage.
-        BB special value "-0.5" means away is favored by 0.5, so margin = -0.5
-        Wait - let's think about this more carefully:
-          specialValues=["-0.5"] means the line is -0.5 for home.
-          If home gets -0.5, that means home is favored.
-          Our convention: positive = home advantage.
-          So margin = -(-0.5) = 0.5? No...
-          Actually looking at the outcome names: "AH 1 -0.5" and "AH 2 0.5"
-          This means home team has -0.5 handicap applied.
-          Home needs to win by more than 0.5 goals (i.e., win).
-          This is equivalent to "home gives 0.5" = home advantage.
-          In our system positive margin = home advantage.
-          So special value -0.5 → our margin = 0.5 (negate BB sign).
-
-        Wait, let me reconsider. In standard Asian HC:
-          - If home is favorite, they give goals (negative handicap for home)
-          - Special value "-1" means home gives 1 goal
-          - Our convention: positive margin = home advantage
-          - So our margin = -specialValue = 1
-
-        But MaxBet also negates. Let me check what other scrapers do.
-        MaxBet: raw param is negative for home advantage, code negates it.
-        Admiral: raw sBV appears to be positive for home advantage already.
-
-        For BB: specialValue "-1" + outcomes "AH 1 -1" and "AH 2 1"
-        The -1 means home gives 1 goal. This IS home advantage.
-        So our margin = abs(specialValue) = 1? No, we need the sign.
-        Convention: positive = home advantage.
-        BB "-1" = home gives 1 goal = home advantage of 1.
-        So we negate: margin = -(-1) = 1. ✓
-
-        But what if BB has positive specialValue like "+1"?
-        That would mean away gives 1 goal to home.
-        Convention: margin = -(+1) = -1 (away advantage). ✓
-
+        Our convention: positive margin = home advantage.
+        BB negative specialValue = home gives goals = home advantage.
         So: margin = -float(specialValue)
         """
         if not special_values:
@@ -853,25 +979,17 @@ class BalkanBetScraper(BaseScraper):
         odd2 = sorted_oc[1].get('odd', 0)  # Away
 
         if odd1 > 0 and odd2 > 0:
-            match.add_odds(bet_type_id=9, odd1=odd1, odd2=odd2, margin=margin)
+            match.add_odds(bet_type_id=bt, odd1=odd1, odd2=odd2, margin=margin)
 
     def _parse_european_handicap(
         self, outcomes: List[Dict], special_values: List,
-        match: ScrapedMatch
+        bt: int, match: ScrapedMatch
     ) -> None:
         """Parse European (3-way) handicap.
 
         specialValues format: "X:Y" where X=home handicap, Y=away handicap.
-        e.g. "0:1" means away gets +1, i.e. home is favored by 1.
-        e.g. "1:0" means home gets +1, i.e. away is favored by 1.
-
         Our convention: positive margin = home advantage.
-        "0:1" → home advantage = 1 (away gives 1) → margin = 1
-        "1:0" → home advantage = -1 (home gets 1) → margin = -1
-        "0:2" → margin = 2
-        "2:0" → margin = -2
-
-        So: margin = away_hc - home_hc
+        margin = away_hc - home_hc
         """
         if not special_values:
             return
@@ -895,7 +1013,7 @@ class BalkanBetScraper(BaseScraper):
 
         if odd1 > 0 and odd2 > 0 and odd3 > 0:
             match.add_odds(
-                bet_type_id=80, odd1=odd1, odd2=odd2, odd3=odd3,
+                bet_type_id=bt, odd1=odd1, odd2=odd2, odd3=odd3,
                 margin=margin
             )
 
@@ -996,6 +1114,90 @@ class BalkanBetScraper(BaseScraper):
             if selection:
                 match.add_odds(bet_type_id=bt, odd1=odd, selection=selection)
 
+    def _parse_over_under(
+        self, outcomes: List[Dict], special_values: List,
+        bt: int, match: ScrapedMatch
+    ) -> None:
+        """Parse over/under market with line from specialValues.
+
+        Uses name-based detection (Više=over, Manje=under) rather than
+        position order, because BB O/U shortcuts are reversed (1=under, 2=over)
+        while positions may follow shortcuts.
+        Convention: odd1=over, odd2=under, margin=line.
+        """
+        if not special_values:
+            return
+        try:
+            margin = float(special_values[0])
+        except (ValueError, TypeError):
+            return
+
+        over_odd = None
+        under_odd = None
+        for o in outcomes:
+            odd = o.get('odd', 0)
+            if odd <= 0:
+                continue
+            name = o.get('name', '').lower()
+            if 'više' in name or 'vise' in name or 'vi\u0161' in name:
+                over_odd = odd
+            elif 'manje' in name:
+                under_odd = odd
+
+        if over_odd and under_odd:
+            match.add_odds(bet_type_id=bt, odd1=over_odd, odd2=under_odd, margin=margin)
+
+    def _parse_btts(
+        self, outcomes: List[Dict], match: ScrapedMatch
+    ) -> None:
+        """Parse BTTS market by name detection.
+
+        Hockey uses "GG Da"/"GG Ne" with reversed shortcut order,
+        so detect by name rather than position.
+        Convention: odd1=yes(GG), odd2=no(NG).
+        """
+        gg_odd = None
+        ng_odd = None
+        for o in outcomes:
+            odd = o.get('odd', 0)
+            if odd <= 0:
+                continue
+            name = o.get('name', '').strip()
+            if 'Da' in name or name == 'GG':
+                gg_odd = odd
+            elif 'Ne' in name or name == 'NG':
+                ng_odd = odd
+
+        if gg_odd and ng_odd:
+            match.add_odds(bet_type_id=8, odd1=gg_odd, odd2=ng_odd)
+
+    def _parse_sel_ou(
+        self, outcomes: List[Dict], special_values: List,
+        bt: int, match: ScrapedMatch
+    ) -> None:
+        """Parse selection-based combo with O/U and margin from specialValues.
+
+        Handles markets like Winner+Total ("1&Manje"→"1&U"), Result+Total
+        ("X&Više"→"X&O"), H1 result+H1 total ("I1 & I manje"→"1&U").
+        """
+        if not special_values:
+            return
+        try:
+            margin = float(special_values[0])
+        except (ValueError, TypeError):
+            return
+
+        for o in outcomes:
+            odd = o.get('odd', 0)
+            if odd <= 0:
+                continue
+            name = o.get('name', '').strip()
+            if not name:
+                continue
+            selection = _normalize_ou_combo(name)
+            if selection:
+                match.add_odds(bet_type_id=bt, odd1=odd, selection=selection, margin=margin)
+
     def _parse_selection(
         self, outcomes: List[Dict], bt: int, market_id: int,
         match: ScrapedMatch
@@ -1013,8 +1215,13 @@ class BalkanBetScraper(BaseScraper):
             # Use appropriate normalizer based on bet type
             actual_bt = bt
 
+            # Tennis set games range: strip set prefix, skip odd/even
+            if bt in (66, 67):
+                selection = _normalize_tennis_games(name)
+                if not selection:
+                    continue
             # Route combo outcomes from bt27/bt28 to bt119/bt120
-            if bt in (27, 28) and '&' in name:
+            elif bt in (27, 28) and '&' in name:
                 actual_bt = 119 if bt == 27 else 120
                 selection = _normalize_combo_selection(name, actual_bt, market_id)
             elif bt in (25, 26, 27, 28, 29, 30, 31, 32, 33, 34):
@@ -1067,20 +1274,26 @@ class BalkanBetScraper(BaseScraper):
             if selection:
                 match.add_odds(bet_type_id=46, odd1=odd, selection=selection)
 
-    def _parse_market(self, market: Dict, match: ScrapedMatch) -> None:
-        """Parse a single market and add odds to match.
-        Override to handle BTTS market 425 specially."""
+    def _parse_market(
+        self, market: Dict, match: ScrapedMatch, sport_id: int = 1
+    ) -> None:
+        """Parse a single market and add odds to match."""
         market_id = market.get('marketId')
 
-        # Special handling for BTTS market 425
-        if market_id == 425:
+        # Football-only: special handling for BTTS market 425
+        if sport_id == 1 and market_id == 425:
             outcomes = market.get('outcomes', [])
             active_outcomes = [o for o in outcomes if o.get('active')]
             if active_outcomes:
                 self._handle_btts_market(active_outcomes, match)
             return
 
-        mapping = FOOTBALL_MAP.get(market_id)
+        # Select map based on sport
+        market_map = SPORT_MAPS.get(sport_id)
+        if not market_map:
+            return
+
+        mapping = market_map.get(market_id)
         if not mapping:
             return
 
@@ -1102,9 +1315,15 @@ class BalkanBetScraper(BaseScraper):
         elif parser_type == '3way_fg':
             self._parse_3way_fg(active_outcomes, bt, match)
         elif parser_type == 'ah':
-            self._parse_asian_handicap(active_outcomes, special_values, match)
+            self._parse_asian_handicap(active_outcomes, special_values, bt, match)
         elif parser_type == 'eh':
-            self._parse_european_handicap(active_outcomes, special_values, match)
+            self._parse_european_handicap(active_outcomes, special_values, bt, match)
+        elif parser_type == 'ou':
+            self._parse_over_under(active_outcomes, special_values, bt, match)
+        elif parser_type == 'btts':
+            self._parse_btts(active_outcomes, match)
+        elif parser_type == 'sel_ou':
+            self._parse_sel_ou(active_outcomes, special_values, bt, match)
         elif parser_type == 'sel_score':
             self._parse_correct_score(active_outcomes, bt, match)
         elif parser_type == 'sel_htft':

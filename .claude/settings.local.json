@@ -9,7 +9,8 @@
       "Bash(xargs:*)",
       "mcp__github__list_commits",
       "mcp__github__search_repositories",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python3:*)"
     ]
   }
 }
