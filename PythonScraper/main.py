@@ -43,7 +43,7 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.config import settings, SPORTS, BET_TYPES
+from core.config import settings, SPORTS, BET_TYPES, BOOKMAKERS
 from core.db import db
 
 
@@ -379,16 +379,25 @@ async def run_scraper_only():
     # Connect to database
     await db.connect()
 
-    # Register all scrapers
-    engine.register_scraper(AdmiralScraper())
-    engine.register_scraper(SoccerbetScraper())
-    engine.register_scraper(MaxbetScraper())
-    engine.register_scraper(MozzartScraper())
-    engine.register_scraper(MeridianScraper())
-    engine.register_scraper(SuperbetScraper())
-    engine.register_scraper(MerkurScraper())
-    engine.register_scraper(TopbetScraper())
-    engine.register_scraper(BalkanBetScraper())
+    # Fix 2.9: respect enabled flag from BOOKMAKERS config
+    # Only register scrapers whose bookmaker_id is marked enabled=True
+    scraper_candidates = [
+        (AdmiralScraper,   4),
+        (SoccerbetScraper, 5),
+        (MaxbetScraper,    3),
+        (MozzartScraper,   1),
+        (MeridianScraper,  2),
+        (SuperbetScraper,  6),
+        (MerkurScraper,    7),
+        (TopbetScraper,    10),
+        (BalkanBetScraper, 12),
+    ]
+    for scraper_cls, bookmaker_id in scraper_candidates:
+        bm_config = BOOKMAKERS.get(bookmaker_id, {})
+        if bm_config.get('enabled', True):
+            engine.register_scraper(scraper_cls())
+        else:
+            logger.info(f"Skipping disabled bookmaker id={bookmaker_id} ({bm_config.get('name', '?')})")
 
     # Optional Telegram notifications
     if settings.enable_telegram and settings.telegram_bot_token:

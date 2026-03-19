@@ -126,10 +126,10 @@ HOCKEY_MARKETS = {
     "1. gol":                                   (18, '3way'),   # First goal
     "1. trećina - ukupno golova":               (6,  'ou'),
     "1. trećina - par/nepar":                   (77, 'oe'),     # P1 odd/even
-    "X. trećina - 1X2":                         (3,  '3way'),
+    # "X. trećina - *" markets are NOT dispatched here — they contain all 3 periods'
+    # entries mixed together. _try_hockey_period_market handles them and filters
+    # to period 1 only via specialBetValue == "1".
     "1 trećina - Dupla šansa":                  (20, 'dc'),
-    "X. trećina - winner DNB":                  (21, '2way'),
-    "X. trećina - oba tima daju gol":           (8,  'yn'),
 }
 
 HOCKEY_TEAM_PATTERNS = [
@@ -314,7 +314,8 @@ class SuperbetScraper(BaseScraper):
             elif code == "12" or name == "12":
                 o12 = o.get("price")
         if o1x and ox2 and o12:
-            return ScrapedOdds(bet_type_id=bt_id, odd1=float(o1x), odd2=float(ox2), odd3=float(o12))
+            # Fix 2.2: Convention: odd1=1X, odd2=12, odd3=X2
+            return ScrapedOdds(bet_type_id=bt_id, odd1=float(o1x), odd2=float(o12), odd3=float(ox2))
         return None
 
     def _parse_over_under(self, bt_id: int, odds_entries: List[Dict]) -> List[ScrapedOdds]:
@@ -342,8 +343,8 @@ class SuperbetScraper(BaseScraper):
             if data["under"] and data["over"]:
                 results.append(ScrapedOdds(
                     bet_type_id=bt_id,
-                    odd1=float(data["under"]),
-                    odd2=float(data["over"]),
+                    odd1=float(data["over"]),   # Fix 2.4: Convention: odd1=Over, odd2=Under
+                    odd2=float(data["under"]),  # Fix 2.4: Convention: odd1=Over, odd2=Under
                     margin=data["margin"],
                 ))
         return results

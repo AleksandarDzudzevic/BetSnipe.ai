@@ -178,7 +178,8 @@ class ScraperEngine:
                             selection=odds.selection
                         )
                 except Exception as e:
-                    logger.debug(f"Error upserting odds for match {match_id}: {e}")
+                    # Fix 5.5: log errors at WARNING level
+                    logger.warning(f"Error upserting odds for match {match_id}: {e}")
 
             self._stats['matches_processed'] += 1
 
@@ -194,7 +195,8 @@ class ScraperEngine:
             return match_id
 
         except Exception as e:
-            logger.debug(f"Error processing match {match.team1} vs {match.team2}: {e}")
+            # Fix 5.5: log errors at WARNING level
+            logger.warning(f"Error processing match {match.team1} vs {match.team2}: {e}")
             raise
 
     async def scrape_bookmaker(self, scraper: BaseScraper) -> int:

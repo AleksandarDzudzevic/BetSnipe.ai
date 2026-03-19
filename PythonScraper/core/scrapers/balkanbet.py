@@ -926,22 +926,30 @@ class BalkanBetScraper(BaseScraper):
         sorted_oc = sorted(outcomes, key=lambda x: x.get('position') or 0)
 
         if bt == 89:
-            # Last goal is 2-way in our system (skip "Niko"/none)
-            home_odd = None
-            away_odd = None
+            # Fix 2.3: Last goal market (market 662) has 3 outcomes:
+            # odd1=team1 scores last, odd2=nobody scores last (Niko), odd3=team2 scores last
+            # Parse all 3 outcomes so cross-bookmaker arbitrage works correctly.
+            home_odd = none_odd = away_odd = None
             for o in sorted_oc:
                 name = o.get('name', '').strip()
                 odd = o.get('odd', 0)
                 if odd <= 0:
                     continue
-                if 'Niko' in name or name.endswith('0'):
-                    continue  # Skip "no goal" outcome
-                if '1' in o.get('shortcut', '') or name.endswith('1'):
-                    home_odd = odd
-                elif '2' in o.get('shortcut', '') or name.endswith('2'):
-                    away_odd = odd
+                shortcut = o.get('shortcut', '')
+                if 'Niko' in name or 'niko' in name.lower():
+                    none_odd = odd  # Fix 2.3: nobody scores last → oddX position
+                elif '1' in shortcut or name.endswith('1'):
+                    home_odd = odd  # Fix 2.3: team1 scores last → odd1
+                elif '2' in shortcut or name.endswith('2'):
+                    away_odd = odd  # Fix 2.3: team2 scores last → odd3
             if home_odd and away_odd:
-                match.add_odds(bet_type_id=bt, odd1=home_odd, odd2=away_odd)
+                if none_odd:
+                    # Full 3-way: team1 / nobody / team2
+                    match.add_odds(
+                        bet_type_id=bt, odd1=home_odd, odd2=none_odd, odd3=away_odd
+                    )
+                else:
+                    match.add_odds(bet_type_id=bt, odd1=home_odd, odd2=away_odd)
         else:
             # 3-way: home / none / away
             if len(sorted_oc) >= 3:
@@ -1112,6 +1120,12 @@ class BalkanBetScraper(BaseScraper):
 
             selection = _normalize_or_selection(name, bt)
             if selection:
+                # Fix 2.7: bt114 markets 401 and 458 represent different combo types;
+                # prefix selections to prevent false cross-market matching in arbitrage.
+                if bt == 114 and market_id == 401:
+                    selection = "h1ft:" + selection  # Fix 2.7: H1 or FT result prefix
+                elif bt == 114 and market_id == 458:
+                    selection = "rott:" + selection  # Fix 2.7: Result or total prefix
                 match.add_odds(bet_type_id=bt, odd1=odd, selection=selection)
 
     def _parse_over_under(

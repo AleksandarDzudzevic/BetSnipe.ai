@@ -48,7 +48,7 @@ FOOTBALL_3WAY = {
 # Simple 2-way markets: bet_type_id -> (code1, code2)
 FOOTBALL_2WAY = {
     8:  ('272', '273'),    # BTTS (GG, NG)
-    15: ('231', '232'),    # Odd/Even (PAR, NEP)
+    15: ('232', '231'),    # Odd/Even — 231=PAR(Even), 232=NEP(Odd); convention: odd1=ODD, odd2=EVEN
     14: ('264', '265'),    # Draw No Bet (W1, W2)
     16: ('295', '296'),    # Double Win (DP1, DP2)
     17: ('282', '283'),    # Win to Nil / Super Win (SP1, SP2)
@@ -677,7 +677,7 @@ HOCKEY_3WAY = {
 HOCKEY_2WAY = {
     14: ('264', '265'),    # Draw No Bet / Winner
     8:  ('272', '273'),    # BTTS (GG, NG)
-    15: ('231', '232'),    # Odd/Even
+    15: ('232', '231'),    # Odd/Even — 231=PAR(Even), 232=NEP(Odd)
 }
 
 HOCKEY_SIMPLE_3WAY = {
@@ -796,7 +796,8 @@ class MaxbetScraper(BaseScraper):
                 over = odds.get(over_code)
                 if under and over:
                     odds_list.append(ScrapedOdds(
-                        bet_type_id=bt, odd1=float(under), odd2=float(over), margin=margin
+                        # Fix 2.4: Convention: odd1=Over, odd2=Under
+                        bet_type_id=bt, odd1=float(over), odd2=float(under), margin=margin
                     ))
 
     @staticmethod
@@ -813,8 +814,9 @@ class MaxbetScraper(BaseScraper):
                         try:
                             odds_list.append(ScrapedOdds(
                                 bet_type_id=bt,
-                                odd1=float(odds[under_code]),
-                                odd2=float(odds[over_code]),
+                                # Fix 2.4: Convention: odd1=Over, odd2=Under
+                                odd1=float(odds[over_code]),
+                                odd2=float(odds[under_code]),
                                 margin=float(margin_val)
                             ))
                         except (ValueError, TypeError):

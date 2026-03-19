@@ -448,6 +448,38 @@ class AdmiralScraper(BaseScraper):
             return []
         try:
             sorted_oc = sorted(outcomes, key=lambda x: x.get("orderNo", 0))
+            if bt == 8:
+                # Fix 2.5: BTTS — use name-based detection: odd1=GG, odd2=NG
+                # Convention: odd1=GG (both teams score), odd2=NG (not both score)
+                gg_odd = ng_odd = None
+                for oc in sorted_oc:
+                    name = oc.get("name", "").strip().upper()
+                    odd = float(oc.get("odd", 0))
+                    if odd <= 0:
+                        continue
+                    if "GG" in name or "DA" in name or "DAJU" in name:
+                        gg_odd = odd
+                    elif "NG" in name or "NE" in name or "NEMA" in name:
+                        ng_odd = odd
+                if gg_odd and ng_odd:
+                    return [ScrapedOdds(bet_type_id=bt, odd1=gg_odd, odd2=ng_odd)]
+                return []
+            if bt in (15, 77, 78, 59):
+                # ODD/EVEN markets — Admiral returns "par"(Even) first by orderNo.
+                # Convention across all scrapers: odd1=ODD(Nepar), odd2=EVEN(Par).
+                odd_val = even_val = None
+                for oc in sorted_oc:
+                    name = oc.get("name", "").strip().lower()
+                    val = float(oc.get("odd", 0))
+                    if val <= 0:
+                        continue
+                    if "nepar" in name:
+                        odd_val = val
+                    elif "par" in name:
+                        even_val = val
+                if odd_val and even_val:
+                    return [ScrapedOdds(bet_type_id=bt, odd1=odd_val, odd2=even_val)]
+                return []
             return [ScrapedOdds(
                 bet_type_id=bt,
                 odd1=float(sorted_oc[0].get("odd", 0)),
@@ -479,8 +511,8 @@ class AdmiralScraper(BaseScraper):
             if "under" in odds and "over" in odds:
                 result.append(ScrapedOdds(
                     bet_type_id=bt,
-                    odd1=odds["under"],
-                    odd2=odds["over"],
+                    odd1=odds["over"],   # Fix 2.4: Convention: odd1=Over, odd2=Under
+                    odd2=odds["under"],  # Fix 2.4: Convention: odd1=Over, odd2=Under
                     margin=margin,
                 ))
         return result
@@ -556,7 +588,8 @@ class AdmiralScraper(BaseScraper):
         return result
 
     @staticmethod
-    def _parse_selection(outcomes: List[Dict], bt: int) -> List[ScrapedOdds]:
+    def _parse_selection(outcomes: List[Dict], bt: int,
+                         market_id: int = 0) -> List[ScrapedOdds]:
         """Parse selection market with normalization.
 
         For bt25 (total goals range): standalone digits (exact counts) are
@@ -574,8 +607,14 @@ class AdmiralScraper(BaseScraper):
                 if bt == 25 and re.match(r'^\d$', name):
                     out_bt = 26
                 sel = _normalize_selection(name, bt)
+                # Fix 2.6: bt38 markets 1154 (home combos) and 1155 (away combos)
+                # share the same bet_type_id; prefix selections to avoid DB overwrites
+                if bt == 38 and market_id == 1154:
+                    sel = "h:" + sel  # Fix 2.6: home combo prefix to prevent collision
+                elif bt == 38 and market_id == 1155:
+                    sel = "a:" + sel  # Fix 2.6: away combo prefix to prevent collision
                 result.append(ScrapedOdds(
-                    bet_type_id=out_bt, odd1=odd, odd2=0, selection=sel,
+                    bet_type_id=out_bt, odd1=odd, odd2=None, selection=sel,  # Fix N4: None instead of 0 for unused odd slots
                 ))
             except (ValueError, TypeError):
                 continue
@@ -593,7 +632,7 @@ class AdmiralScraper(BaseScraper):
                     continue
                 sel = _normalize_selection(name, bt)
                 result.append(ScrapedOdds(
-                    bet_type_id=bt, odd1=odd, odd2=0, selection=sel,
+                    bet_type_id=bt, odd1=odd, odd2=None, selection=sel,  # Fix N4: None instead of 0 for unused odd slots
                 ))
             except (ValueError, TypeError):
                 continue
@@ -632,7 +671,8 @@ class AdmiralScraper(BaseScraper):
             elif parser_type == 'hc3':
                 odds_list.extend(self._parse_handicap_3way(outcomes, internal_bt))
             elif parser_type == 'sel':
-                odds_list.extend(self._parse_selection(outcomes, internal_bt))
+                # Fix 2.6: pass bt_id (admiral market ID) for collision-prevention prefixing
+                odds_list.extend(self._parse_selection(outcomes, internal_bt, market_id=bt_id))
             elif parser_type == 'sel_htft':
                 odds_list.extend(self._parse_selection_htft(outcomes, internal_bt))
 

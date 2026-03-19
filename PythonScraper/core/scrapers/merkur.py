@@ -43,7 +43,7 @@ FOOTBALL_3WAY = {
 
 FOOTBALL_2WAY = {
     8:  ('272', '273'),    # BTTS
-    15: ('231', '232'),    # Odd/Even
+    15: ('232', '231'),    # Odd/Even — 231=PAR(Even), 232=NEP(Odd); convention: odd1=ODD, odd2=EVEN
     14: ('264', '265'),    # Draw No Bet
     16: ('295', '296'),    # Double Win
     17: ('282', '283'),    # Win to Nil
@@ -625,7 +625,7 @@ TENNIS_SELECTIONS = {
 # ============================================================================
 
 HOCKEY_3WAY = {2: ('1', '2', '3')}
-HOCKEY_2WAY = {14: ('264', '265'), 8: ('272', '273'), 15: ('231', '232')}
+HOCKEY_2WAY = {14: ('264', '265'), 8: ('272', '273'), 15: ('232', '231')}  # 231=PAR(Even), 232=NEP(Odd)
 HOCKEY_SIMPLE_3WAY = {13: ('7', '8', '9')}
 HOCKEY_PERIOD_3WAY = {
     3: ('50495', '50496', '50497'),
@@ -717,7 +717,8 @@ class MerkurScraper(BaseScraper):
                 over = odds.get(over_code)
                 if under and over:
                     odds_list.append(ScrapedOdds(
-                        bet_type_id=bt, odd1=float(under), odd2=float(over), margin=margin
+                        # Fix 2.4: Convention: odd1=Over, odd2=Under
+                        bet_type_id=bt, odd1=float(over), odd2=float(under), margin=margin
                     ))
 
     @staticmethod
@@ -730,8 +731,9 @@ class MerkurScraper(BaseScraper):
                         try:
                             odds_list.append(ScrapedOdds(
                                 bet_type_id=bt,
-                                odd1=float(odds[under_code]),
-                                odd2=float(odds[over_code]),
+                                # Fix 2.4: Convention: odd1=Over, odd2=Under
+                                odd1=float(odds[over_code]),
+                                odd2=float(odds[under_code]),
                                 margin=float(margin_val)
                             ))
                         except (ValueError, TypeError):

@@ -12,7 +12,7 @@ Full format fields: marketId, name, specialValues, outcomes[{shortcut, name, odd
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 
 from .base import BaseScraper, ScrapedMatch, ScrapedOdds
@@ -273,7 +273,8 @@ class TopbetScraper(BaseScraper):
         over = self._get_outcome(outcomes, "Više") or self._get_outcome(outcomes, "+")
         under = self._get_outcome(outcomes, "Manje") or self._get_outcome(outcomes, "-")
         if over and under:
-            return [ScrapedOdds(bet_type_id=bt_id, odd1=under, odd2=over,
+            # Fix 2.4: Convention: odd1=Over, odd2=Under
+            return [ScrapedOdds(bet_type_id=bt_id, odd1=over, odd2=under,
                                 margin=margin)]
         return []
 
@@ -502,7 +503,8 @@ class TopbetScraper(BaseScraper):
                         self._get_outcome(outcomes, "-")
                 if over and under:
                     result.append(ScrapedOdds(
-                        bet_type_id=ou_bt, odd1=under, odd2=over,
+                        # Fix 2.4: Convention: odd1=Over, odd2=Under
+                        bet_type_id=ou_bt, odd1=over, odd2=under,
                         margin=margin_val))
                     continue
 
@@ -592,8 +594,9 @@ class TopbetScraper(BaseScraper):
                 if not start_time_str:
                     continue
                 try:
+                    # Fix N3: ensure UTC-aware datetime
                     start_time = datetime.strptime(
-                        start_time_str, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        start_time_str, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
                 except ValueError:
                     start_time = self.parse_timestamp(start_time_str)
                     if not start_time:

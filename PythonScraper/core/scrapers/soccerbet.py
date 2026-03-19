@@ -47,7 +47,7 @@ FOOTBALL_3WAY = {
 
 FOOTBALL_2WAY = {
     8:  ('272', '273'),    # BTTS (GG, NG)
-    15: ('231', '232'),    # Odd/Even
+    15: ('232', '231'),    # Odd/Even — 231=PAR(Even), 232=NEP(Odd); convention: odd1=ODD, odd2=EVEN
     14: ('264', '265'),    # Draw No Bet
     16: ('295', '296'),    # Double Win
     17: ('282', '283'),    # Win to Nil
@@ -511,21 +511,16 @@ FOOTBALL_SELECTIONS = {
         '57305': '12&H2+', '57306': '12&A2+',
     },
     # === Misc combo goal ranges ===
-    # NOT exactly X goals markets (no standard bt, use bt39 = result combos)
+    # Fix 2.8: 'not exactly N goals' markets (codes 505,506,507, etc.) are skipped
+    # because they have no equivalent at other bookmakers — cannot be compared for arbitrage.
+    # Codes 519/520 and OR combos (623-625, 51769, 57294/57295, 57337) are also removed
+    # as they mix semantically incompatible outcomes with other scrapers' bt39 data.
     39: {
-        '505': 'N1', '506': 'N2', '507': 'N3',  # not exactly 1/2/3 goals
-        '776': 'H1_N1', '778': 'H1_N2',   # H1 not exactly 1/2 goals
-        '781': 'H2_N1', '783': 'H2_N2',   # H2 not exactly 1/2 goals
-        '55190': 'N1-2', '55191': 'N1-3', '55192': 'N1-4',
-        '55196': 'N3-4', '55197': 'N3-5', '55198': 'N4-6',
-        '57335': 'N3-6', '57336': 'N4-5',
-        '51769': 'A0-1|H0-1',   # at least one team scores ≤1
-        '623': 'H1:0|H2:0',     # at least one half goalless
-        '624': 'H1:0|H2:0-1',   # no goals H1 or ≤1 in H2
-        '625': 'H1:0-1|H2:0',   # ≤1 in H1 or no goals H2
-        '57294': 'H_NG_H1|H2:0', '57295': 'A_NG_H1|H2:0',
-        '57337': 'H1:N1-3|H2:N1-3',
-        '519': '1&2+', '520': '2&2+',  # result + 2+
+        # Skipped: 'not exactly N goals' markets have no equivalent at other bookmakers
+        # (removed: '505':'N1', '506':'N2', '507':'N3', H1/H2 variants, N-ranges)
+        # (removed: '776','778','781','783','55190'-'55198','57335','57336')
+        # (removed: '51769','623','624','625','57294','57295','57337')
+        '519': '1&2+', '520': '2&2+',  # result + 2+ (kept: standard result combos)
     },
     # === HT/FT combos (bt45) ===
     45: {
@@ -616,7 +611,7 @@ HOCKEY_SIMPLE_3WAY = {
 HOCKEY_2WAY = {
     14: ('264', '265'),                      # Draw No Bet / Winner
     8:  ('272', '273'),                      # BTTS (GG, NG)
-    15: ('231', '232'),                      # Odd/Even
+    15: ('232', '231'),                      # Odd/Even — 231=PAR(Even), 232=NEP(Odd)
 }
 
 HOCKEY_SELECTIONS = {
@@ -722,7 +717,8 @@ class SoccerbetScraper(BaseScraper):
                 over = odds.get(over_code)
                 if under and over:
                     odds_list.append(ScrapedOdds(
-                        bet_type_id=bt, odd1=float(under), odd2=float(over), margin=margin
+                        # Fix 2.4: Convention: odd1=Over, odd2=Under
+                        bet_type_id=bt, odd1=float(over), odd2=float(under), margin=margin
                     ))
 
     @staticmethod
@@ -734,7 +730,7 @@ class SoccerbetScraper(BaseScraper):
                 val = odds.get(code)
                 if val:
                     odds_list.append(ScrapedOdds(
-                        bet_type_id=bt, odd1=float(val), odd2=0, selection=selection
+                        bet_type_id=bt, odd1=float(val), odd2=None, selection=selection  # Fix N5: None instead of 0 for unused odd slots
                     ))
 
     # ========================================================================

@@ -107,8 +107,8 @@ class Settings(BaseSettings):
 
 # Bookmaker configuration
 BOOKMAKERS = {
-    1: {"name": "mozzart", "display": "Mozzart Bet", "enabled": False},  # Cloudflare blocked
-    2: {"name": "meridian", "display": "Meridian Bet", "enabled": True},  # Re-enabled
+    1: {"name": "mozzart", "display": "Mozzart Bet", "enabled": True},  # Active: uses Playwright for Cloudflare bypass
+    2: {"name": "meridian", "display": "Meridian Bet", "enabled": True},  # Re-enabled: fixed auth token extraction (regex) and added required API headers
     3: {"name": "maxbet", "display": "MaxBet", "enabled": True},
     4: {"name": "admiral", "display": "Admiral Bet", "enabled": True},
     5: {"name": "soccerbet", "display": "Soccer Bet", "enabled": True},

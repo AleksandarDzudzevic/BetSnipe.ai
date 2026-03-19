@@ -7,11 +7,10 @@ Scrapes odds from Meridian Bet Serbia API.
 import asyncio
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
 import aiohttp
-from bs4 import BeautifulSoup
 
 from .base import BaseScraper, ScrapedMatch, ScrapedOdds
 
@@ -36,6 +35,7 @@ class MeridianScraper(BaseScraper):
     Scraper for Meridian Bet Serbia.
 
     Requires auth token from main page, then uses API endpoints.
+    Odds are embedded inline in the leagues response — no per-event market calls needed.
     """
 
     def __init__(self):
@@ -48,11 +48,14 @@ class MeridianScraper(BaseScraper):
 
     def get_headers(self) -> Dict[str, str]:
         headers = {
-            "Accept": "application/json",
-            "Accept-Language": "sr",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "sr-Latn-RS,sr;q=0.9,en-US;q=0.8",
             "Origin": "https://meridianbet.rs",
-            "Referer": "https://meridianbet.rs/",
+            "Referer": "https://meridianbet.rs/sr/kladjenje/fudbal",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "medium": "PREMATCH_WEB",
+            "language": "sr",
+            "x-timezone-offset": "-60",
         }
         if self._auth_token:
             headers["Authorization"] = f"Bearer {self._auth_token}"
@@ -62,36 +65,51 @@ class MeridianScraper(BaseScraper):
         return [1, 2, 3, 4, 5]
 
     async def fetch_auth_token(self) -> Optional[str]:
-        """Fetch auth token from main page."""
+        """Fetch auth token from main page using regex on raw HTML."""
         try:
             url = "https://meridianbet.rs/sr/kladjenje/fudbal"
             headers = {
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "sr-Latn-RS,sr;q=0.9",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
             }
+            async with self.session.get(url, headers=headers) as response:
+                if response.status != 200:
+                    logger.warning(f"[Meridian] Auth page returned {response.status}")
+                    return None
+                text = await response.text()
+                # The HTML embeds: {"NEW_TOKEN":"{\"access_token\":\"eyJ...\"}"}
+                # JWT is base64url chars (A-Za-z0-9._-) in escaped JSON
+                m = re.search(r'\\\"access_token\\\":\\\"([A-Za-z0-9._-]+)\\\"', text)
+                if m:
+                    token = m.group(1)
+                    logger.info(f"[Meridian] Successfully extracted auth token ({len(token)} chars)")
+                    return token
+                # Fallback: try Nigerian site
+                logger.warning("[Meridian] Token not found on .rs site, trying .ng fallback")
+                return await self._fetch_token_from_ng()
+        except Exception as e:
+            logger.warning(f"[Meridian] Error fetching auth token: {e}")
+        return None
 
+    async def _fetch_token_from_ng(self) -> Optional[str]:
+        """Fallback: fetch token from Nigerian Meridian site (same token format)."""
+        try:
+            url = "https://meridianbet.ng/en/betting"
+            headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            }
             async with self.session.get(url, headers=headers) as response:
                 if response.status != 200:
                     return None
-
                 text = await response.text()
-                soup = BeautifulSoup(text, "html.parser")
-
-                for script in soup.find_all("script"):
-                    if script.string and "NEW_TOKEN" in script.string:
-                        try:
-                            import json
-                            json_data = json.loads(script.string)
-                            if "NEW_TOKEN" in json_data:
-                                token_data = json.loads(json_data["NEW_TOKEN"])
-                                if "access_token" in token_data:
-                                    return token_data["access_token"]
-                        except (json.JSONDecodeError, KeyError):
-                            continue
-
+                m = re.search(r'\\\"access_token\\\":\\\"([A-Za-z0-9._-]+)\\\"', text)
+                if m:
+                    logger.info("[Meridian] Using token from .ng fallback site")
+                    return m.group(1)
         except Exception as e:
-            logger.warning(f"[Meridian] Error fetching auth token: {e}")
-
+            logger.warning(f"[Meridian] Error fetching .ng fallback token: {e}")
         return None
 
     async def ensure_token(self) -> bool:
@@ -101,13 +119,8 @@ class MeridianScraper(BaseScraper):
         return self._auth_token is not None
 
     async def fetch_events(self, sport_id: int, page: int = 0) -> Optional[Dict]:
-        """Fetch events for a sport page."""
-        meridian_sport_id = None
-        for mid, sid in MERIDIAN_SPORTS.items():
-            if sid == sport_id:
-                meridian_sport_id = mid
-                break
-
+        """Fetch events (with embedded odds) for a sport page."""
+        meridian_sport_id = next((mid for mid, sid in MERIDIAN_SPORTS.items() if sid == sport_id), None)
         if not meridian_sport_id:
             return None
 
@@ -120,324 +133,298 @@ class MeridianScraper(BaseScraper):
 
         return await self.fetch_json(url, params=params)
 
-    async def fetch_event_markets(self, event_id: int) -> Optional[List[Dict]]:
-        """Fetch markets/odds for an event with rate limiting."""
-        async with self._rate_semaphore:
-            url = f"{self.get_base_url()}/v2/events/{event_id}/markets"
-
-            data = await self.fetch_json(url)
-            await asyncio.sleep(MERIDIAN_REQUEST_DELAY)
-
-            if data:
-                return data.get("payload", [])
-            return None
-
-    def parse_football_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
-        """Parse football odds from Meridian markets."""
+    def parse_football_odds(self, groups: List[Dict]) -> List[ScrapedOdds]:
+        """Parse football odds from Meridian groups (flat list of group dicts)."""
         odds_list = []
 
-        for market_group in markets:
-            market_name = market_group.get("marketName", "")
+        for group in groups:
+            market_name = group.get("name", "")
+            selections = group.get("selections", [])
+            # Filter to only ACTIVE selections
+            active = [s for s in selections if s.get("state") == "ACTIVE"]
+            over_under = group.get("overUnder")
+            handicap = group.get("handicap")
 
             if market_name == "Konačan Ishod":
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 3:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=2,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            odd3=float(selections[2].get("price", 0))
-                        ))
+                if len(active) >= 3:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=2,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0)),
+                        odd3=float(active[2].get("price", 0))
+                    ))
 
             elif market_name in ("I Pol. Konačan Ishod", "Prvo Poluvreme - Konačan Ishod"):
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 3:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=3,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            odd3=float(selections[2].get("price", 0))
-                        ))
+                if len(active) >= 3:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=3,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0)),
+                        odd3=float(active[2].get("price", 0))
+                    ))
 
             elif market_name in ("II Pol. Konačan Ishod", "Drugo Poluvreme - Konačan Ishod"):
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 3:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=4,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            odd3=float(selections[2].get("price", 0))
-                        ))
+                if len(active) >= 3:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=4,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0)),
+                        odd3=float(active[2].get("price", 0))
+                    ))
 
             elif market_name == "Oba Tima Daju Gol":
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    gg = next((s.get("price") for s in selections if s.get("name") == "GG"), None)
-                    ng = next((s.get("price") for s in selections if s.get("name") == "NG"), None)
-                    if gg and ng:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=8,
-                            odd1=float(gg),
-                            odd2=float(ng)
-                        ))
+                gg = next((s.get("price") for s in active if s.get("name") == "GG"), None)
+                ng = next((s.get("price") for s in active if s.get("name") == "NG"), None)
+                if gg and ng:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=8,
+                        odd1=float(gg),
+                        odd2=float(ng)
+                    ))
 
             elif market_name == "Ukupno Golova":
-                for market in market_group.get("markets", []):
-                    over_under = market.get("overUnder")
-                    selections = market.get("selections", [])
-                    if over_under and len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=5,
-                            odd1=float(selections[0].get("price", 0)),  # Over
-                            odd2=float(selections[1].get("price", 0)),  # Under
-                            margin=float(over_under)
-                        ))
+                if over_under and len(active) >= 2:
+                    # Assign Over/Under explicitly by name to avoid positional errors
+                    over_price = next((s.get("price") for s in active if s.get("name") in ("Više", "Over", "V")), None)
+                    under_price = next((s.get("price") for s in active if s.get("name") in ("Manje", "Under", "M")), None)
+                    # Fallback to positional if names not found
+                    if over_price is None:
+                        over_price = active[0].get("price", 0)
+                    if under_price is None:
+                        under_price = active[1].get("price", 0)
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=5,
+                        odd1=float(over_price),
+                        odd2=float(under_price),
+                        margin=float(over_under)
+                    ))
 
             elif market_name in ("I Pol. Ukupno", "Prvo Poluvreme - Ukupno Golova"):
-                for market in market_group.get("markets", []):
-                    over_under = market.get("overUnder")
-                    selections = market.get("selections", [])
-                    if over_under and len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=6,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            margin=float(over_under)
-                        ))
+                if over_under and len(active) >= 2:
+                    over_price = next((s.get("price") for s in active if s.get("name") in ("Više", "Over", "V")), None)
+                    under_price = next((s.get("price") for s in active if s.get("name") in ("Manje", "Under", "M")), None)
+                    if over_price is None:
+                        over_price = active[0].get("price", 0)
+                    if under_price is None:
+                        under_price = active[1].get("price", 0)
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=6,
+                        odd1=float(over_price),
+                        odd2=float(under_price),
+                        margin=float(over_under)
+                    ))
 
             elif market_name in ("II Pol. Ukupno", "Drugo Poluvreme - Ukupno Golova"):
-                for market in market_group.get("markets", []):
-                    over_under = market.get("overUnder")
-                    selections = market.get("selections", [])
-                    if over_under and len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=7,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            margin=float(over_under)
-                        ))
+                if over_under and len(active) >= 2:
+                    over_price = next((s.get("price") for s in active if s.get("name") in ("Više", "Over", "V")), None)
+                    under_price = next((s.get("price") for s in active if s.get("name") in ("Manje", "Under", "M")), None)
+                    if over_price is None:
+                        over_price = active[0].get("price", 0)
+                    if under_price is None:
+                        under_price = active[1].get("price", 0)
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=7,
+                        odd1=float(over_price),
+                        odd2=float(under_price),
+                        margin=float(over_under)
+                    ))
 
         return odds_list
 
-    def parse_basketball_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
-        """Parse basketball odds from Meridian markets."""
+    def parse_basketball_odds(self, groups: List[Dict]) -> List[ScrapedOdds]:
+        """Parse basketball odds from Meridian groups (flat list of group dicts)."""
         odds_list = []
 
-        for market_group in markets:
-            market_name = market_group.get("marketName", "")
+        for group in groups:
+            market_name = group.get("name", "")
+            selections = group.get("selections", [])
+            active = [s for s in selections if s.get("state") == "ACTIVE"]
+            over_under = group.get("overUnder")
+            handicap = group.get("handicap")
 
             # Winner (12)
             if market_name in ["Pobednik", "Pobednik Meča"]:
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=1,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0))
-                        ))
+                if len(active) >= 2:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=1,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0))
+                    ))
 
             # Total Points
             elif market_name == "Ukupno Poena":
-                for market in market_group.get("markets", []):
-                    over_under = market.get("overUnder")
-                    selections = market.get("selections", [])
-                    if over_under and len(selections) >= 2:
-                        total = float(over_under)
-                        if total > 130:  # Basketball totals
-                            odds_list.append(ScrapedOdds(
-                                bet_type_id=10,
-                                odd1=float(selections[0].get("price", 0)),
-                                odd2=float(selections[1].get("price", 0)),
-                                margin=total
-                            ))
+                if over_under and len(active) >= 2:
+                    total = float(over_under)
+                    if total > 130:  # Basketball totals
+                        odds_list.append(ScrapedOdds(
+                            bet_type_id=10,
+                            odd1=float(active[0].get("price", 0)),
+                            odd2=float(active[1].get("price", 0)),
+                            margin=total
+                        ))
 
             # Handicap
             elif market_name == "Hendikep":
-                for market in market_group.get("markets", []):
-                    handicap = market.get("handicap")
-                    selections = market.get("selections", [])
-                    if handicap and len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=9,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            margin=float(handicap)
-                        ))
+                if handicap and len(active) >= 2:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=9,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0)),
+                        margin=float(handicap)
+                    ))
 
         return odds_list
 
-    def parse_tennis_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
-        """Parse tennis odds from Meridian markets."""
+    def parse_tennis_odds(self, groups: List[Dict]) -> List[ScrapedOdds]:
+        """Parse tennis odds from Meridian groups (flat list of group dicts)."""
         odds_list = []
 
-        for market_group in markets:
-            market_name = market_group.get("marketName", "")
+        for group in groups:
+            market_name = group.get("name", "")
+            selections = group.get("selections", [])
+            active = [s for s in selections if s.get("state") == "ACTIVE"]
 
             # Match Winner (12)
             if market_name in ["Pobednik", "Pobednik Meča"]:
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=1,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0))
-                        ))
+                if len(active) >= 2:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=1,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0))
+                    ))
 
-            # First Set Winner
+            # First Set Winner — bt57 (2-way set winner)
             elif market_name in ["1. Set - Pobednik", "I Set Pobednik"]:
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=11,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0))
-                        ))
+                if len(active) >= 2:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=57,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0))
+                    ))
 
         return odds_list
 
-    def parse_hockey_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
-        """Parse hockey odds from Meridian markets."""
+    def parse_hockey_odds(self, groups: List[Dict]) -> List[ScrapedOdds]:
+        """Parse hockey odds from Meridian groups (flat list of group dicts)."""
         odds_list = []
 
-        for market_group in markets:
-            market_name = market_group.get("marketName", "")
+        for group in groups:
+            market_name = group.get("name", "")
+            selections = group.get("selections", [])
+            active = [s for s in selections if s.get("state") == "ACTIVE"]
 
             # 1X2
             if market_name == "Konačan Ishod":
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 3:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=2,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0)),
-                            odd3=float(selections[2].get("price", 0))
-                        ))
+                if len(active) >= 3:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=2,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0)),
+                        odd3=float(active[2].get("price", 0))
+                    ))
 
         return odds_list
 
-    def parse_table_tennis_odds(self, markets: List[Dict]) -> List[ScrapedOdds]:
-        """Parse table tennis odds from Meridian markets."""
+    def parse_table_tennis_odds(self, groups: List[Dict]) -> List[ScrapedOdds]:
+        """Parse table tennis odds from Meridian groups (flat list of group dicts)."""
         odds_list = []
 
-        for market_group in markets:
-            market_name = market_group.get("marketName", "")
+        for group in groups:
+            market_name = group.get("name", "")
+            selections = group.get("selections", [])
+            active = [s for s in selections if s.get("state") == "ACTIVE"]
 
             # Winner (12)
             if market_name in ["Pobednik", "Pobednik Meča"]:
-                for market in market_group.get("markets", []):
-                    selections = market.get("selections", [])
-                    if len(selections) >= 2:
-                        odds_list.append(ScrapedOdds(
-                            bet_type_id=1,
-                            odd1=float(selections[0].get("price", 0)),
-                            odd2=float(selections[1].get("price", 0))
-                        ))
+                if len(active) >= 2:
+                    odds_list.append(ScrapedOdds(
+                        bet_type_id=1,
+                        odd1=float(active[0].get("price", 0)),
+                        odd2=float(active[1].get("price", 0))
+                    ))
 
         return odds_list
 
-    def parse_odds(self, markets: List[Dict], sport_id: int) -> List[ScrapedOdds]:
-        """Parse odds based on sport type."""
+    def parse_odds(self, groups: List[Dict], sport_id: int) -> List[ScrapedOdds]:
+        """Parse odds based on sport type. groups is a flat list of group dicts."""
         if sport_id == 1:
-            return self.parse_football_odds(markets)
+            return self.parse_football_odds(groups)
         elif sport_id == 2:
-            return self.parse_basketball_odds(markets)
+            return self.parse_basketball_odds(groups)
         elif sport_id == 3:
-            return self.parse_tennis_odds(markets)
+            return self.parse_tennis_odds(groups)
         elif sport_id == 4:
-            return self.parse_hockey_odds(markets)
+            return self.parse_hockey_odds(groups)
         elif sport_id == 5:
-            return self.parse_table_tennis_odds(markets)
+            return self.parse_table_tennis_odds(groups)
         return []
 
     async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all matches for a sport with rate-limited market fetching."""
+        """Scrape all matches for a sport. Odds are embedded inline in the leagues response."""
         matches: List[ScrapedMatch] = []
 
-        # Ensure we have auth token
         if not await self.ensure_token():
             logger.warning("[Meridian] Could not obtain auth token")
             return matches
 
-        # Step 1: Collect all events from league pages
+        meridian_sport_id = next((mid for mid, sid in MERIDIAN_SPORTS.items() if sid == sport_id), None)
+        if not meridian_sport_id:
+            return matches
+
         page = 0
-        events = []
+        total_events = 0
 
         while True:
             data = await self.fetch_events(sport_id, page)
-
-            if not data or "payload" not in data:
+            if not data:
                 break
 
-            leagues = data.get("payload", {}).get("leagues", [])
+            payload = data.get("payload", {})
+            leagues = payload.get("leagues", [])
             if not leagues:
                 break
 
             for league in leagues:
+                league_name = league.get("leagueName", "")
                 for event in league.get("events", []):
                     header = event.get("header", {})
                     event_id = header.get("eventId")
                     rivals = header.get("rivals", [])
                     start_time_ms = header.get("startTime", 0)
+                    state = header.get("state", "")
 
-                    if not event_id or len(rivals) < 2:
+                    if not event_id or len(rivals) < 2 or state != "ACTIVE":
                         continue
 
-                    events.append({
-                        'event_id': event_id,
-                        'team1': rivals[0],
-                        'team2': rivals[1],
-                        'start_time': datetime.utcfromtimestamp(start_time_ms / 1000) if start_time_ms else None,
-                        'league_name': league.get("name", ""),
-                    })
+                    start_time = datetime.fromtimestamp(start_time_ms / 1000, tz=timezone.utc) if start_time_ms else None
+                    if not start_time:
+                        continue
+
+                    # Extract all groups from all positions (the embedded odds)
+                    all_groups = []
+                    for position in event.get("positions", []):
+                        all_groups.extend(position.get("groups", []))
+
+                    if not all_groups:
+                        continue
+
+                    try:
+                        scraped = ScrapedMatch(
+                            team1=rivals[0],
+                            team2=rivals[1],
+                            sport_id=sport_id,
+                            start_time=start_time,
+                            league_name=league_name,
+                            external_id=str(event_id),
+                        )
+                        scraped.odds = self.parse_odds(all_groups, sport_id)
+                        if scraped.odds:
+                            matches.append(scraped)
+                            total_events += 1
+                    except Exception as e:
+                        logger.warning(f"[Meridian] Error processing event {event_id}: {e}")
 
             page += 1
 
-        logger.info(f"[Meridian] Found {len(events)} events for sport {sport_id}, fetching markets ({MERIDIAN_MAX_CONCURRENT} concurrent, {MERIDIAN_REQUEST_DELAY}s delay)...")
-
-        # Step 2: Fetch markets with rate limiting (semaphore + delay in fetch_event_markets)
-        market_tasks = [
-            self.fetch_event_markets(evt['event_id'])
-            for evt in events
-        ]
-        market_results = await asyncio.gather(*market_tasks, return_exceptions=True)
-
-        # Step 3: Parse results
-        errors = 0
-        for evt, market_data in zip(events, market_results):
-            if isinstance(market_data, Exception):
-                errors += 1
-                logger.debug(f"[Meridian] Market fetch error for {evt['event_id']}: {market_data}")
-                continue
-            if not market_data:
-                errors += 1
-                continue
-
-            try:
-                scraped = ScrapedMatch(
-                    team1=evt['team1'],
-                    team2=evt['team2'],
-                    sport_id=sport_id,
-                    start_time=evt['start_time'],
-                    league_name=evt['league_name'],
-                    external_id=str(evt['event_id']),
-                )
-
-                scraped.odds = self.parse_odds(market_data, sport_id)
-
-                if scraped.odds:
-                    matches.append(scraped)
-
-            except Exception as e:
-                logger.warning(f"[Meridian] Error processing event {evt['event_id']}: {e}")
-
-        if errors:
-            logger.warning(f"[Meridian] {errors}/{len(events)} market fetches failed for sport {sport_id}")
-
+        logger.info(f"[Meridian] Sport {sport_id}: scraped {total_events} events across {page} pages")
         return matches

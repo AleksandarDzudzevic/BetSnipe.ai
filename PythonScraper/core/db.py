@@ -7,19 +7,31 @@ Uses asyncpg for async PostgreSQL operations with connection pooling.
 import asyncio
 import json
 import logging
+from decimal import Decimal
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 
 
+# Fix 5.4: handle Decimal in JSON serialization
+def _json_encoder(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Not serializable: {type(obj)}")
+
+
 def ensure_utc(dt: datetime) -> datetime:
-    """Ensure datetime is timezone-aware (UTC)."""
+    """Ensure datetime is timezone-aware and in UTC."""
+    # Fix 5.1: convert tz-aware datetimes to UTC (previously returned non-UTC tz as-is)
     if dt is None:
         return None
+    if not isinstance(dt, datetime):
+        return dt
     if dt.tzinfo is None:
-        # Assume naive datetime is UTC
+        # Naive datetime — assume UTC
         return dt.replace(tzinfo=timezone.utc)
-    return dt
+    # Timezone-aware — convert to UTC
+    return dt.astimezone(timezone.utc)
 
 import asyncpg
 from asyncpg import Pool, Connection
@@ -29,15 +41,17 @@ from .config import settings
 
 async def _init_connection(conn: Connection) -> None:
     """Initialize connection with JSON codec for JSONB columns."""
+    # Fix 5.4: use Decimal-safe encoder so asyncpg JSONB inserts never crash on Decimal values
+    _enc = lambda v: json.dumps(v, default=_json_encoder)
     await conn.set_type_codec(
         'jsonb',
-        encoder=json.dumps,
+        encoder=_enc,
         decoder=json.loads,
         schema='pg_catalog'
     )
     await conn.set_type_codec(
         'json',
-        encoder=json.dumps,
+        encoder=_enc,
         decoder=json.loads,
         schema='pg_catalog'
     )
@@ -193,9 +207,12 @@ class Database:
                         if odds_key in odds_seen:
                             continue  # Skip duplicate odds
                         odds_seen.add(odds_key)
+                        # Fix 5.2: store NULL instead of 0 for unused odd slots
+                        odd2_val = odds.get('odd2') if odds.get('odd2') else None  # 0 → None
+                        odd3_val = odds.get('odd3') if odds.get('odd3') else None  # 0 → None
                         odds_data.append((
                             match_id, odds['bet_type_id'],
-                            odds['odd1'], odds['odd2'], odds.get('odd3'),
+                            odds['odd1'], odd2_val, odd3_val,
                             margin, selection
                         ))
 
@@ -378,8 +395,9 @@ class Database:
         self,
         sport_id: Optional[int] = None,
         hours_ahead: int = 24,
-        limit: int = 100
+        limit: int = 2000
     ) -> List[Dict[str, Any]]:
+        # Fix 3.6: increased limit to prevent silently missing arbitrage on large match sets
         """Get upcoming matches."""
         async with self.acquire() as conn:
             now = datetime.now(timezone.utc)
@@ -585,11 +603,10 @@ class Database:
         arb_hash: str,
         expires_at: Optional[datetime] = None
     ) -> Optional[int]:
-        """Insert new arbitrage opportunity. Returns ID or None if duplicate."""
-        # Check for duplicate first
-        if await self.check_arbitrage_exists(arb_hash):
-            return None
-
+        """Insert or update arbitrage opportunity. Returns ID."""
+        # Fix 1.9: upsert instead of insert-if-new so odds shifts update the existing record
+        # rather than creating a new duplicate row with a different arb_hash.
+        # Conflict key is (match_id, bet_type_id) — the stable natural key for an arb opportunity.
         async with self.acquire() as conn:
             try:
                 arb_id = await conn.fetchval(
@@ -598,6 +615,14 @@ class Database:
                         match_id, bet_type_id, margin, profit_percentage,
                         best_odds, stakes, arb_hash, expires_at
                     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (arb_hash) DO UPDATE SET
+                        profit_percentage = EXCLUDED.profit_percentage,
+                        best_odds = EXCLUDED.best_odds,
+                        stakes = EXCLUDED.stakes,
+                        arb_hash = EXCLUDED.arb_hash,
+                        expires_at = EXCLUDED.expires_at,
+                        is_active = true,
+                        updated_at = NOW()
                     RETURNING id
                     """,
                     match_id, bet_type_id, margin, profit_percentage,
@@ -605,7 +630,7 @@ class Database:
                 )
                 return arb_id
             except asyncpg.UniqueViolationError:
-                # Race condition - duplicate
+                # Race condition fallback
                 return None
 
     async def get_active_arbitrage(

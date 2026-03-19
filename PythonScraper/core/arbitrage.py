@@ -4,6 +4,7 @@ Arbitrage detection for BetSnipe.ai v2.0
 Detects arbitrage opportunities across bookmakers and calculates optimal stakes.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -62,6 +63,13 @@ class ArbitrageDetector:
     - Selection-based N-way arbitrage (e.g., correct score, HT/FT)
     """
 
+    MAX_PROFIT_PCT = 10.0  # Hard cap — higher values almost always indicate a data/matching error
+
+    # Bet types excluded from arbitrage detection:
+    # - Handicap IDs: European vs Asian handicap conventions produce systematic false arbs
+    # - LAST_GOAL (89): doesn't cover the 0-0 outcome, so no true arbitrage is possible
+    EXCLUDED_BET_TYPE_IDS = {9, 50, 56, 58, 80, 85, 95, 89}
+
     def __init__(self, min_profit: Optional[float] = None):
         self.min_profit = min_profit or settings.min_profit_percentage
 
@@ -81,16 +89,26 @@ class ArbitrageDetector:
         if len(odds) < 2:
             return None
 
-        # Find best odds for each outcome
-        best_odd1 = max(odds, key=lambda x: x[2] if x[2] else 0)
-        best_odd2 = max(odds, key=lambda x: x[3] if x[3] else 0)
-
-        if not best_odd1[2] or not best_odd2[2]:
+        # Fix 1.4: filter out rows with odds <= 1.0 (invalid odds)
+        valid_odds = [o for o in odds if o[2] and o[3] and o[2] > 1.0 and o[3] > 1.0]
+        if len(valid_odds) < 2:
             return None
+
+        # Find best odds for each outcome
+        best_odd1 = max(valid_odds, key=lambda x: x[2])
+        best_odd2 = max(valid_odds, key=lambda x: x[3])
+
+        # Fix 1.1: require different bookmakers for each leg
+        if best_odd1[0] == best_odd2[0]:
+            # Find best odd2 from a different bookmaker
+            alt_odds = [o for o in valid_odds if o[0] != best_odd1[0]]
+            if not alt_odds:
+                return None  # only one bookmaker, no real arb
+            best_odd2 = max(alt_odds, key=lambda x: x[3])
 
         # Calculate implied probabilities
         prob1 = 1 / best_odd1[2]
-        prob2 = 1 / best_odd2[2]
+        prob2 = 1 / best_odd2[3]
 
         total_prob = prob1 + prob2
 
@@ -101,7 +119,7 @@ class ArbitrageDetector:
         # Calculate profit percentage
         profit_pct = ((1 / total_prob) - 1) * 100
 
-        if profit_pct < self.min_profit:
+        if profit_pct < self.min_profit or profit_pct > self.MAX_PROFIT_PCT:
             return None
 
         # Calculate optimal stakes for 100 unit total bet
@@ -120,7 +138,7 @@ class ArbitrageDetector:
                 'bookmaker_id': best_odd2[0],
                 'bookmaker_name': best_odd2[1],
                 'outcome': 2,
-                'odd': best_odd2[2]
+                'odd': best_odd2[3]
             }
         ]
 
@@ -144,13 +162,20 @@ class ArbitrageDetector:
         if len(odds) < 2:
             return None
 
-        # Find best odds for each outcome
-        best_odd1 = max(odds, key=lambda x: x[2] if x[2] else 0)
-        best_oddX = max(odds, key=lambda x: x[3] if x[3] else 0)
-        best_odd2 = max(odds, key=lambda x: x[4] if x[4] else 0)
-
-        if not best_odd1[2] or not best_oddX[3] or not best_odd2[4]:
+        # Fix 1.4: filter out rows with any odds <= 1.0 (invalid odds)
+        valid_odds = [o for o in odds if o[2] and o[3] and o[4] and o[2] > 1.0 and o[3] > 1.0 and o[4] > 1.0]
+        if len(valid_odds) < 2:
             return None
+
+        # Find best odds for each outcome
+        best_odd1 = max(valid_odds, key=lambda x: x[2])
+        best_oddX = max(valid_odds, key=lambda x: x[3])
+        best_odd2 = max(valid_odds, key=lambda x: x[4])
+
+        # Fix 1.2: require at least 2 different bookmakers across 3 legs
+        bookmakers_used = {best_odd1[0], best_oddX[0], best_odd2[0]}
+        if len(bookmakers_used) < 2:
+            return None  # all legs from same bookmaker
 
         # Calculate implied probabilities
         prob1 = 1 / best_odd1[2]
@@ -166,7 +191,7 @@ class ArbitrageDetector:
         # Calculate profit percentage
         profit_pct = ((1 / total_prob) - 1) * 100
 
-        if profit_pct < self.min_profit:
+        if profit_pct < self.min_profit or profit_pct > self.MAX_PROFIT_PCT:
             return None
 
         # Calculate optimal stakes for 100 unit total bet
@@ -232,6 +257,11 @@ class ArbitrageDetector:
         if len(best_per_selection) < 2:
             return None
 
+        # Fix 1.3: require at least 2 different bookmakers across all selection legs
+        bk_ids = set(v[0] for v in best_per_selection.values())
+        if len(bk_ids) < 2:
+            return None  # all selections from one bookmaker, not real arb
+
         # Calculate implied probabilities
         total_prob = sum(1.0 / best[2] for best in best_per_selection.values())
 
@@ -240,7 +270,7 @@ class ArbitrageDetector:
 
         profit_pct = ((1 / total_prob) - 1) * 100
 
-        if profit_pct < self.min_profit:
+        if profit_pct < self.min_profit or profit_pct > self.MAX_PROFIT_PCT:
             return None
 
         # Calculate optimal stakes for 100 unit total bet
@@ -273,8 +303,8 @@ class ArbitrageDetector:
         selection: str = ''
     ) -> str:
         """Generate unique hash for arbitrage opportunity."""
-        # Sort odds for consistent hashing
-        sorted_odds = sorted(best_odds, key=lambda x: x['outcome'])
+        # Sort odds for consistent hashing; use str() to handle mixed int/'X' outcomes
+        sorted_odds = sorted(best_odds, key=lambda x: str(x.get('outcome', '')))
 
         hash_data = {
             'match_id': match_id,
@@ -324,6 +354,8 @@ class ArbitrageDetector:
 
         # Check each group for arbitrage
         for (bet_type_id, margin, selection), group_odds in odds_groups.items():
+            if bet_type_id in self.EXCLUDED_BET_TYPE_IDS:
+                continue
             if len(group_odds) < 2:
                 # For selection markets, single-bookmaker selections are still
                 # collected but filtered later by the 2+ bookmaker requirement
@@ -420,6 +452,8 @@ class ArbitrageDetector:
         # Each (bet_type_id, margin) group has multiple selections forming
         # a mutually exclusive set of outcomes
         for (bet_type_id, margin), sel_odds in selection_markets.items():
+            if bet_type_id in self.EXCLUDED_BET_TYPE_IDS:
+                continue
             # Only include selections offered by 2+ bookmakers
             filtered = {
                 sel: odds_list
@@ -470,36 +504,45 @@ class ArbitrageDetector:
         opportunities = []
 
         # Get all upcoming matches
-        matches = await db.get_upcoming_matches(hours_ahead=24, limit=500)
+        matches = await db.get_upcoming_matches(hours_ahead=48, limit=5000)
 
         logger.info(f"Checking {len(matches)} matches for arbitrage")
 
-        for match in matches:
-            match_opportunities = await self.detect_for_match(
-                match['id'], match
-            )
+        # Fix 1.6: run detect_for_match concurrently with a semaphore to cap parallelism
+        semaphore = asyncio.Semaphore(50)
 
-            for opp in match_opportunities:
-                # Check if already detected
-                if not await db.check_arbitrage_exists(opp.arb_hash):
-                    # Store new opportunity
-                    arb_id = await db.insert_arbitrage(
-                        match_id=opp.match_id,
-                        bet_type_id=opp.bet_type_id,
-                        margin=opp.margin,
-                        profit_percentage=opp.profit_percentage,
-                        best_odds=opp.best_odds,
-                        stakes=opp.stakes,
-                        arb_hash=opp.arb_hash,
-                        expires_at=opp.start_time
+        async def bounded_detect(match):
+            async with semaphore:
+                try:
+                    return await self.detect_for_match(match['id'], match)
+                except Exception as e:
+                    logger.warning(f"Error detecting arb for match {match.get('id')}: {e}")
+                    return []
+
+        all_results = await asyncio.gather(*[bounded_detect(m) for m in matches])
+        match_opportunities_list = [opp for result in all_results if result for opp in result]
+
+        for opp in match_opportunities_list:
+            # Check if already detected
+            if not await db.check_arbitrage_exists(opp.arb_hash):
+                # Store new opportunity
+                arb_id = await db.insert_arbitrage(
+                    match_id=opp.match_id,
+                    bet_type_id=opp.bet_type_id,
+                    margin=opp.margin,
+                    profit_percentage=opp.profit_percentage,
+                    best_odds=opp.best_odds,
+                    stakes=opp.stakes,
+                    arb_hash=opp.arb_hash,
+                    expires_at=opp.start_time
+                )
+
+                if arb_id:
+                    opportunities.append(opp)
+                    logger.info(
+                        f"New arbitrage: {opp.team1} vs {opp.team2} "
+                        f"({opp.bet_type_name}) - {opp.profit_percentage:.2f}%"
                     )
-
-                    if arb_id:
-                        opportunities.append(opp)
-                        logger.info(
-                            f"New arbitrage: {opp.team1} vs {opp.team2} "
-                            f"({opp.bet_type_name}) - {opp.profit_percentage:.2f}%"
-                        )
 
         return opportunities
 

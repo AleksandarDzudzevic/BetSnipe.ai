@@ -4,36 +4,20 @@ Mozzart Bet scraper for BetSnipe.ai v2.0
 Scrapes odds from Mozzart Bet Serbia API.
 Supports: Football, Basketball, Tennis, Hockey, Table Tennis
 
-Uses Playwright to bypass Cloudflare protection with a real browser context.
+Uses plain aiohttp — no headless browser needed.
 """
 
 import asyncio
 import logging
-import random
-import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
-try:
-    from playwright.async_api import async_playwright, Browser, BrowserContext, Page
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
-    async_playwright = None
-    Browser = None
-    BrowserContext = None
-    Page = None
+import aiohttp
 
 from .base import BaseScraper, ScrapedMatch, ScrapedOdds
 
 logger = logging.getLogger(__name__)
 
-
-def generate_unique_id() -> str:
-    """Generate unique ID in format used by Mozzart: timestamp-randomhex"""
-    timestamp = int(time.time() * 1000)
-    random_hex = ''.join(random.choices('0123456789abcdef', k=8))
-    return f"{timestamp}-{random_hex}"
 
 # Sport ID mapping (Mozzart to internal)
 # Updated based on actual API response from 2026-01-19
@@ -53,7 +37,7 @@ class MozzartScraper(BaseScraper):
     """
     Scraper for Mozzart Bet Serbia.
 
-    Uses Playwright to bypass Cloudflare protection with a real browser.
+    Uses plain aiohttp — the API returns HTTP 200 with the right headers.
 
     API endpoints:
     - POST /betting/get-competitions: Get leagues for a sport
@@ -63,124 +47,46 @@ class MozzartScraper(BaseScraper):
 
     def __init__(self):
         super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
-        self._semaphore = asyncio.Semaphore(6)  # Limit concurrent requests
-        self._playwright = None
-        self._browser: Optional[Browser] = None
-        self._context: Optional[BrowserContext] = None
-        self._initialized = False
-        self._init_lock = asyncio.Lock()  # Prevent race condition during initialization
-
-    async def _ensure_initialized(self):
-        """Initialize Playwright browser if not already done."""
-        if self._initialized:
-            return
-
-        # Use lock to prevent race condition when multiple sports scrape concurrently
-        async with self._init_lock:
-            # Double-check after acquiring lock (another task may have initialized)
-            if self._initialized:
-                return
-
-            try:
-                self._playwright = await async_playwright().start()
-                self._browser = await self._playwright.chromium.launch(
-                    headless=True,
-                    args=['--disable-blink-features=AutomationControlled']
-                )
-                self._context = await self._browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
-                )
-
-                # Create a persistent page for making API requests
-                self._page = await self._context.new_page()
-
-                # Warm up session by visiting the betting page
-                try:
-                    await self._page.goto('https://www.mozzartbet.com/sr/kladjenje/sport/1?date=today', timeout=45000)
-                    await asyncio.sleep(3)
-                    logger.info("[Mozzart] Playwright browser initialized and warmed up")
-                except Exception as e:
-                    logger.warning(f"[Mozzart] Warmup navigation issue: {e}")
-
-                self._initialized = True
-
-            except Exception as e:
-                logger.error(f"[Mozzart] Failed to initialize Playwright: {e}")
-                raise
-
-    async def reset_session(self) -> None:
-        """No-op: Mozzart browser persists across cycles for performance."""
-        pass
-
-    async def close(self):
-        """Clean up Playwright resources."""
-        if hasattr(self, '_page') and self._page:
-            await self._page.close()
-        if self._context:
-            await self._context.close()
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
-        self._initialized = False
-        logger.debug("[Mozzart] Playwright browser closed")
+        self._semaphore = asyncio.Semaphore(6)  # Limit concurrent match-detail requests
 
     def get_base_url(self) -> str:
         return "https://www.mozzartbet.com"
 
     def get_headers(self) -> Dict[str, str]:
         return {
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.7',
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'sr-RS,sr;q=0.9,en-US;q=0.7,en;q=0.5',
+            'medium': 'PREMATCH_WEB',
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
             'Origin': 'https://www.mozzartbet.com',
             'Referer': 'https://www.mozzartbet.com/sr/kladjenje',
-            'Medium': 'WEB'
         }
 
     def get_supported_sports(self) -> List[int]:
         return [1, 2, 3, 4, 5]
 
     async def _post_request(self, url: str, payload: Dict) -> Optional[Dict]:
-        """Make a POST request using fetch() from within the browser page."""
-        await self._ensure_initialized()
-
-        unique_id = generate_unique_id()
-
+        """Make a POST request using aiohttp with Mozzart-specific headers."""
+        self._request_count += 1
         try:
-            # Use page.evaluate to make fetch request with browser's full context
-            result = await self._page.evaluate('''async ({url, payload, uniqueId}) => {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json, text/plain, */*',
-                            'Content-Type': 'application/json',
-                            'medium': 'PREMATCH_WEB',
-                            'x-unique-id': uniqueId
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        return {success: true, data: await response.json()};
-                    } else {
-                        return {success: false, status: response.status};
-                    }
-                } catch (e) {
-                    return {success: false, error: e.message};
-                }
-            }''', {'url': url, 'payload': payload, 'uniqueId': unique_id})
-
-            if result.get('success'):
-                return result.get('data')
-            else:
-                logger.warning(f"[Mozzart] Request failed for {url}: {result}")
-                return None
-
+            async with self.session.post(url, json=payload) as response:
+                if response.status == 200:
+                    return await response.json(content_type=None)
+                else:
+                    logger.warning(f"[Mozzart] HTTP {response.status} for {url}")
+                    return None
+        except asyncio.TimeoutError:
+            logger.warning(f"[Mozzart] Timeout for {url}")
+            self._error_count += 1
+            return None
+        except aiohttp.ClientError as e:
+            logger.warning(f"[Mozzart] Client error for {url}: {e}")
+            self._error_count += 1
+            return None
         except Exception as e:
             logger.warning(f"[Mozzart] Error fetching {url}: {e}")
+            self._error_count += 1
             return None
 
     async def fetch_leagues(self, sport_id: int) -> List[Tuple[int, str]]:
@@ -261,7 +167,7 @@ class MozzartScraper(BaseScraper):
         # === Grouped markets (2-3 outcomes, use odd1/odd2/odd3) ===
         "Konačan ishod":                ("_parse_1x2", 2),
         "Dupla šansa":                  ("_parse_three_way", 13),   # 1X, 12, X2
-        "Ukupno golova - Par/Nepar":    ("_parse_two_way", 15),     # Par, Nepar -> odd/even
+        "Ukupno golova - Par/Nepar":    ("_parse_odd_even", 15),    # Par, Nepar -> odd/even
         "Winner":                       ("_parse_two_way", 14),     # draw no bet
         "Dupla pobeda":                 ("_parse_two_way", 16),     # both halves winner
         "Sigurna pobeda":               ("_parse_two_way", 17),     # win to nil
@@ -274,10 +180,10 @@ class MozzartScraper(BaseScraper):
         "Prolazi dalje":                ("_parse_two_way", 22),     # to qualify
         "Dupla šansa drugo poluvreme":  ("_parse_three_way", 75),   # double chance H2
         "Winner drugo poluvreme":       ("_parse_two_way", 76),     # draw no bet H2
-        "Ukupno golova - Par/Nepar prvo poluvreme":  ("_parse_two_way", 77),  # odd/even H1
-        "Ukupno golova prvo poluvreme - Par/Nepar":  ("_parse_two_way", 77),  # odd/even H1 (alt name)
-        "Ukupno golova - Par/Nepar drugo poluvreme": ("_parse_two_way", 78),  # odd/even H2
-        "Ukupno golova drugo poluvreme - Par/Nepar": ("_parse_two_way", 78),  # odd/even H2 (alt name)
+        "Ukupno golova - Par/Nepar prvo poluvreme":  ("_parse_odd_even", 77),  # odd/even H1
+        "Ukupno golova prvo poluvreme - Par/Nepar":  ("_parse_odd_even", 77),  # odd/even H1 (alt name)
+        "Ukupno golova - Par/Nepar drugo poluvreme": ("_parse_odd_even", 78),  # odd/even H2
+        "Ukupno golova drugo poluvreme - Par/Nepar": ("_parse_odd_even", 78),  # odd/even H2 (alt name)
         # === Selection markets (multi-outcome, 1 row per selection) ===
         "Tačan rezultat":               ("_parse_selection", 23),
         "Tačan rezultat prvog poluvremena":  ("_parse_selection", 79),  # H1 correct score
@@ -414,6 +320,26 @@ class MozzartScraper(BaseScraper):
         result.extend(combos)
         return result
 
+    def _parse_odd_even(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
+        """Parse ODD/EVEN group using name-based detection.
+        Convention: odd1=ODD (Nepar), odd2=EVEN (Par) — consistent with Superbet/BalkanBet."""
+        odd_val = even_val = None
+        for odd in odds_group.get("odds", []):
+            name = odd.get("subgame", {}).get("name", "").upper()
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value <= 0:
+                continue
+            if name == "NEPAR":
+                odd_val = value
+            elif name == "PAR":
+                even_val = value
+        if odd_val and even_val:
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=odd_val, odd2=even_val)]
+        return []
+
     def _parse_ou_markets(self, match: Dict) -> List[ScrapedOdds]:
         """Parse all O/U markets (specialOddValueType=MARGIN) across all groups."""
         total_goals = {}
@@ -468,18 +394,21 @@ class MozzartScraper(BaseScraper):
         odds_list = []
         for total, t_odds in total_goals.items():
             if "under" in t_odds and "over" in t_odds:
+                # Convention: odd1=Over, odd2=Under
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=5, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
+                    bet_type_id=5, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
                 ))
         for total, t_odds in total_goals_h1.items():
             if "under" in t_odds and "over" in t_odds:
+                # Convention: odd1=Over, odd2=Under
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=6, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
+                    bet_type_id=6, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
                 ))
         for total, t_odds in total_goals_h2.items():
             if "under" in t_odds and "over" in t_odds:
+                # Convention: odd1=Over, odd2=Under
                 odds_list.append(ScrapedOdds(
-                    bet_type_id=7, odd1=t_odds["under"], odd2=t_odds["over"], margin=total
+                    bet_type_id=7, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
                 ))
         return odds_list
 
@@ -533,9 +462,10 @@ class MozzartScraper(BaseScraper):
                     collected["over"] = value
 
         if "under" in collected and "over" in collected and margin is not None:
+            # Convention: odd1=Over, odd2=Under
             return [ScrapedOdds(
                 bet_type_id=bet_type_id,
-                odd1=collected["under"], odd2=collected["over"],
+                odd1=collected["over"], odd2=collected["under"],
                 margin=margin
             )]
         return []
@@ -717,12 +647,12 @@ class MozzartScraper(BaseScraper):
         "Prvi set":                                                ("_parse_two_way", 57),   # first_set_winner
         "Prvi set - Kraj":                                         ("_parse_selection", 64),  # first_set_match_combo
         "Tačan broj setova":                                       ("_parse_selection", 65),  # exact_sets
-        "Ukupno gemova - Par/Nepar":                               ("_parse_two_way", 15),   # odd_even
+        "Ukupno gemova - Par/Nepar":                               ("_parse_odd_even", 15),  # odd_even
         "Rangovi gemova prvi set":                                 ("_parse_selection", 66),  # games_range_s1
-        "Ukupno gemova prvi set - Par/Nepar":                      ("_parse_two_way", 59),   # odd_even_s1
+        "Ukupno gemova prvi set - Par/Nepar":                      ("_parse_odd_even", 59),  # odd_even_s1
         "Tajbrejk u prvom setu - Da/Ne":                           ("_parse_two_way", 60),   # tiebreak_s1
         "Rangovi gemova drugi set":                                ("_parse_selection", 67),  # games_range_s2
-        "Ukupno gemova drugi set - Par/Nepar":                     ("_parse_two_way", 61),   # odd_even_s2
+        "Ukupno gemova drugi set - Par/Nepar":                     ("_parse_odd_even", 61),  # odd_even_s2
         "Tajbrejk u drugom setu - Da/Ne":                          ("_parse_two_way", 62),   # tiebreak_s2
         "Pobeda igrača 1 + Gemovi prvi set":                       ("_parse_selection", 69),  # p1_win_games_s1
         "Pobeda igrača 1 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 70),   # p1_win_odd_even_s1
@@ -907,6 +837,8 @@ class MozzartScraper(BaseScraper):
 
     def parse_odds(self, match_data: Dict, sport_id: int) -> List[ScrapedOdds]:
         """Parse odds based on sport type."""
+        if match_data is None:
+            return []
         if sport_id == 1:
             return self.parse_football_odds(match_data)
         elif sport_id == 2:
