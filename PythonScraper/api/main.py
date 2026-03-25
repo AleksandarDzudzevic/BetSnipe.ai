@@ -21,11 +21,12 @@ from core.scrapers import (
     AdmiralScraper,
     SoccerbetScraper,
     MozzartScraper,
-    # MeridianScraper,  # Disabled temporarily
+    MeridianScraper,
     MaxbetScraper,
     SuperbetScraper,
     MerkurScraper,
     TopbetScraper,
+    BalkanBetScraper,
 )
 
 from .routes import odds, arbitrage, auth, user
@@ -53,11 +54,12 @@ async def lifespan(app: FastAPI):
     engine.register_scraper(AdmiralScraper())
     engine.register_scraper(SoccerbetScraper())
     engine.register_scraper(MozzartScraper())
-    # engine.register_scraper(MeridianScraper())  # Disabled temporarily
+    engine.register_scraper(MeridianScraper())
     engine.register_scraper(MaxbetScraper())
     engine.register_scraper(SuperbetScraper())
     engine.register_scraper(MerkurScraper())
     engine.register_scraper(TopbetScraper())
+    engine.register_scraper(BalkanBetScraper())
     logger.info(f"Registered {len(engine._scrapers)} scrapers")
 
     # Register WebSocket update callback

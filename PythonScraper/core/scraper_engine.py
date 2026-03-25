@@ -282,7 +282,11 @@ class ScraperEngine:
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        total_matches = sum(r for r in results if isinstance(r, int))
+        total_scraped = sum(r for r in results if isinstance(r, int))
+
+        # Get actual unique match count from DB for accurate logging
+        stats = await db.get_stats()
+        total_matches = stats.get('total_matches', 0)
 
         # Detect arbitrage
         arbitrage_opportunities = await self._detector.detect_all()
@@ -312,19 +316,35 @@ class ScraperEngine:
         cycle_stats = {
             'cycle': self._stats['cycles'],
             'duration_seconds': cycle_duration,
-            'matches_scraped': total_matches,
+            'matches_scraped': total_scraped,
+            'matches_in_db': total_matches,
             'arbitrage_found': len(arbitrage_opportunities),
             'timestamp': cycle_end.isoformat(),
         }
 
         logger.info(
             f"Cycle {self._stats['cycles']}: "
-            f"{total_matches} matches, "
+            f"{total_scraped} scraped → {total_matches} unique matches, "
             f"{len(arbitrage_opportunities)} arbitrage, "
             f"{cycle_duration:.1f}s"
         )
 
         return cycle_stats
+
+    async def _cleanup_loop(self, interval_minutes: int = 30, hours_after_start: int = 4):
+        """Periodically delete expired matches. Runs as a background task."""
+        while self._running:
+            try:
+                await asyncio.sleep(interval_minutes * 60)
+                if not self._running:
+                    break
+                deleted = await db.cleanup_expired_matches(hours_after_start)
+                if deleted:
+                    logger.info(f"Cleanup: deleted {deleted} expired matches (>{hours_after_start}h old)")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Cleanup error: {e}")
 
     async def start(self) -> None:
         """Start the continuous scraping loop."""
@@ -337,10 +357,14 @@ class ScraperEngine:
             return
 
         self._running = True
+        self._cleanup_task = None
         logger.info(f"Starting scraper engine with {len(self._scrapers)} scrapers")
 
         # Connect to database
         await db.connect()
+
+        # Start periodic cleanup (every 30 min, delete matches >4h old)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
         try:
             while self._running:
@@ -354,6 +378,13 @@ class ScraperEngine:
                 await asyncio.sleep(settings.scrape_interval_seconds)
 
         finally:
+            # Cancel cleanup task
+            if self._cleanup_task:
+                self._cleanup_task.cancel()
+                try:
+                    await self._cleanup_task
+                except asyncio.CancelledError:
+                    pass
             # Cleanup
             await self.stop()
 

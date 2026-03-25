@@ -65,8 +65,8 @@ class Settings(BaseSettings):
 
     # Arbitrage settings
     min_profit_percentage: float = Field(
-        default=1.0,
-        description="Minimum profit percentage to report arbitrage"
+        default=0.0,
+        description="Minimum profit percentage to report arbitrage (0 = report all)"
     )
     arbitrage_dedup_hours: int = Field(
         default=24,

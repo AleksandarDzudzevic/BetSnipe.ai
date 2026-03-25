@@ -68,6 +68,7 @@ class ArbitrageDetector:
     # Bet types excluded from arbitrage detection:
     # - Handicap IDs: European vs Asian handicap conventions produce systematic false arbs
     # - LAST_GOAL (89): doesn't cover the 0-0 outcome, so no true arbitrage is possible
+    # Note: all selection-based markets (outcomes=1) are also skipped in detect_for_match()
     EXCLUDED_BET_TYPE_IDS = {9, 50, 56, 58, 80, 85, 95, 89}
 
     def __init__(self, min_profit: Optional[float] = None):
@@ -302,8 +303,13 @@ class ArbitrageDetector:
         profit_pct: float,
         selection: str = ''
     ) -> str:
-        """Generate unique hash for arbitrage opportunity."""
-        # Sort odds for consistent hashing; use str() to handle mixed int/'X' outcomes
+        """Generate stable hash for arbitrage opportunity.
+
+        Hashes the structural identity (match, bet type, margin, bookmaker set)
+        but NOT the exact odds or profit. This prevents notification spam when
+        odds tick by small amounts — the same fundamental arb keeps the same hash.
+        """
+        # Sort by outcome for consistent hashing
         sorted_odds = sorted(best_odds, key=lambda x: str(x.get('outcome', '')))
 
         hash_data = {
@@ -311,8 +317,7 @@ class ArbitrageDetector:
             'bet_type_id': bet_type_id,
             'margin': float(margin),
             'selection': selection,
-            'odds': [(o['bookmaker_id'], o['outcome'], round(o['odd'], 3)) for o in sorted_odds],
-            'profit': round(profit_pct, 2)
+            'bookmakers': [(o['bookmaker_id'], o['outcome']) for o in sorted_odds],
         }
 
         hash_str = json.dumps(hash_data, sort_keys=True)
@@ -335,8 +340,8 @@ class ArbitrageDetector:
         """
         opportunities = []
 
-        # Get all current odds for this match
-        current_odds = await db.get_current_odds_for_match(match_id)
+        # Get current odds, filtering out stale data (>5 min old) to prevent phantom arbs
+        current_odds = await db.get_current_odds_for_match(match_id, max_staleness_minutes=5)
 
         if len(current_odds) < 2:
             return opportunities
@@ -349,46 +354,19 @@ class ArbitrageDetector:
                 odds_groups[key] = []
             odds_groups[key].append(odd)
 
-        # Collect selection-based odds for regrouping by (bet_type_id, margin)
-        selection_markets: Dict[Tuple[int, float], Dict[str, List[Tuple[int, str, float]]]] = {}
-
-        # Check each group for arbitrage
+        # Check each group for arbitrage (2-way and 3-way only)
         for (bet_type_id, margin, selection), group_odds in odds_groups.items():
             if bet_type_id in self.EXCLUDED_BET_TYPE_IDS:
                 continue
             if len(group_odds) < 2:
-                # For selection markets, single-bookmaker selections are still
-                # collected but filtered later by the 2+ bookmaker requirement
-                bet_type = BET_TYPES.get(bet_type_id, {})
-                if bet_type.get('outcomes', 2) == 1:
-                    market_key = (bet_type_id, margin)
-                    if market_key not in selection_markets:
-                        selection_markets[market_key] = {}
-                    if selection not in selection_markets[market_key]:
-                        selection_markets[market_key][selection] = []
-                    for o in group_odds:
-                        if o['odd1']:
-                            bm_name = o.get('bookmaker_name', BOOKMAKERS.get(o['bookmaker_id'], {}).get('name', 'Unknown'))
-                            selection_markets[market_key][selection].append(
-                                (o['bookmaker_id'], bm_name, float(o['odd1']))
-                            )
                 continue
 
             bet_type = BET_TYPES.get(bet_type_id, {})
 
-            # Selection-based markets: collect odds for regrouping
+            # Skip selection-based markets (outcomes=1) — different bookmakers
+            # offer different selection subsets, producing systematic false arbs.
+            # Only 2-way and 3-way markets have guaranteed complete outcome sets.
             if bet_type.get('outcomes', 2) == 1:
-                market_key = (bet_type_id, margin)
-                if market_key not in selection_markets:
-                    selection_markets[market_key] = {}
-                if selection not in selection_markets[market_key]:
-                    selection_markets[market_key][selection] = []
-                for o in group_odds:
-                    if o['odd1']:
-                        bm_name = o.get('bookmaker_name', BOOKMAKERS.get(o['bookmaker_id'], {}).get('name', 'Unknown'))
-                        selection_markets[market_key][selection].append(
-                            (o['bookmaker_id'], bm_name, float(o['odd1']))
-                        )
                 continue
 
             is_three_way = bet_type.get('outcomes', 2) == 3
@@ -448,50 +426,6 @@ class ArbitrageDetector:
 
                 opportunities.append(opportunity)
 
-        # Process selection-based markets (outcomes=1)
-        # Each (bet_type_id, margin) group has multiple selections forming
-        # a mutually exclusive set of outcomes
-        for (bet_type_id, margin), sel_odds in selection_markets.items():
-            if bet_type_id in self.EXCLUDED_BET_TYPE_IDS:
-                continue
-            # Only include selections offered by 2+ bookmakers
-            filtered = {
-                sel: odds_list
-                for sel, odds_list in sel_odds.items()
-                if len(set(o[0] for o in odds_list)) >= 2
-            }
-
-            if len(filtered) < 2:
-                continue
-
-            result = self.calculate_selection_arbitrage(filtered)
-
-            if result:
-                profit_pct, best_odds, stakes = result
-                bet_type = BET_TYPES.get(bet_type_id, {})
-
-                arb_hash = self.generate_arb_hash(
-                    match_id, bet_type_id, margin, best_odds, profit_pct
-                )
-
-                opportunity = ArbitrageOpportunity(
-                    match_id=match_id,
-                    team1=match_data.get('team1', ''),
-                    team2=match_data.get('team2', ''),
-                    sport_id=match_data.get('sport_id', 0),
-                    start_time=match_data.get('start_time'),
-                    bet_type_id=bet_type_id,
-                    bet_type_name=bet_type.get('name', 'Unknown'),
-                    margin=margin,
-                    profit_percentage=profit_pct,
-                    best_odds=best_odds,
-                    stakes=stakes,
-                    arb_hash=arb_hash,
-                    is_two_way=False
-                )
-
-                opportunities.append(opportunity)
-
         return opportunities
 
     async def detect_all(self) -> List[ArbitrageOpportunity]:
@@ -503,8 +437,8 @@ class ArbitrageDetector:
         """
         opportunities = []
 
-        # Get all upcoming matches
-        matches = await db.get_upcoming_matches(hours_ahead=48, limit=5000)
+        # Get all upcoming matches (168h = 7 days covers all scraped matches)
+        matches = await db.get_upcoming_matches(hours_ahead=168, limit=10000)
 
         logger.info(f"Checking {len(matches)} matches for arbitrage")
 

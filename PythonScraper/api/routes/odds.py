@@ -452,7 +452,7 @@ async def search_matches(
             sport_name=m.get('sport_name', ''),
             start_time=m['start_time'],
             status=m.get('status', 'upcoming'),
-            relevance=float(m.get('rank', 0))
+            relevance=1.0
         )
         for m in matches
     ]

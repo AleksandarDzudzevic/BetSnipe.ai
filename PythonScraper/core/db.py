@@ -76,8 +76,8 @@ class Database:
             self._pool = await asyncpg.create_pool(
                 self.database_url,
                 min_size=5,
-                max_size=50,
-                command_timeout=60,
+                max_size=20,
+                command_timeout=300,
                 statement_cache_size=100,
                 init=_init_connection,
             )
@@ -147,8 +147,8 @@ class Database:
         async with self.acquire() as conn:
             processed = 0
 
-            # Process in chunks
-            chunk_size = 500
+            # Process in chunks (200 matches → ~20K odds per batch, avoids long index locks)
+            chunk_size = 200
             for i in range(0, len(unique_matches), chunk_size):
                 chunk = unique_matches[i:i + chunk_size]
 
@@ -168,12 +168,12 @@ class Database:
                 # Bulk insert/update matches and get all IDs back
                 match_rows = await conn.fetch("""
                     INSERT INTO matches (team1, team2, team1_normalized, team2_normalized,
-                                        sport_id, start_time, external_ids, metadata)
+                                        sport_id, start_time, external_ids)
                     SELECT
                         unnest($1::text[]), unnest($2::text[]),
                         unnest($3::text[]), unnest($4::text[]),
                         unnest($5::int[]), unnest($6::timestamptz[]),
-                        unnest($7::jsonb[]), '{}'::jsonb
+                        unnest($7::jsonb[])
                     ON CONFLICT (team1_normalized, team2_normalized, sport_id, start_time)
                     DO UPDATE SET
                         updated_at = NOW(),
@@ -216,8 +216,10 @@ class Database:
                             margin, selection
                         ))
 
-                # Step 3: Bulk upsert all odds
-                if odds_data:
+                # Step 3: Bulk upsert odds in sub-chunks to avoid huge payloads
+                odds_chunk_size = 15000
+                for j in range(0, len(odds_data), odds_chunk_size):
+                    odds_batch = odds_data[j:j + odds_chunk_size]
                     await conn.execute("""
                         INSERT INTO current_odds (match_id, bookmaker_id, bet_type_id, odd1, odd2, odd3, margin, selection)
                         SELECT
@@ -232,12 +234,15 @@ class Database:
                             odd2 = EXCLUDED.odd2,
                             odd3 = EXCLUDED.odd3,
                             updated_at = NOW()
+                        WHERE current_odds.odd1 IS DISTINCT FROM EXCLUDED.odd1
+                           OR current_odds.odd2 IS DISTINCT FROM EXCLUDED.odd2
+                           OR current_odds.odd3 IS DISTINCT FROM EXCLUDED.odd3
                     """,
-                        [o[0] for o in odds_data], bookmaker_id,
-                        [o[1] for o in odds_data],
-                        [o[2] for o in odds_data], [o[3] for o in odds_data], [o[4] for o in odds_data],
-                        [o[5] for o in odds_data],
-                        [o[6] for o in odds_data]
+                        [o[0] for o in odds_batch], bookmaker_id,
+                        [o[1] for o in odds_batch],
+                        [o[2] for o in odds_batch], [o[3] for o in odds_batch], [o[4] for o in odds_batch],
+                        [o[5] for o in odds_batch],
+                        [o[6] for o in odds_batch]
                     )
 
             return processed
@@ -373,12 +378,12 @@ class Database:
                     """
                     INSERT INTO matches (
                         team1, team2, team1_normalized, team2_normalized,
-                        sport_id, league_id, start_time, external_ids, metadata
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                        sport_id, league_id, start_time, external_ids
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     RETURNING id
                     """,
                     team1, team2, team1_normalized, team2_normalized,
-                    sport_id, league_id, start_time, external_ids, metadata or {}
+                    sport_id, league_id, start_time, external_ids
                 )
                 return match_id
 
@@ -522,22 +527,45 @@ class Database:
 
     async def get_current_odds_for_match(
         self,
-        match_id: int
+        match_id: int,
+        max_staleness_minutes: int = 0
     ) -> List[Dict[str, Any]]:
-        """Get all current odds for a match."""
+        """Get all current odds for a match.
+
+        Args:
+            match_id: The match ID
+            max_staleness_minutes: If > 0, exclude odds not updated within this window.
+                Pass 5 from arb detector to prevent phantom arbs from stale scrapers.
+                Default 0 = no filter (API endpoints show all odds).
+        """
         async with self.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT co.*, b.name as bookmaker_name, b.display_name,
-                       bt.name as bet_type_name
-                FROM current_odds co
-                JOIN bookmakers b ON co.bookmaker_id = b.id
-                JOIN bet_types bt ON co.bet_type_id = bt.id
-                WHERE co.match_id = $1
-                ORDER BY bt.id, co.margin, b.name
-                """,
-                match_id
-            )
+            if max_staleness_minutes > 0:
+                rows = await conn.fetch(
+                    """
+                    SELECT co.*, b.name as bookmaker_name, b.display_name,
+                           bt.name as bet_type_name
+                    FROM current_odds co
+                    JOIN bookmakers b ON co.bookmaker_id = b.id
+                    JOIN bet_types bt ON co.bet_type_id = bt.id
+                    WHERE co.match_id = $1
+                      AND co.updated_at >= NOW() - ($2 || ' minutes')::INTERVAL
+                    ORDER BY bt.id, co.margin, b.name
+                    """,
+                    match_id, str(max_staleness_minutes)
+                )
+            else:
+                rows = await conn.fetch(
+                    """
+                    SELECT co.*, b.name as bookmaker_name, b.display_name,
+                           bt.name as bet_type_name
+                    FROM current_odds co
+                    JOIN bookmakers b ON co.bookmaker_id = b.id
+                    JOIN bet_types bt ON co.bet_type_id = bt.id
+                    WHERE co.match_id = $1
+                    ORDER BY bt.id, co.margin, b.name
+                    """,
+                    match_id
+                )
             return [dict(row) for row in rows]
 
     async def get_odds_history(
@@ -752,6 +780,14 @@ class Database:
     # ==========================================
     # UTILITY OPERATIONS
     # ==========================================
+
+    async def cleanup_expired_matches(self, hours_after_start: int = 4) -> int:
+        """Delete matches that started more than N hours ago. CASCADE handles odds/arbs."""
+        async with self.acquire() as conn:
+            deleted = await conn.fetchval(
+                "SELECT cleanup_expired_matches($1)", hours_after_start
+            )
+            return deleted or 0
 
     async def cleanup_old_data(self, days_to_keep: int = 7) -> Dict[str, int]:
         """Clean up old data from database."""
@@ -1261,24 +1297,23 @@ class Database:
         status: str = 'upcoming',
         limit: int = 20
     ) -> List[Dict[str, Any]]:
-        """Full-text search for matches."""
+        """Search for matches by team name using ILIKE."""
         async with self.acquire() as conn:
-            # Use plainto_tsquery for simpler search
+            pattern = f"%{query}%"
             sql = """
-                SELECT m.*, s.name as sport_name,
-                       ts_rank(m.search_vector, plainto_tsquery('simple', $1)) as rank
+                SELECT m.*, s.name as sport_name
                 FROM matches m
                 JOIN sports s ON m.sport_id = s.id
-                WHERE m.search_vector @@ plainto_tsquery('simple', $1)
+                WHERE (m.team1 ILIKE $1 OR m.team2 ILIKE $1)
                   AND m.status = $2
             """
-            params = [query, status]
+            params = [pattern, status]
 
             if sport_id:
                 params.append(sport_id)
                 sql += f" AND m.sport_id = ${len(params)}"
 
-            sql += " ORDER BY rank DESC, m.start_time"
+            sql += " ORDER BY m.start_time"
             params.append(limit)
             sql += f" LIMIT ${len(params)}"
 

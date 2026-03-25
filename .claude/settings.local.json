@@ -14,7 +14,9 @@
       "Bash(grep:*)",
       "Bash(ls:*)",
       "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *main.py*\")",
+      "Bash(taskkill //F //FI \"IMAGENAME eq python.exe\")"
     ]
   }
 }

@@ -1,0 +1,57 @@
+PS D:\source\BetSnipe.ai\PythonScraper> python main.py --cycles 2
+2026-03-24 23:10:47,208 - __main__ - INFO - ==================================================
+2026-03-24 23:10:47,208 - __main__ - INFO -   BetSnipe.ai v2.0
+2026-03-24 23:10:47,208 - __main__ - INFO -   Real-time Odds Platform for Serbian Bookmakers
+2026-03-24 23:10:47,208 - __main__ - INFO - ==================================================
+INFO:     Started server process [35348]
+INFO:     Waiting for application startup.
+2026-03-24 23:10:47,417 - api.main - INFO - Starting BetSnipe.ai API server
+2026-03-24 23:10:48,129 - core.db - INFO - Database connection pool established
+2026-03-24 23:10:48,129 - api.main - INFO - Database connected
+2026-03-24 23:10:48,129 - core.scraper_engine - INFO - Registered scraper: Admiral
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Soccerbet
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Mozzart
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Maxbet
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Superbet
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Merkur
+2026-03-24 23:10:48,130 - core.scraper_engine - INFO - Registered scraper: Topbet
+2026-03-24 23:10:48,130 - api.main - INFO - Registered 7 scrapers
+2026-03-24 23:10:48,131 - core.scraper_engine - INFO - Starting scraper engine with 7 scrapers
+INFO:     Application startup complete.
+2026-03-24 23:10:48,131 - core.scrapers.base - INFO - [Admiral] Scraping 5 sports
+2026-03-24 23:10:48,131 - core.scrapers.base - INFO - [Soccerbet] Scraping 5 sports
+2026-03-24 23:10:48,131 - core.scrapers.base - INFO - [Mozzart] Scraping 5 sports
+2026-03-24 23:10:48,131 - core.scrapers.base - INFO - [Maxbet] Scraping 5 sports
+2026-03-24 23:10:48,132 - core.scrapers.base - INFO - [Superbet] Scraping 5 sports
+2026-03-24 23:10:48,132 - core.scrapers.base - INFO - [Merkur] Scraping 5 sports
+2026-03-24 23:10:48,132 - core.scrapers.base - INFO - [Topbet] Scraping 5 sports
+2026-03-24 23:10:48,135 - core.scrapers.mozzart - INFO - [Mozzart] Launching Playwright browser for Cloudflare bypass...
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-03-24 23:10:49,072 - core.scrapers.base - INFO - [Topbet] Total: 297 matches, 37042 odds
+2026-03-24 23:10:49,073 - core.scraper_engine - INFO - [Topbet] Scraped 297 matches in 0.94s, processing...
+2026-03-24 23:10:58,910 - core.scraper_engine - INFO - [Topbet] Processed 297 matches in 10.78s (scrape: 0.94s, db: 9.84s)
+2026-03-24 23:11:01,142 - core.scrapers.mozzart - INFO - [Mozzart] Browser ready — Cloudflare bypassed
+2026-03-24 23:11:10,129 - core.scrapers.base - INFO - [Admiral] Total: 670 matches, 254743 odds
+2026-03-24 23:11:10,129 - core.scraper_engine - INFO - [Admiral] Scraped 670 matches in 22.00s, processing...
+2026-03-24 23:11:13,107 - core.scrapers.base - INFO - [Maxbet] Total: 703 matches, 214903 odds
+2026-03-24 23:11:13,107 - core.scraper_engine - INFO - [Maxbet] Scraped 703 matches in 24.98s, processing...
+2026-03-24 23:11:17,156 - core.scrapers.base - INFO - [Merkur] Total: 583 matches, 205995 odds
+2026-03-24 23:11:17,156 - core.scraper_engine - INFO - [Merkur] Scraped 583 matches in 29.02s, processing...
+2026-03-24 23:11:21,657 - core.scrapers.base - INFO - [Soccerbet] Total: 767 matches, 267458 odds
+2026-03-24 23:11:21,658 - core.scraper_engine - INFO - [Soccerbet] Scraped 767 matches in 33.53s, processing...
+2026-03-24 23:11:47,009 - core.scraper_engine - INFO - [Maxbet] Processed 703 matches in 58.88s (scrape: 24.98s, db: 33.90s)
+2026-03-24 23:11:48,825 - core.scraper_engine - INFO - [Admiral] Processed 670 matches in 60.69s (scrape: 22.00s, db: 38.70s)
+2026-03-24 23:12:04,429 - core.scraper_engine - INFO - [Soccerbet] Processed 649 matches in 76.30s (scrape: 33.53s, db: 42.77s)
+2026-03-24 23:12:10,192 - core.scrapers.base - INFO - [Superbet] Total: 1653 matches, 461535 odds
+2026-03-24 23:12:10,192 - core.scraper_engine - INFO - [Superbet] Scraped 1653 matches in 82.06s, processing...
+2026-03-24 23:12:10,689 - core.scraper_engine - INFO - [Merkur] Processed 523 matches in 82.56s (scrape: 29.02s, db: 53.53s)
+2026-03-24 23:12:25,634 - core.scrapers.base - INFO - [Mozzart] Total: 706 matches, 181997 odds
+2026-03-24 23:12:25,634 - core.scraper_engine - INFO - [Mozzart] Scraped 706 matches in 97.50s, processing...
+2026-03-24 23:12:41,764 - core.scraper_engine - INFO - [Mozzart] Processed 706 matches in 113.63s (scrape: 97.50s, db: 16.13s)
+2026-03-24 23:12:48,754 - core.scraper_engine - INFO - [Superbet] Processed 1653 matches in 120.62s (scrape: 82.06s, db: 38.56s)
+2026-03-24 23:12:49,345 - core.arbitrage - INFO - Checking 2057 matches for arbitrage
+2026-03-24 23:13:07,408 - core.arbitrage - INFO - New arbitrage: Naprzod Jedrzejow vs Czarni Polaniec (1x2) - 0.48%
+2026-03-24 23:13:07,588 - core.arbitrage - INFO - New arbitrage: Naprzod Jedrzejow vs Czarni Polaniec (draw_no_bet) - 2.23%
+2026-03-24 23:13:07,686 - core.scraper_engine - ERROR - Error sending Telegram notification: cannot import name 'notifier' from 'telegram_utils' (D:\source\BetSnipe.ai\PythonScraper\telegram_utils.py)
+2026-03-24 23:13:07,686 - core.scraper_engine - ERROR - Error sending Telegram notification: cannot import name 'notifier' from 'telegram_utils' (D:\source\BetSnipe.ai\PythonScraper\telegram_utils.py)
+2026-03-24 23:13:07,768 - core.scraper_engine - INFO - Cycle 1: 5379 matches, 2 arbitrage, 139.6s

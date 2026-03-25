@@ -1,0 +1,1 @@
+ssh -i C:\Users\pejov\.ssh\hetzner_ed25519 root@46.224.164.83

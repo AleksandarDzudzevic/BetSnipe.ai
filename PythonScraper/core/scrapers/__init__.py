@@ -13,6 +13,7 @@ from .maxbet import MaxbetScraper
 from .superbet import SuperbetScraper
 from .merkur import MerkurScraper
 from .topbet import TopbetScraper
+from .balkanbet import BalkanBetScraper
 
 __all__ = [
     'BaseScraper',
@@ -26,4 +27,5 @@ __all__ = [
     'SuperbetScraper',
     'MerkurScraper',
     'TopbetScraper',
+    'BalkanBetScraper',
 ]

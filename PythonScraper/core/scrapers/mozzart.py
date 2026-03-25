@@ -4,11 +4,12 @@ Mozzart Bet scraper for BetSnipe.ai v2.0
 Scrapes odds from Mozzart Bet Serbia API.
 Supports: Football, Basketball, Tennis, Hockey, Table Tennis
 
-Uses plain aiohttp — no headless browser needed.
+Hybrid approach: uses Playwright once to bypass Cloudflare, then aiohttp for speed.
 """
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
@@ -37,7 +38,10 @@ class MozzartScraper(BaseScraper):
     """
     Scraper for Mozzart Bet Serbia.
 
-    Uses plain aiohttp — the API returns HTTP 200 with the right headers.
+    Uses Playwright browser context for all API calls to bypass Cloudflare.
+    The browser is launched once and kept alive for the scrape session.
+    API calls are made via page.evaluate(fetch(...)) inside the browser,
+    which inherits the browser's TLS fingerprint and Cloudflare cookies.
 
     API endpoints:
     - POST /betting/get-competitions: Get leagues for a sport
@@ -48,6 +52,15 @@ class MozzartScraper(BaseScraper):
     def __init__(self):
         super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
         self._semaphore = asyncio.Semaphore(6)  # Limit concurrent match-detail requests
+        self._pw = None       # Playwright instance
+        self._browser = None  # Browser instance
+        self._context = None  # Browser context
+        self._page = None     # Page for API calls
+        self._ready = False
+        self._browser_lock = asyncio.Lock()  # Prevent concurrent browser launches
+        self._cf_failures = 0  # Consecutive Cloudflare 403 failures
+        self._launch_time = 0  # Time when browser was last launched
+        self._browser_max_age = 900  # Restart browser every 15 min for memory hygiene
 
     def get_base_url(self) -> str:
         return "https://www.mozzartbet.com"
@@ -58,7 +71,7 @@ class MozzartScraper(BaseScraper):
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'sr-RS,sr;q=0.9,en-US;q=0.7,en;q=0.5',
             'medium': 'PREMATCH_WEB',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Origin': 'https://www.mozzartbet.com',
             'Referer': 'https://www.mozzartbet.com/sr/kladjenje',
         }
@@ -66,26 +79,147 @@ class MozzartScraper(BaseScraper):
     def get_supported_sports(self) -> List[int]:
         return [1, 2, 3, 4, 5]
 
+    async def _ensure_browser(self) -> None:
+        """Launch Playwright browser and navigate to Mozzart to pass Cloudflare."""
+        if self._ready:
+            # Periodic restart for memory hygiene
+            if time.time() - self._launch_time > self._browser_max_age:
+                logger.info("[Mozzart] Periodic browser restart for memory hygiene")
+                await self._cleanup_browser()
+            else:
+                return
+
+        async with self._browser_lock:
+            # Double-check after acquiring lock (another coroutine may have finished)
+            if self._ready:
+                return
+
+            logger.info("[Mozzart] Launching Playwright browser for Cloudflare bypass...")
+            try:
+                from playwright.async_api import async_playwright
+
+                self._pw = await async_playwright().start()
+                self._browser = await self._pw.chromium.launch(headless=True)
+                self._context = await self._browser.new_context(
+                    locale='sr-RS',
+                    timezone_id='Europe/Belgrade',
+                )
+                self._page = await self._context.new_page()
+
+                # Navigate to pass Cloudflare challenge
+                await self._page.goto(
+                    'https://www.mozzartbet.com/sr/kladjenje',
+                    wait_until='networkidle',
+                    timeout=30000,
+                )
+                await self._page.wait_for_timeout(2000)
+
+                self._ready = True
+                self._cf_failures = 0
+                self._launch_time = time.time()
+                logger.info("[Mozzart] Browser ready — Cloudflare bypassed")
+
+            except Exception as e:
+                logger.error(f"[Mozzart] Failed to launch browser: {e}")
+                await self._cleanup_browser()
+
+    async def _cleanup_browser(self) -> None:
+        """Close Playwright browser and cleanup."""
+        try:
+            if self._context:
+                await self._context.close()
+        except Exception:
+            pass
+        try:
+            if self._browser:
+                await self._browser.close()
+        except Exception:
+            pass
+        try:
+            if self._pw:
+                await self._pw.stop()
+        except Exception:
+            pass
+        self._context = None
+        self._browser = None
+        self._page = None
+        self._pw = None
+        self._ready = False
+
+    async def reset_session(self) -> None:
+        """Reset Playwright browser for error recovery."""
+        logger.info("[Mozzart] Resetting browser session for error recovery")
+        await self._cleanup_browser()
+        await super().reset_session()
+
+    async def close(self) -> None:
+        """Close browser and aiohttp session."""
+        await self._cleanup_browser()
+        await super().close()
+
     async def _post_request(self, url: str, payload: Dict) -> Optional[Dict]:
-        """Make a POST request using aiohttp with Mozzart-specific headers."""
+        """Make a POST request via the Playwright browser's fetch API."""
+        if not self._ready or not self._page:
+            return None
+
         self._request_count += 1
         try:
-            async with self.session.post(url, json=payload) as response:
-                if response.status == 200:
-                    return await response.json(content_type=None)
+            import json as _json
+            payload_json = _json.dumps(payload)
+
+            result = await self._page.evaluate(f'''async () => {{
+                try {{
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000);
+                    const resp = await fetch("{url}", {{
+                        method: "POST",
+                        headers: {{
+                            "Content-Type": "application/json",
+                            "Accept": "application/json, text/plain, */*",
+                            "medium": "PREMATCH_WEB"
+                        }},
+                        body: {repr(payload_json)},
+                        signal: controller.signal
+                    }});
+                    clearTimeout(timeoutId);
+                    if (resp.status !== 200) {{
+                        return {{ __error: true, status: resp.status }};
+                    }}
+                    return await resp.json();
+                }} catch (e) {{
+                    return {{ __error: true, message: e.message }};
+                }}
+            }}''')
+
+            if isinstance(result, dict) and result.get('__error'):
+                status = result.get('status', 'unknown')
+                msg = result.get('message', '')
+                logger.warning(f"[Mozzart] HTTP {status} for {url} {msg}")
+                # Track consecutive 403s — Cloudflare cookie expiry
+                if status == 403:
+                    self._cf_failures += 1
+                    if self._cf_failures >= 3:
+                        logger.warning("[Mozzart] Multiple 403s — Cloudflare cookies likely expired, will relaunch browser")
+                        self._ready = False
+                        self._cf_failures = 0
                 else:
-                    logger.warning(f"[Mozzart] HTTP {response.status} for {url}")
-                    return None
-        except asyncio.TimeoutError:
-            logger.warning(f"[Mozzart] Timeout for {url}")
-            self._error_count += 1
-            return None
-        except aiohttp.ClientError as e:
-            logger.warning(f"[Mozzart] Client error for {url}: {e}")
-            self._error_count += 1
-            return None
+                    self._cf_failures = 0
+                return None
+
+            # Success — reset CF failure counter
+            self._cf_failures = 0
+            return result
+
         except Exception as e:
-            logger.warning(f"[Mozzart] Error fetching {url}: {e}")
+            error_str = str(e).lower()
+            # Detect crashed/closed browser page
+            if any(kw in error_str for kw in ('target closed', 'browser has been closed',
+                                                'context has been closed', 'page has been closed',
+                                                'connection closed')):
+                logger.warning(f"[Mozzart] Browser appears dead, will relaunch next cycle: {e}")
+                self._ready = False
+            else:
+                logger.warning(f"[Mozzart] Error fetching {url}: {e}")
             self._error_count += 1
             return None
 
@@ -857,6 +991,9 @@ class MozzartScraper(BaseScraper):
         processed_matches = set()
 
         try:
+            # Ensure browser is ready (Cloudflare bypassed)
+            await self._ensure_browser()
+
             leagues = await self.fetch_leagues(sport_id)
             if not leagues:
                 logger.warning(f"[Mozzart] No leagues found for sport {sport_id}")
