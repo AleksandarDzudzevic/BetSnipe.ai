@@ -108,6 +108,208 @@ class Database:
             yield conn
 
     # ==========================================
+    # FUZZY MATCH RESOLUTION
+    # ==========================================
+
+    async def resolve_fuzzy_matches(
+        self,
+        matches_data: List[Dict],
+        fuzzy_threshold: float = 80.0,
+        min_individual: float = 65.0,
+    ) -> int:
+        """
+        Resolve incoming matches against existing DB matches using fuzzy name matching.
+
+        For each incoming match, checks if a match with similar team names already exists
+        in the DB at the same (sport_id, start_time). If found, rewrites the incoming
+        match's normalized names to match the existing DB row, so the bulk upsert
+        merges them instead of creating duplicates.
+
+        Also deduplicates within the incoming batch itself (cross-bookmaker same-cycle).
+
+        Args:
+            matches_data: List of match dicts (modified in place)
+            fuzzy_threshold: Minimum RapidFuzz score to consider a match (0-100)
+
+        Returns:
+            Number of matches resolved (rewritten to existing DB entries)
+        """
+        if not matches_data:
+            return 0
+
+        from rapidfuzz import fuzz
+        import re
+
+        # Gender/category markers to detect in original team names
+        # If one match has these and another doesn't, never merge
+        _GENDER_CATEGORY_RE = re.compile(
+            r'(?:\bwom[ae]?n?\b|\bwom\.|\bw\b|\(w\)|\(wom\)|\([žŽ]\)|\b[žŽ]ene\b|\bladies\b|\bfemale\b)'
+            r'|(?:^|\s)u-?\d{2}\b',
+            re.IGNORECASE
+        )
+
+        def _has_category(team1: str, team2: str) -> bool:
+            """Check if either team name contains gender/age category markers."""
+            combined = f"{team1} {team2}"
+            return bool(_GENDER_CATEGORY_RE.search(combined))
+
+        # Group incoming matches by (sport_id, start_time) for efficient lookup
+        time_groups: Dict[tuple, List[Dict]] = {}
+        for m in matches_data:
+            key = (m['sport_id'], ensure_utc(m['start_time']).isoformat())
+            time_groups.setdefault(key, []).append(m)
+
+        resolved = 0
+
+        async with self.acquire() as conn:
+            # For each time group, query DB for existing matches at the same time
+            for (sport_id, time_iso), group in time_groups.items():
+                start_time = ensure_utc(group[0]['start_time'])
+
+                # Query existing matches at this exact (sport_id, start_time)
+                existing = await conn.fetch("""
+                    SELECT id, team1, team2, team1_normalized, team2_normalized
+                    FROM matches
+                    WHERE sport_id = $1 AND start_time = $2
+                """, sport_id, start_time)
+
+                if not existing:
+                    # No existing matches at this time — also check within the batch
+                    # for fuzzy duplicates (two bookmakers in same cycle)
+                    self._dedup_within_group(group, fuzzy_threshold, fuzz, _has_category)
+                    continue
+
+                # Build list of existing (normalized pair + category flag)
+                existing_entries = [
+                    (row['team1_normalized'], row['team2_normalized'],
+                     _has_category(row['team1'], row['team2']))
+                    for row in existing
+                ]
+
+                for m in group:
+                    t1n = m['team1_normalized']
+                    t2n = m['team2_normalized']
+                    m_has_cat = _has_category(m['team1'], m['team2'])
+
+                    # Check if already an exact match in DB (no fuzzy needed)
+                    exact = False
+                    for e_t1, e_t2, _ in existing_entries:
+                        if (t1n == e_t1 and t2n == e_t2) or (t1n == e_t2 and t2n == e_t1):
+                            exact = True
+                            break
+                    if exact:
+                        continue
+
+                    # Fuzzy match against existing DB matches
+                    best_score = 0
+                    best_pair = None
+                    swapped = False
+
+                    for e_t1, e_t2, e_has_cat in existing_entries:
+                        # Never merge across gender/category boundaries
+                        if m_has_cat != e_has_cat:
+                            continue
+                        # Normal order — use both ratio and token_set_ratio, take the max
+                        # This balances exact similarity with subset matching
+                        s1 = max(fuzz.ratio(t1n, e_t1), fuzz.token_set_ratio(t1n, e_t1))
+                        s2 = max(fuzz.ratio(t2n, e_t2), fuzz.token_set_ratio(t2n, e_t2))
+                        score_normal = (s1 + s2) / 2
+                        min_normal = min(s1, s2)
+
+                        # Swapped order
+                        s1s = max(fuzz.ratio(t1n, e_t2), fuzz.token_set_ratio(t1n, e_t2))
+                        s2s = max(fuzz.ratio(t2n, e_t1), fuzz.token_set_ratio(t2n, e_t1))
+                        score_swapped = (s1s + s2s) / 2
+                        min_swapped = min(s1s, s2s)
+
+                        # Pick best direction, but require EACH team to pass min_individual
+                        if score_normal >= score_swapped:
+                            if score_normal > best_score and min_normal >= min_individual:
+                                best_score = score_normal
+                                best_pair = (e_t1, e_t2)
+                                swapped = False
+                        else:
+                            if score_swapped > best_score and min_swapped >= min_individual:
+                                best_score = score_swapped
+                                best_pair = (e_t1, e_t2)
+                                swapped = True
+
+                    if best_score >= fuzzy_threshold and best_pair:
+                        # Rewrite normalized names to match existing DB row
+                        if swapped:
+                            m['team1_normalized'] = best_pair[1]
+                            m['team2_normalized'] = best_pair[0]
+                        else:
+                            m['team1_normalized'] = best_pair[0]
+                            m['team2_normalized'] = best_pair[1]
+                        resolved += 1
+                        logger.debug(
+                            f"Fuzzy resolved: \"{t1n}\" vs \"{t2n}\" "
+                            f"-> \"{m['team1_normalized']}\" vs \"{m['team2_normalized']}\" "
+                            f"(score={best_score:.0f})"
+                        )
+
+                # Also add newly resolved entries for within-batch dedup
+                for m in group:
+                    entry = (m['team1_normalized'], m['team2_normalized'],
+                             _has_category(m['team1'], m['team2']))
+                    existing_norms = [(e[0], e[1]) for e in existing_entries]
+                    if (entry[0], entry[1]) not in existing_norms:
+                        existing_entries.append(entry)
+
+        # Second pass: dedup within the batch for groups that had no DB matches
+        # (handled inline above via _dedup_within_group)
+
+        if resolved:
+            logger.info(f"Fuzzy match resolution: {resolved} matches resolved to existing DB entries")
+
+        return resolved
+
+    @staticmethod
+    def _dedup_within_group(group: List[Dict], threshold: float, fuzz, has_category_fn) -> None:
+        """Deduplicate matches within a time group using fuzzy matching.
+
+        The first match in the group becomes the canonical name.
+        Later matches with fuzzy-similar names get rewritten to match.
+        """
+        if len(group) <= 1:
+            return
+
+        canonical = []  # List of (team1_normalized, team2_normalized, has_category)
+
+        for m in group:
+            t1n = m['team1_normalized']
+            t2n = m['team2_normalized']
+            m_has_cat = has_category_fn(m['team1'], m['team2'])
+
+            matched = False
+            for c_t1, c_t2, c_has_cat in canonical:
+                # Never merge across category boundaries
+                if m_has_cat != c_has_cat:
+                    continue
+                s1n = max(fuzz.ratio(t1n, c_t1), fuzz.token_set_ratio(t1n, c_t1))
+                s2n = max(fuzz.ratio(t2n, c_t2), fuzz.token_set_ratio(t2n, c_t2))
+                s_normal = (s1n + s2n) / 2
+
+                s1s = max(fuzz.ratio(t1n, c_t2), fuzz.token_set_ratio(t1n, c_t2))
+                s2s = max(fuzz.ratio(t2n, c_t1), fuzz.token_set_ratio(t2n, c_t1))
+                s_swapped = (s1s + s2s) / 2
+
+                if s_normal >= threshold and min(s1n, s2n) >= 65:
+                    m['team1_normalized'] = c_t1
+                    m['team2_normalized'] = c_t2
+                    matched = True
+                    break
+                elif s_swapped >= threshold and min(s1s, s2s) >= 65:
+                    m['team1_normalized'] = c_t2
+                    m['team2_normalized'] = c_t1
+                    matched = True
+                    break
+
+            if not matched:
+                canonical.append((t1n, t2n, m_has_cat))
+
+    # ==========================================
     # BULK OPERATIONS (for fast scraper processing)
     # ==========================================
 

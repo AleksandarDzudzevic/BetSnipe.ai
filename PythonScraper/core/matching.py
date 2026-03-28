@@ -44,14 +44,29 @@ CYRILLIC_TO_LATIN = {
     'Џ': 'Dz', 'Ш': 'S',
 }
 
-# Common suffixes to remove from team names
+# Club type abbreviations (FK, KK, BC, etc.) — stripped as both prefix and suffix
+CLUB_ABBREVIATIONS = r'(?:fc|fk|sk|bc|hc|kk|rk|ok|sc|ac|as|ss|us|cd|cf|sd|ud|rc|afc|sfc)'
+
+# Common qualifiers to remove (city names used as disambiguators, sport names in team names)
+TEAM_QUALIFIERS = [
+    # Sport names that appear in team names (e.g., "Dubai Basketball" → "Dubai")
+    r'\s+(?:basketball|football|soccer|handball|volleyball|hockey|futsal|waterpolo|esports?|gaming)$',
+    # Common city/region qualifiers used to disambiguate (e.g., "Crvena Zvezda Belgrade" → "Crvena Zvezda")
+    r'\s+(?:belgrade|beograd|zagreb|sarajevo|podgorica|novi\s+sad|nis|niš|skopje|ljubljana|pristina|priština)$',
+]
+
+# Patterns to remove from team names
 TEAM_SUFFIXES = [
-    r'\s+(fc|fk|sk|bc|hc|kk|rk|ok|sc|ac|as|ss|us|cd|cf|sd|ud|rc|afc|sfc)$',
+    # Club abbreviations at the END (e.g., "Partizan FK" → "Partizan")
+    rf'\s+{CLUB_ABBREVIATIONS}$',
     r'\s+\d{4}$',  # Year suffixes like "2024"
     r'\s+\(w\)$',  # Women indicator
     r'\s+\(e\)$',  # Esports indicator
-    r'\s+esports?$',
-    r'\s+gaming$',
+]
+
+TEAM_PREFIXES = [
+    # Club abbreviations at the START (e.g., "FK Partizan" → "Partizan")
+    rf'^{CLUB_ABBREVIATIONS}\s+',
 ]
 
 # Category patterns (must match exactly between teams)
@@ -122,9 +137,17 @@ class MatchMatcher:
         for pattern in CATEGORY_PATTERNS.values():
             normalized = re.sub(pattern, '', normalized, flags=re.IGNORECASE)
 
+        # Remove club abbreviation prefixes (e.g., "fk partizan" → "partizan")
+        for prefix in TEAM_PREFIXES:
+            normalized = re.sub(prefix, '', normalized, flags=re.IGNORECASE)
+
         # Remove common suffixes
         for suffix in TEAM_SUFFIXES:
             normalized = re.sub(suffix, '', normalized, flags=re.IGNORECASE)
+
+        # Remove qualifiers (sport names, city disambiguators)
+        for qualifier in TEAM_QUALIFIERS:
+            normalized = re.sub(qualifier, '', normalized, flags=re.IGNORECASE)
 
         # Remove special characters
         normalized = re.sub(r'[^\w\s]', ' ', normalized)

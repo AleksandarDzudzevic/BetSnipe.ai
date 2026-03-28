@@ -248,6 +248,10 @@ class ScraperEngine:
                     'odds': odds_list,
                 })
 
+            # Fuzzy-resolve incoming matches against existing DB entries
+            # This prevents duplicates when bookmakers use different name variants
+            await db.resolve_fuzzy_matches(matches_data)
+
             # Use bulk processing for much faster inserts
             processed = await db.bulk_upsert_matches_and_odds(
                 matches_data, scraper.bookmaker_id
