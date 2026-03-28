@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BetSnipe.ai is a Python-based real-time arbitrage betting detection system that scrapes odds from Serbian bookmakers, identifies arbitrage opportunities, and provides a mobile app + API for users.
+BetSnipe.ai is a Python-based real-time arbitrage betting detection system that scrapes odds from Serbian bookmakers, identifies arbitrage opportunities, and provides a web app + API for users.
 
 ## Tech Stack
 
 - **Backend**: Python FastAPI + asyncpg (PostgreSQL) + WebSocket
 - **Database**: Supabase (PostgreSQL with Row Level Security)
-- **Mobile**: Expo/React Native with TypeScript
+- **Web App**: React + Vite (located in `../kvotara_web`)
 - **Auth**: Supabase Auth with JWT tokens
 - **Scraping**: aiohttp + Playwright (for Cloudflare-protected sites)
 
@@ -62,23 +62,24 @@ ScraperEngine (core/scraper_engine.py)
 
 ## Active Scrapers
 
-| Bookmaker | ID | Method | Status |
-|-----------|-----|--------|--------|
-| Admiral | 4 | aiohttp | ✅ Active |
-| Soccerbet | 5 | aiohttp | ✅ Active |
-| Mozzart | 1 | Playwright | ✅ Active (Cloudflare bypass) |
-| Maxbet | 3 | aiohttp | ✅ Active |
-| Superbet | 6 | aiohttp | ✅ Active |
-| Merkur | 7 | aiohttp | ✅ Active |
-| Topbet | 10 | aiohttp | ✅ Active |
-| BalkanBet | 12 | aiohttp | ✅ Active |
-| Meridian | 2 | - | ❌ Disabled |
+| Bookmaker | ID  | Method     | Status                        |
+| --------- | --- | ---------- | ----------------------------- |
+| Admiral   | 4   | aiohttp    | ✅ Active                     |
+| Soccerbet | 5   | aiohttp    | ✅ Active                     |
+| Mozzart   | 1   | Playwright | ✅ Active (Cloudflare bypass) |
+| Maxbet    | 3   | aiohttp    | ✅ Active                     |
+| Superbet  | 6   | aiohttp    | ✅ Active                     |
+| Merkur    | 7   | aiohttp    | ✅ Active                     |
+| Topbet    | 10  | aiohttp    | ✅ Active                     |
+| BalkanBet | 12  | aiohttp    | ✅ Active                     |
+| Meridian  | 2   | -          | ✅ Active                     |
 
 ## ID Mappings
 
 **Sports**: Football (1), Basketball (2), Tennis (3), Hockey (4), Table Tennis (5)
 
 **Bet Types** (124 total, IDs 1-124):
+
 - 2-way (outcomes=2): O/U, BTTS, yes/no markets — odd1 vs odd2
 - 3-way (outcomes=3): 1X2 markets — odd1 vs oddX vs odd2
 - Selection-based (outcomes=1): correct score, HT/FT, combos — each row has a selection key, odd1 only
@@ -102,12 +103,14 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-key
 ## Database Schema
 
 Key tables in Supabase:
+
 - `matches` - Deduplicated matches with unique constraint on (team1_normalized, team2_normalized, sport_id, start_time)
 - `current_odds` - Latest odds with PK (match_id, bookmaker_id, bet_type_id, margin, selection)
 - `arbitrage_opportunities` - Detected arbitrage with profit %, stakes
 - `odds_history` - Historical odds for trend analysis
 
 User tables (v3):
+
 - `user_preferences` - Min profit, sports, bookmaker filters
 - `user_devices` - Expo push tokens
 - `user_watchlist` - Watched matches
@@ -148,10 +151,6 @@ Use `PythonScraper/claude_test/` for any temporary test, diagnostic, or dump scr
 4. **Composite indexes** - `idx_matches_bulk_lookup` for fast lookups
 5. **Concurrent scraping** - All 8 bookmakers scraped in parallel
 
-## Mobile App (MobileApp/)
+## Web App
 
-Expo/React Native app with:
-- `src/app/` - Expo Router screens
-- `src/services/` - API, WebSocket, Auth, Notifications
-- `src/stores/` - Zustand state management
-- `src/types/` - TypeScript types
+The frontend is a React + Vite web app located at `../kvotara_web`. See that directory's `CLAUDE.md` for full details.
