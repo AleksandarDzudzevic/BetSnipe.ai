@@ -346,10 +346,24 @@ class Database:
                 existing_idx = seen[key]
                 unique_matches[existing_idx]['odds'].extend(m.get('odds', []))
 
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                return await self._bulk_upsert_inner(unique_matches, bookmaker_id)
+            except asyncpg.exceptions.DeadlockDetectedError:
+                if attempt < max_retries - 1:
+                    wait = 0.5 * (attempt + 1)
+                    logger.warning(f"Deadlock on bulk upsert (attempt {attempt+1}), retrying in {wait}s...")
+                    await asyncio.sleep(wait)
+                else:
+                    logger.error("Deadlock on bulk upsert after all retries")
+                    raise
+
+    async def _bulk_upsert_inner(self, unique_matches, bookmaker_id):
         async with self.acquire() as conn:
             processed = 0
 
-            # Process in chunks (200 matches → ~20K odds per batch, avoids long index locks)
+            # Process in chunks (200 matches -> ~20K odds per batch, avoids long index locks)
             chunk_size = 200
             for i in range(0, len(unique_matches), chunk_size):
                 chunk = unique_matches[i:i + chunk_size]
