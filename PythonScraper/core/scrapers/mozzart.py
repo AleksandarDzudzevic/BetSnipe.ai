@@ -1,327 +1,154 @@
 """
-Mozzart Bet scraper for BetSnipe.ai v2.0
+Mozzart Bet scraper v3.0 — Mobile API Edition
 
-Scrapes odds from Mozzart Bet Serbia API.
-Supports: Football, Basketball, Tennis, Hockey, Table Tennis
+Uses the undocumented mobile API at api-gateway.mozzartbet.com
+with tls_client for Cloudflare TLS fingerprint bypass.
 
-Hybrid approach: uses Playwright once to bypass Cloudflare, then aiohttp for speed.
+No Playwright, no browser, no headless Chrome needed.
+
+Endpoints:
+  POST /mobile-content-service/mobile/sports       → list sports/competitions
+  POST /mobile-content-service/mobile/matches       → matches for a competition
+  POST /mobile-content-service/mobile/match-by-id   → match details + odds
+
+Auth: Basic YW5kcm9pZDpkanVzYW1lbnRvbA== (android:djusamentol)
+TLS:  tls_client with chrome_120 profile
 """
 
 import asyncio
 import logging
-import time
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Tuple
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+from typing import Optional, List, Dict
 
-import aiohttp
+import tls_client
 
 from .base import BaseScraper, ScrapedMatch, ScrapedOdds
 
 logger = logging.getLogger(__name__)
 
 
-# Sport ID mapping (Mozzart to internal)
-# Updated based on actual API response from 2026-01-19
+# Sport ID mapping (Mozzart → internal)
 MOZZART_SPORTS = {
     1: 1,   # Fudbal (Football)
     2: 2,   # Kosarka (Basketball)
     5: 3,   # Tenis (Tennis)
     4: 4,   # Hokej (Hockey)
-    9: 5,   # Stoni tenis (Table Tennis) - Changed from 28 to 9
+    9: 5,   # Stoni tenis (Table Tennis)
 }
-
-# Reverse mapping
 INTERNAL_TO_MOZZART = {v: k for k, v in MOZZART_SPORTS.items()}
 
 
-class MozzartScraper(BaseScraper):
-    """
-    Scraper for Mozzart Bet Serbia.
+# ============================================================
+# API Client
+# ============================================================
 
-    Uses Playwright browser context for all API calls to bypass Cloudflare.
-    The browser is launched once and kept alive for the scrape session.
-    API calls are made via page.evaluate(fetch(...)) inside the browser,
-    which inherits the browser's TLS fingerprint and Cloudflare cookies.
+class MozzartMobileAPI:
+    """Lightweight HTTP client for Mozzart's mobile API."""
 
-    API endpoints:
-    - POST /betting/get-competitions: Get leagues for a sport
-    - POST /betting/matches: Get matches for a league
-    - POST /betting/match/{id}: Get match details with odds
-    """
+    BASE = "https://api-gateway.mozzartbet.com/mobile-content-service/mobile"
 
     def __init__(self):
-        super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
-        self._semaphore = asyncio.Semaphore(6)  # Limit concurrent match-detail requests
-        self._pw = None       # Playwright instance
-        self._browser = None  # Browser instance
-        self._context = None  # Browser context
-        self._page = None     # Page for API calls
-        self._ready = False
-        self._browser_lock = asyncio.Lock()  # Prevent concurrent browser launches
-        self._cf_failures = 0  # Consecutive Cloudflare 403 failures
-        self._launch_time = 0  # Time when browser was last launched
-        self._browser_max_age = 900  # Restart browser every 15 min for memory hygiene
+        self.session = tls_client.Session(client_identifier="chrome_120")
+        self._request_count = 0
+        self._error_count = 0
 
-    def get_base_url(self) -> str:
-        return "https://www.mozzartbet.com"
-
-    def get_headers(self) -> Dict[str, str]:
+    @property
+    def _headers(self) -> Dict[str, str]:
         return {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'sr-RS,sr;q=0.9,en-US;q=0.7,en;q=0.5',
-            'medium': 'PREMATCH_WEB',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Origin': 'https://www.mozzartbet.com',
-            'Referer': 'https://www.mozzartbet.com/sr/kladjenje',
+            "Authorization": "Basic YW5kcm9pZDpkanVzYW1lbnRvbA==",
+            "Content-Type": "application/json",
+            "User-Agent": "AndroidClientApp/bosna",
+            "moz-origin": "ANDROID",
+            "origin-app-name": "mozzart-betting-and-app-v3",
+            "correlationId": str(uuid.uuid4()),
         }
 
-    def get_supported_sports(self) -> List[int]:
-        return [1, 2, 3, 4, 5]
-
-    async def _ensure_browser(self) -> None:
-        """Launch Playwright browser and navigate to Mozzart to pass Cloudflare."""
-        if self._ready:
-            # Periodic restart for memory hygiene
-            if time.time() - self._launch_time > self._browser_max_age:
-                logger.info("[Mozzart] Periodic browser restart for memory hygiene")
-                await self._cleanup_browser()
-            else:
-                return
-
-        async with self._browser_lock:
-            # Double-check after acquiring lock (another coroutine may have finished)
-            if self._ready:
-                return
-
-            logger.info("[Mozzart] Launching Playwright browser for Cloudflare bypass...")
-            try:
-                from playwright.async_api import async_playwright
-
-                self._pw = await async_playwright().start()
-                self._browser = await self._pw.chromium.launch(headless=True)
-                self._context = await self._browser.new_context(
-                    locale='sr-RS',
-                    timezone_id='Europe/Belgrade',
-                )
-                self._page = await self._context.new_page()
-
-                # Navigate to pass Cloudflare challenge
-                await self._page.goto(
-                    'https://www.mozzartbet.com/sr/kladjenje',
-                    wait_until='networkidle',
-                    timeout=30000,
-                )
-                await self._page.wait_for_timeout(2000)
-
-                self._ready = True
-                self._cf_failures = 0
-                self._launch_time = time.time()
-                logger.info("[Mozzart] Browser ready — Cloudflare bypassed")
-
-            except Exception as e:
-                logger.error(f"[Mozzart] Failed to launch browser: {e}")
-                await self._cleanup_browser()
-
-    async def _cleanup_browser(self) -> None:
-        """Close Playwright browser and cleanup."""
-        try:
-            if self._context:
-                await self._context.close()
-        except Exception:
-            pass
-        try:
-            if self._browser:
-                await self._browser.close()
-        except Exception:
-            pass
-        try:
-            if self._pw:
-                await self._pw.stop()
-        except Exception:
-            pass
-        self._context = None
-        self._browser = None
-        self._page = None
-        self._pw = None
-        self._ready = False
-
-    async def reset_session(self) -> None:
-        """Reset Playwright browser for error recovery."""
-        logger.info("[Mozzart] Resetting browser session for error recovery")
-        await self._cleanup_browser()
-        await super().reset_session()
-
-    async def close(self) -> None:
-        """Close browser and aiohttp session."""
-        await self._cleanup_browser()
-        await super().close()
-
-    async def _post_request(self, url: str, payload: Dict) -> Optional[Dict]:
-        """Make a POST request via the Playwright browser's fetch API."""
-        if not self._ready or not self._page:
-            return None
-
+    def _post(self, path: str, payload: Dict) -> Optional[Dict]:
+        """Make a POST request. Returns parsed JSON or None."""
         self._request_count += 1
+        url = f"{self.BASE}{path}"
         try:
-            import json as _json
-            payload_json = _json.dumps(payload)
-
-            result = await self._page.evaluate(f'''async () => {{
-                try {{
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 10000);
-                    const resp = await fetch("{url}", {{
-                        method: "POST",
-                        headers: {{
-                            "Content-Type": "application/json",
-                            "Accept": "application/json, text/plain, */*",
-                            "medium": "PREMATCH_WEB"
-                        }},
-                        body: {repr(payload_json)},
-                        signal: controller.signal
-                    }});
-                    clearTimeout(timeoutId);
-                    if (resp.status !== 200) {{
-                        return {{ __error: true, status: resp.status }};
-                    }}
-                    return await resp.json();
-                }} catch (e) {{
-                    return {{ __error: true, message: e.message }};
-                }}
-            }}''')
-
-            if isinstance(result, dict) and result.get('__error'):
-                status = result.get('status', 'unknown')
-                msg = result.get('message', '')
-                logger.warning(f"[Mozzart] HTTP {status} for {url} {msg}")
-                # Track consecutive 403s — Cloudflare cookie expiry
-                if status == 403:
-                    self._cf_failures += 1
-                    if self._cf_failures >= 3:
-                        logger.warning("[Mozzart] Multiple 403s — Cloudflare cookies likely expired, will relaunch browser")
-                        self._ready = False
-                        self._cf_failures = 0
-                else:
-                    self._cf_failures = 0
-                return None
-
-            # Success — reset CF failure counter
-            self._cf_failures = 0
-            return result
-
+            r = self.session.post(url, headers=self._headers, json=payload)
+            if r.status_code == 200:
+                return r.json()
+            logger.warning(f"[Mozzart] {r.status_code} for {path}")
+            self._error_count += 1
+            return None
         except Exception as e:
-            error_str = str(e).lower()
-            # Detect crashed/closed browser page
-            if any(kw in error_str for kw in ('target closed', 'browser has been closed',
-                                                'context has been closed', 'page has been closed',
-                                                'connection closed')):
-                logger.warning(f"[Mozzart] Browser appears dead, will relaunch next cycle: {e}")
-                self._ready = False
-            else:
-                logger.warning(f"[Mozzart] Error fetching {url}: {e}")
+            logger.warning(f"[Mozzart] Error {path}: {e}")
             self._error_count += 1
             return None
 
-    async def fetch_leagues(self, sport_id: int) -> List[Tuple[int, str]]:
-        """Fetch leagues for a sport."""
-        mozzart_sport_id = INTERNAL_TO_MOZZART.get(sport_id)
-        if mozzart_sport_id is None:
-            return []
+    def get_sports(self, mozzart_sport_id: int) -> Optional[Dict]:
+        """Get sports overview (competition list with match counts)."""
+        return self._post("/sports", {
+            "groupationId": 1,
+            "sportIds": [mozzart_sport_id],
+            "orderType": "BY_COMPETITION",
+            "uberOffer": True,
+            "packGroupsInMatch": True,
+        })
 
-        url = f"{self.get_base_url()}/betting/get-competitions"
-        # Updated payload format based on actual API
-        payload = {
-            "date": "all_days",
-            "sportId": mozzart_sport_id
-        }
+    def get_matches(self, filter_payload: Dict) -> Optional[Dict]:
+        """Fetch matches using a filter object returned by /sports."""
+        filter_payload["groupationId"] = 1
+        return self._post("/matches", filter_payload)
 
-        data = await self._post_request(url, payload)
-
-        if not data:
-            return []
-
-        leagues = []
-        for comp in data.get("competitions", []):
-            league_id = comp.get("id")
-            league_name = comp.get("name")
-            if league_id and league_name:
-                leagues.append((league_id, league_name))
-
-        return leagues
-
-    async def fetch_match_ids(self, sport_id: int, league_id: int) -> List[int]:
-        """Fetch match IDs for a league."""
-        mozzart_sport_id = INTERNAL_TO_MOZZART.get(sport_id)
-        if mozzart_sport_id is None:
-            return []
-
-        url = f"{self.get_base_url()}/betting/matches"
-        # Updated payload format based on actual API
-        payload = {
-            "date": "all_days",
-            "sort": "bycompetition",
-            "currentPage": 0,
+    def get_match_details(self, match_id: int) -> Optional[Dict]:
+        """Get full match details including all odds groups."""
+        return self._post("/match-by-id", {
+            "groupationId": 1,
+            "matchId": match_id,
             "pageSize": 100,
-            "sportId": mozzart_sport_id,
-            "competitionIds": [league_id],
-            "search": "",
-            "matchTypeId": 0
-        }
+            "currentPage": 0,
+            "matchTypeId": 0,
+            "orderType": "BY_COMPETITION",
+            "offerType": "PRE_MATCH",
+            "loadPriorityTemplateGamesOnly": False,
+            "loadAllTemplateGames": True,
+            "packGamesGroupBySport": False,
+            "medium": "ANDROID",
+            "loadExtendedOffer": True,
+            "packGroupsInMatch": True,
+            "uberOffer": True,
+            "sportsLoad": True,
+            "tspMatchLoad": True,
+        })
 
-        data = await self._post_request(url, payload)
 
-        if not data or not data.get("items"):
-            return []
+# ============================================================
+# Odds parsers (ported from v2.0 — same Mozzart data format)
+# ============================================================
 
-        return [match["id"] for match in data["items"]]
+class OddsParser:
+    """Static parsing methods for Mozzart odds groups."""
 
-    async def fetch_match_details(self, match_id: int, sport_id: int, league_id: int) -> Optional[Dict]:
-        """Fetch detailed match data with odds."""
-        async with self._semaphore:
-            # Match endpoint - simple POST with empty body or minimal payload
-            url = f"{self.get_base_url()}/betting/match/{match_id}"
-            payload = {}  # Match endpoint typically needs minimal payload
-
-            for attempt in range(3):
-                data = await self._post_request(url, payload)
-                if data and not data.get("error"):
-                    return data
-                await asyncio.sleep(0.5)
-
-            return None
-
-    # ==========================================
-    # Football group-based parsing
-    # ==========================================
-
-    # Mapping of Mozzart group names to parsing handlers
-    # Each handler returns a list of ScrapedOdds
+    # ---- Football group map ----
     FOOTBALL_GROUP_MAP = {
-        # === Grouped markets (2-3 outcomes, use odd1/odd2/odd3) ===
         "Konačan ishod":                ("_parse_1x2", 2),
-        "Dupla šansa":                  ("_parse_three_way", 13),   # 1X, 12, X2
-        "Ukupno golova - Par/Nepar":    ("_parse_odd_even", 15),    # Par, Nepar -> odd/even
-        "Winner":                       ("_parse_two_way", 14),     # draw no bet
-        "Dupla pobeda":                 ("_parse_two_way", 16),     # both halves winner
-        "Sigurna pobeda":               ("_parse_two_way", 17),     # win to nil
-        "Daje prvi gol":                ("_parse_three_way", 18),   # first goal team
-        "Poluvreme sa više golova":     ("_parse_three_way", 19),   # half with more goals
-        "Prvo poluvreme":               ("_parse_1x2", 3),          # 1X2 first half
-        "Dupla šansa prvo poluvreme":   ("_parse_three_way", 20),   # double chance H1
-        "Winner prvo poluvreme":        ("_parse_two_way", 21),     # draw no bet H1
-        "Drugo poluvreme":              ("_parse_1x2", 4),          # 1X2 second half
-        "Prolazi dalje":                ("_parse_two_way", 22),     # to qualify
-        "Dupla šansa drugo poluvreme":  ("_parse_three_way", 75),   # double chance H2
-        "Winner drugo poluvreme":       ("_parse_two_way", 76),     # draw no bet H2
-        "Ukupno golova - Par/Nepar prvo poluvreme":  ("_parse_odd_even", 77),  # odd/even H1
-        "Ukupno golova prvo poluvreme - Par/Nepar":  ("_parse_odd_even", 77),  # odd/even H1 (alt name)
-        "Ukupno golova - Par/Nepar drugo poluvreme": ("_parse_odd_even", 78),  # odd/even H2
-        "Ukupno golova drugo poluvreme - Par/Nepar": ("_parse_odd_even", 78),  # odd/even H2 (alt name)
-        # === Selection markets (multi-outcome, 1 row per selection) ===
+        "Dupla šansa":                  ("_parse_three_way", 13),
+        "Ukupno golova - Par/Nepar":    ("_parse_odd_even", 15),
+        "Winner":                       ("_parse_two_way", 14),
+        "Dupla pobeda":                 ("_parse_two_way", 16),
+        "Sigurna pobeda":               ("_parse_two_way", 17),
+        "Daje prvi gol":                ("_parse_three_way", 18),
+        "Poluvreme sa više golova":     ("_parse_1x2", 19),
+        "Prvo poluvreme":               ("_parse_1x2", 3),
+        "Dupla šansa prvo poluvreme":   ("_parse_three_way", 20),
+        "Winner prvo poluvreme":        ("_parse_two_way", 21),
+        "Drugo poluvreme":              ("_parse_1x2", 4),
+        "Prolazi dalje":                ("_parse_two_way", 22),
+        "Dupla šansa drugo poluvreme":  ("_parse_three_way", 75),
+        "Winner drugo poluvreme":       ("_parse_two_way", 76),
+        "Ukupno golova - Par/Nepar prvo poluvreme":  ("_parse_odd_even", 77),
+        "Ukupno golova prvo poluvreme - Par/Nepar":  ("_parse_odd_even", 77),
+        "Ukupno golova - Par/Nepar drugo poluvreme": ("_parse_odd_even", 78),
+        "Ukupno golova drugo poluvreme - Par/Nepar": ("_parse_odd_even", 78),
         "Tačan rezultat":               ("_parse_selection", 23),
-        "Tačan rezultat prvog poluvremena":  ("_parse_selection", 79),  # H1 correct score
-        "Tačan rezultat I poluvreme":       ("_parse_selection", 79),  # H1 CS (alt name)
+        "Tačan rezultat prvog poluvremena":  ("_parse_selection", 79),
+        "Tačan rezultat I poluvreme":        ("_parse_selection", 79),
         "Poluvreme - Kraj":             ("_parse_selection", 24),
         "Ukupno golova na meču":        ("_parse_selection", 25),
         "Tačan broj golova na meču":    ("_parse_selection", 26),
@@ -347,8 +174,90 @@ class MozzartScraper(BaseScraper):
         "Mozzart šansa":                            ("_parse_selection", 47),
     }
 
-    def _parse_1x2(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a 1X2 (three-way) group into a single grouped ScrapedOdds."""
+    # ---- Basketball group map ----
+    BASKETBALL_GROUP_MAP = {
+        "Konačan ishod":                          ("_parse_1x2", 2),
+        "Pobednik meča sa ev. produžecima":       ("_parse_two_way", 1),
+        "Dupla šansa":                            ("_parse_two_way", 13),
+        "Prvo poluvreme":                         ("_parse_1x2", 3),
+        "Dupla pobeda":                           ("_parse_two_way", 16),
+        "Dupla šansa prvo poluvreme":             ("_parse_two_way", 20),
+        "Poluvreme sa više poena":                ("_parse_three_way", 19),
+        "Poluvreme - kraj":                       ("_parse_selection", 24),
+        "Četvrtina sa najviše poena":             ("_parse_selection", 54),
+    }
+    BASKETBALL_MARGIN_MAP = {
+        "Ukupno poena na meču":                   10,
+        "Ukupno poena Tim 1":                     48,
+        "Ukupno poena Tim 2":                     49,
+        "Ukupno poena prvo poluvreme":            6,
+        "Ukupno poena prvo poluvreme Tim 1":      51,
+        "Ukupno poena prvo poluvreme Tim 2":      52,
+        "Ukupno poena drugo poluvreme":           7,
+        "Ukupno poena najefikasnija četvrtina":   53,
+    }
+    BASKETBALL_COMBO_MARGIN_MAP = {
+        "Konačan ishod + Ukupno poena":                       38,
+        "Prvo poluvreme + Ukupno poena prvo poluvreme":       55,
+    }
+
+    # ---- Tennis group map ----
+    TENNIS_GROUP_MAP = {
+        "Konačan ishod":                                           ("_parse_two_way", 1),
+        "Prvi set":                                                ("_parse_two_way", 57),
+        "Prvi set - Kraj":                                         ("_parse_selection", 64),
+        "Tačan broj setova":                                       ("_parse_selection", 65),
+        "Ukupno gemova - Par/Nepar":                               ("_parse_odd_even", 15),
+        "Rangovi gemova prvi set":                                 ("_parse_selection", 66),
+        "Ukupno gemova prvi set - Par/Nepar":                      ("_parse_odd_even", 59),
+        "Tajbrejk u prvom setu - Da/Ne":                           ("_parse_two_way", 60),
+        "Rangovi gemova drugi set":                                ("_parse_selection", 67),
+        "Ukupno gemova drugi set - Par/Nepar":                     ("_parse_odd_even", 61),
+        "Tajbrejk u drugom setu - Da/Ne":                          ("_parse_two_way", 62),
+        "Pobeda igrača 1 + Gemovi prvi set":                       ("_parse_selection", 69),
+        "Pobeda igrača 1 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 70),
+        "Pobeda igrača 2 + Gemovi prvi set":                       ("_parse_selection", 71),
+        "Pobeda igrača 2 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 72),
+        "Konačan ishod + Više gemova - Prvi ili drugi set":        ("_parse_selection", 73),
+        "Više gemova - Prvi ili drugi set":                        ("_parse_three_way", 63),
+    }
+    TENNIS_MARGIN_MAP = {
+        "Ukupno gemova":            5,
+        "Ukupno gemova u 1. setu":  6,
+        "Ukupno gemova u 2. setu":  7,
+    }
+    TENNIS_COMBO_MARGIN_MAP = {
+        "Mozzart kombinazzije":          68,
+        "Konačan ishod + Ukupno gemova": 68,
+    }
+    TENNIS_HANDICAP_MAP = {
+        "Hendikep setova":           56,
+        "Hendikep gemova":           9,
+        "Hendikep gemova u 1. setu": 58,
+    }
+
+    # ---- Hockey group map ----
+    HOCKEY_GROUP_MAP = {
+        "Konačan ishod":                ("_parse_1x2", 2),
+        "Dupla šansa":                  ("_parse_three_way", 13),
+        "Winner":                       ("_parse_two_way", 14),
+        "Prva trećina":                 ("_parse_1x2", 3),
+        "Ukupno golova":                ("_parse_selection", 25),
+        "Konačan ishod + Golovi":       ("_parse_selection", 38),
+        "Prva trećina + Golovi":        ("_parse_selection", 74),
+        "Prva trećina - Kraj":          ("_parse_selection", 24),
+        "Ukupno golova prva trećina":   ("_parse_selection", 29),
+        "Ukupno golova druga trećina":  ("_parse_selection", 30),
+    }
+    HOCKEY_MARGIN_MAP = {
+        "Ukupno golova":                5,
+        "Ukupno golova prva trećina":   6,
+    }
+
+    # ========== primitive parsers ==========
+
+    @staticmethod
+    def _parse_1x2(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         collected = {}
         for odd in odds_group.get("odds", []):
             subgame_name = odd.get("subgame", {}).get("name", "")
@@ -358,16 +267,12 @@ class MozzartScraper(BaseScraper):
                 continue
             if value > 0 and subgame_name in ("1", "X", "2"):
                 collected[subgame_name] = value
-
         if "1" in collected and "X" in collected and "2" in collected:
-            return [ScrapedOdds(
-                bet_type_id=bet_type_id,
-                odd1=collected["1"], odd2=collected["X"], odd3=collected["2"]
-            )]
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=collected["1"], odd2=collected["X"], odd3=collected["2"])]
         return []
 
-    def _parse_three_way(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a three-way group (e.g. double chance: 1X, 12, X2) into grouped odds."""
+    @staticmethod
+    def _parse_three_way(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         values = []
         for odd in sorted(odds_group.get("odds", []), key=lambda o: o.get("subgame", {}).get("rank", 0)):
             try:
@@ -376,16 +281,12 @@ class MozzartScraper(BaseScraper):
                 continue
             if value > 0:
                 values.append(value)
-
         if len(values) == 3:
-            return [ScrapedOdds(
-                bet_type_id=bet_type_id,
-                odd1=values[0], odd2=values[1], odd3=values[2]
-            )]
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=values[0], odd2=values[1], odd3=values[2])]
         return []
 
-    def _parse_two_way(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a two-way group into grouped odds."""
+    @staticmethod
+    def _parse_two_way(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         values = []
         for odd in sorted(odds_group.get("odds", []), key=lambda o: o.get("subgame", {}).get("rank", 0)):
             try:
@@ -394,16 +295,12 @@ class MozzartScraper(BaseScraper):
                 continue
             if value > 0:
                 values.append(value)
-
         if len(values) == 2:
-            return [ScrapedOdds(
-                bet_type_id=bet_type_id,
-                odd1=values[0], odd2=values[1]
-            )]
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=values[0], odd2=values[1])]
         return []
 
-    def _parse_selection(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a multi-outcome group into selection-based ScrapedOdds (1 row per outcome)."""
+    @staticmethod
+    def _parse_selection(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         result = []
         for odd in odds_group.get("odds", []):
             subgame_name = odd.get("subgame", {}).get("name", "")
@@ -414,49 +311,11 @@ class MozzartScraper(BaseScraper):
             except (ValueError, TypeError):
                 continue
             if value > 0:
-                result.append(ScrapedOdds(
-                    bet_type_id=bet_type_id,
-                    odd1=value,
-                    selection=subgame_name
-                ))
+                result.append(ScrapedOdds(bet_type_id=bet_type_id, odd1=value, selection=subgame_name))
         return result
 
-    def _parse_btts_group(self, odds_group: Dict) -> List[ScrapedOdds]:
-        """Parse BTTS group — simple GG/NG goes to bet_type 8, combos to 46."""
-        simple = {}
-        combos = []
-
-        for odd in odds_group.get("odds", []):
-            subgame_name = odd.get("subgame", {}).get("name", "")
-            try:
-                value = float(odd.get("value", 0))
-            except (ValueError, TypeError):
-                continue
-            if value <= 0:
-                continue
-
-            name_lower = subgame_name.lower()
-            if name_lower == "da":
-                simple["gg"] = value
-            elif name_lower == "ne":
-                simple["ng"] = value
-            else:
-                # Combo subgames like "1GG", "2NG", "GG3+", etc.
-                combos.append(ScrapedOdds(
-                    bet_type_id=46, odd1=value, selection=subgame_name
-                ))
-
-        result = []
-        if simple.get("gg") and simple.get("ng"):
-            result.append(ScrapedOdds(
-                bet_type_id=8, odd1=simple["gg"], odd2=simple["ng"]
-            ))
-        result.extend(combos)
-        return result
-
-    def _parse_odd_even(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse ODD/EVEN group using name-based detection.
-        Convention: odd1=ODD (Nepar), odd2=EVEN (Par) — consistent with Superbet/BalkanBet."""
+    @staticmethod
+    def _parse_odd_even(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         odd_val = even_val = None
         for odd in odds_group.get("odds", []):
             name = odd.get("subgame", {}).get("name", "").upper()
@@ -474,85 +333,33 @@ class MozzartScraper(BaseScraper):
             return [ScrapedOdds(bet_type_id=bet_type_id, odd1=odd_val, odd2=even_val)]
         return []
 
-    def _parse_ou_markets(self, match: Dict) -> List[ScrapedOdds]:
-        """Parse all O/U markets (specialOddValueType=MARGIN) across all groups."""
-        total_goals = {}
-        total_goals_h1 = {}
-        total_goals_h2 = {}
+    @staticmethod
+    def _parse_btts_group(odds_group: Dict) -> List[ScrapedOdds]:
+        simple = {}
+        combos = []
+        for odd in odds_group.get("odds", []):
+            subgame_name = odd.get("subgame", {}).get("name", "")
+            try:
+                value = float(odd.get("value", 0))
+            except (ValueError, TypeError):
+                continue
+            if value <= 0:
+                continue
+            name_lower = subgame_name.lower()
+            if name_lower == "da":
+                simple["gg"] = value
+            elif name_lower == "ne":
+                simple["ng"] = value
+            else:
+                combos.append(ScrapedOdds(bet_type_id=46, odd1=value, selection=subgame_name))
+        result = []
+        if simple.get("gg") and simple.get("ng"):
+            result.append(ScrapedOdds(bet_type_id=8, odd1=simple["gg"], odd2=simple["ng"]))
+        result.extend(combos)
+        return result
 
-        for odds_group in match.get("oddsGroup", []):
-            group_name = odds_group.get("groupName", "").lower()
-
-            for odd in odds_group.get("odds", []):
-                # Skip DEACTIVATED odds
-                if odd.get("oddStatus") == "DEACTIVATED":
-                    continue
-                special_value = odd.get("specialOddValue", "")
-                value_type = odd.get("game", {}).get("specialOddValueType", "")
-                subgame_name = odd.get("subgame", {}).get("name", "")
-
-                if value_type != "MARGIN" or not special_value:
-                    continue
-
-                try:
-                    value = float(odd.get("value", 0))
-                    total = float(special_value)
-                except (ValueError, TypeError):
-                    continue
-
-                if value <= 0:
-                    continue
-
-                if "1. poluvreme" in group_name or "pp" in group_name:
-                    if total not in total_goals_h1:
-                        total_goals_h1[total] = {}
-                    if subgame_name == "manje":
-                        total_goals_h1[total]["under"] = value
-                    elif subgame_name == "više":
-                        total_goals_h1[total]["over"] = value
-                elif "2. poluvreme" in group_name or "dp" in group_name:
-                    if total not in total_goals_h2:
-                        total_goals_h2[total] = {}
-                    if subgame_name == "manje":
-                        total_goals_h2[total]["under"] = value
-                    elif subgame_name == "više":
-                        total_goals_h2[total]["over"] = value
-                else:
-                    if total not in total_goals:
-                        total_goals[total] = {}
-                    if subgame_name == "manje":
-                        total_goals[total]["under"] = value
-                    elif subgame_name == "više":
-                        total_goals[total]["over"] = value
-
-        odds_list = []
-        for total, t_odds in total_goals.items():
-            if "under" in t_odds and "over" in t_odds:
-                # Convention: odd1=Over, odd2=Under
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=5, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
-                ))
-        for total, t_odds in total_goals_h1.items():
-            if "under" in t_odds and "over" in t_odds:
-                # Convention: odd1=Over, odd2=Under
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=6, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
-                ))
-        for total, t_odds in total_goals_h2.items():
-            if "under" in t_odds and "over" in t_odds:
-                # Convention: odd1=Over, odd2=Under
-                odds_list.append(ScrapedOdds(
-                    bet_type_id=7, odd1=t_odds["over"], odd2=t_odds["under"], margin=total
-                ))
-        return odds_list
-
-    # ==========================================
-    # Generic helpers for handicap / O/U / combo groups
-    # ==========================================
-
-    def _parse_handicap_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a single handicap group — line read dynamically from specialOddValue.
-        Accepts both '1'/'2' and 'H1'/'H2' subgame naming conventions."""
+    @staticmethod
+    def _parse_handicap_group(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         collected = {}
         margin = None
         for odd in odds_group.get("odds", []):
@@ -565,19 +372,14 @@ class MozzartScraper(BaseScraper):
             except (ValueError, TypeError):
                 continue
             if value > 0 and subgame in ("1", "2", "H1", "H2"):
-                key = subgame[-1]  # "H1" -> "1", "H2" -> "2"
+                key = subgame[-1]
                 collected[key] = value
-
         if "1" in collected and "2" in collected and margin is not None:
-            return [ScrapedOdds(
-                bet_type_id=bet_type_id,
-                odd1=collected["1"], odd2=collected["2"],
-                margin=margin
-            )]
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=collected["1"], odd2=collected["2"], margin=margin)]
         return []
 
-    def _parse_ou_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a single O/U group — line read dynamically from specialOddValue."""
+    @staticmethod
+    def _parse_ou_group(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         collected = {}
         margin = None
         for odd in odds_group.get("odds", []):
@@ -594,18 +396,12 @@ class MozzartScraper(BaseScraper):
                     collected["under"] = value
                 elif subgame == "više":
                     collected["over"] = value
-
         if "under" in collected and "over" in collected and margin is not None:
-            # Convention: odd1=Over, odd2=Under
-            return [ScrapedOdds(
-                bet_type_id=bet_type_id,
-                odd1=collected["over"], odd2=collected["under"],
-                margin=margin
-            )]
+            return [ScrapedOdds(bet_type_id=bet_type_id, odd1=collected["over"], odd2=collected["under"], margin=margin)]
         return []
 
-    def _parse_selection_margin_group(self, odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
-        """Parse a combo group with both selections AND a margin from specialOddValue."""
+    @staticmethod
+    def _parse_selection_margin_group(odds_group: Dict, bet_type_id: int) -> List[ScrapedOdds]:
         result = []
         for odd in odds_group.get("odds", []):
             subgame = odd.get("subgame", {}).get("name", "")
@@ -618,122 +414,82 @@ class MozzartScraper(BaseScraper):
             except (ValueError, TypeError):
                 continue
             if value > 0:
-                result.append(ScrapedOdds(
-                    bet_type_id=bet_type_id,
-                    odd1=value,
-                    selection=subgame,
-                    margin=margin
-                ))
+                result.append(ScrapedOdds(bet_type_id=bet_type_id, odd1=value, selection=subgame, margin=margin))
         return result
 
-    def parse_football_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse all football odds from Mozzart match data using group-based dispatch."""
-        odds_list = []
-        match = match_data.get("match", {})
+    # ========== O/U across all groups (football) ==========
 
-        if "specialMatchGroupId" in match:
-            return odds_list
+    @staticmethod
+    def _parse_ou_markets(match: Dict) -> List[ScrapedOdds]:
+        total_goals = {}
+        total_goals_h1 = {}
+        total_goals_h2 = {}
 
-        # 1) Parse O/U markets (MARGIN-based) across all groups first
-        odds_list.extend(self._parse_ou_markets(match))
-
-        # 2) Parse each group via the dispatch map
         for odds_group in match.get("oddsGroup", []):
-            # Filter out DEACTIVATED odds (template placeholders with value=1)
-            active_odds = [o for o in odds_group.get("odds", [])
-                           if o.get("oddStatus") != "DEACTIVATED"]
-            if not active_odds:
-                continue
-            filtered_group = {**odds_group, "odds": active_odds}
-
-            group_name = odds_group.get("groupName", "")
-
-            # Detect specialOddValueType from first active odd
-            first_type = ""
-            for odd in active_odds:
-                vt = odd.get("game", {}).get("specialOddValueType", "")
-                if vt and vt != "NONE":
-                    first_type = vt
-                    break
-
-            # Handle HANDICAP groups
-            if first_type == "HANDICAP":
-                if "poluvreme" in group_name.lower():
-                    odds_list.extend(self._parse_handicap_group(filtered_group, 50))
+            group_name = odds_group.get("groupName", "").lower()
+            for odd in odds_group.get("odds", []):
+                if odd.get("oddStatus") == "DEACTIVATED":
+                    continue
+                special_value = odd.get("specialOddValue", "")
+                value_type = odd.get("game", {}).get("specialOddValueType", "")
+                subgame_name = odd.get("subgame", {}).get("name", "")
+                if value_type != "MARGIN" or not special_value:
+                    continue
+                try:
+                    value = float(odd.get("value", 0))
+                    total = float(special_value)
+                except (ValueError, TypeError):
+                    continue
+                if value <= 0:
+                    continue
+                if "1. poluvreme" in group_name or "pp" in group_name:
+                    total_goals_h1.setdefault(total, {})
+                    if subgame_name == "manje":
+                        total_goals_h1[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals_h1[total]["over"] = value
+                elif "2. poluvreme" in group_name or "dp" in group_name:
+                    total_goals_h2.setdefault(total, {})
+                    if subgame_name == "manje":
+                        total_goals_h2[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals_h2[total]["over"] = value
                 else:
-                    odds_list.extend(self._parse_handicap_group(filtered_group, 9))
-                continue
+                    total_goals.setdefault(total, {})
+                    if subgame_name == "manje":
+                        total_goals[total]["under"] = value
+                    elif subgame_name == "više":
+                        total_goals[total]["over"] = value
 
-            # Special handling for BTTS (can have both simple and combo subgames)
-            if group_name == "Oba tima daju gol":
-                odds_list.extend(self._parse_btts_group(filtered_group))
-                continue
-
-            mapping = self.FOOTBALL_GROUP_MAP.get(group_name)
-            if not mapping:
-                logger.debug(f"[Mozzart] Unmapped football group: '{group_name}'")
-                continue
-
-            handler_name, bet_type_id = mapping
-            handler = getattr(self, handler_name)
-            odds_list.extend(handler(filtered_group, bet_type_id))
-
+        odds_list = []
+        for total, t in total_goals.items():
+            if "under" in t and "over" in t:
+                odds_list.append(ScrapedOdds(bet_type_id=5, odd1=t["over"], odd2=t["under"], margin=total))
+        for total, t in total_goals_h1.items():
+            if "under" in t and "over" in t:
+                odds_list.append(ScrapedOdds(bet_type_id=6, odd1=t["over"], odd2=t["under"], margin=total))
+        for total, t in total_goals_h2.items():
+            if "under" in t and "over" in t:
+                odds_list.append(ScrapedOdds(bet_type_id=7, odd1=t["over"], odd2=t["under"], margin=total))
         return odds_list
 
-    # ==========================================
-    # Basketball group-based parsing
-    # ==========================================
+    # ========== sport-level dispatchers ==========
 
-    # Simple groups (no HANDICAP/MARGIN specialOddValueType)
-    BASKETBALL_GROUP_MAP = {
-        "Konačan ishod":                          ("_parse_1x2", 2),
-        "Pobednik meča sa ev. produžecima":       ("_parse_two_way", 1),   # winner incl. OT
-        "Dupla šansa":                            ("_parse_two_way", 13),  # only 2 outcomes in basketball
-        "Prvo poluvreme":                         ("_parse_1x2", 3),
-        "Dupla pobeda":                           ("_parse_two_way", 16),
-        "Dupla šansa prvo poluvreme":             ("_parse_two_way", 20),  # only 2 outcomes
-        "Poluvreme sa više poena":                ("_parse_three_way", 19),  # prvo, drugo, jednako
-        "Poluvreme - kraj":                       ("_parse_selection", 24),  # HT/FT
-        "Četvrtina sa najviše poena":             ("_parse_selection", 54),  # quarter most points
-    }
-
-    # MARGIN-type groups → bet_type_id mapping (line from specialOddValue)
-    BASKETBALL_MARGIN_MAP = {
-        "Ukupno poena na meču":                   10,   # total_points
-        "Ukupno poena Tim 1":                     48,   # team1_total_points
-        "Ukupno poena Tim 2":                     49,   # team2_total_points
-        "Ukupno poena prvo poluvreme":            6,    # total_h1
-        "Ukupno poena prvo poluvreme Tim 1":      51,   # team1_total_h1
-        "Ukupno poena prvo poluvreme Tim 2":      52,   # team2_total_h1
-        "Ukupno poena drugo poluvreme":           7,    # total_h2
-        "Ukupno poena najefikasnija četvrtina":   53,   # most_efficient_quarter_total
-    }
-
-    # Combo groups that have MARGIN + selections
-    BASKETBALL_COMBO_MARGIN_MAP = {
-        "Konačan ishod + Ukupno poena":                       38,  # result_total_goals
-        "Prvo poluvreme + Ukupno poena prvo poluvreme":       55,  # h1_result_total
-    }
-
-    def parse_basketball_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse all basketball odds from Mozzart match data using group-based dispatch."""
+    @classmethod
+    def _dispatch_groups(cls, match: Dict, group_map: Dict,
+                         margin_map: Dict = None, combo_margin_map: Dict = None,
+                         handicap_map: Dict = None) -> List[ScrapedOdds]:
+        """Generic dispatcher for any sport's odds groups."""
         odds_list = []
-        match = match_data.get("match", {})
-
-        if "specialMatchGroupId" in match:
-            return odds_list
 
         for odds_group in match.get("oddsGroup", []):
-            # Filter out DEACTIVATED odds (template placeholders with value=1)
-            active_odds = [o for o in odds_group.get("odds", [])
-                           if o.get("oddStatus") != "DEACTIVATED"]
+            active_odds = [o for o in odds_group.get("odds", []) if o.get("oddStatus") != "DEACTIVATED"]
             if not active_odds:
                 continue
             filtered_group = {**odds_group, "odds": active_odds}
-
             group_name = odds_group.get("groupName", "")
 
-            # Detect if this group uses HANDICAP or MARGIN specialOddValueType
+            # Detect specialOddValueType
             first_type = ""
             for odd in active_odds:
                 vt = odd.get("game", {}).get("specialOddValueType", "")
@@ -742,338 +498,293 @@ class MozzartScraper(BaseScraper):
                     break
 
             if first_type == "HANDICAP":
-                # Handicap — determine full-time vs half based on group name
-                if "poluvreme" in group_name.lower():
-                    odds_list.extend(self._parse_handicap_group(filtered_group, 50))
+                if handicap_map:
+                    hc_bt = handicap_map.get(group_name)
+                    if hc_bt is not None:
+                        odds_list.extend(cls._parse_handicap_group(filtered_group, hc_bt))
                 else:
-                    odds_list.extend(self._parse_handicap_group(filtered_group, 9))
+                    bt = 50 if "poluvreme" in group_name.lower() else 9
+                    odds_list.extend(cls._parse_handicap_group(filtered_group, bt))
 
             elif first_type == "MARGIN":
-                # Check combo markets first (they also have MARGIN)
-                combo_bt = self.BASKETBALL_COMBO_MARGIN_MAP.get(group_name)
-                if combo_bt is not None:
-                    odds_list.extend(self._parse_selection_margin_group(filtered_group, combo_bt))
-                else:
-                    # Regular O/U market
-                    ou_bt = self.BASKETBALL_MARGIN_MAP.get(group_name)
+                if combo_margin_map:
+                    combo_bt = combo_margin_map.get(group_name)
+                    if combo_bt is not None:
+                        odds_list.extend(cls._parse_selection_margin_group(filtered_group, combo_bt))
+                        continue
+                if margin_map:
+                    ou_bt = margin_map.get(group_name)
                     if ou_bt is not None:
-                        odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
+                        odds_list.extend(cls._parse_ou_group(filtered_group, ou_bt))
 
             else:
-                # Simple group — use dispatch map
-                mapping = self.BASKETBALL_GROUP_MAP.get(group_name)
+                # Special handling for BTTS
+                if group_name == "Oba tima daju gol":
+                    odds_list.extend(cls._parse_btts_group(filtered_group))
+                    continue
+
+                mapping = group_map.get(group_name)
                 if mapping:
                     handler_name, bet_type_id = mapping
-                    handler = getattr(self, handler_name)
+                    handler = getattr(cls, handler_name)
                     odds_list.extend(handler(filtered_group, bet_type_id))
-                else:
-                    logger.debug(f"[Mozzart] Unmapped basketball group: '{group_name}'")
 
         return odds_list
 
-    # ==========================================
-    # Tennis group-based parsing
-    # ==========================================
+    @classmethod
+    def parse_football(cls, match: Dict) -> List[ScrapedOdds]:
+        odds = cls._parse_ou_markets(match)
+        odds.extend(cls._dispatch_groups(match, cls.FOOTBALL_GROUP_MAP))
+        return odds
 
-    # Simple groups (no HANDICAP/MARGIN specialOddValueType)
-    TENNIS_GROUP_MAP = {
-        "Konačan ishod":                                           ("_parse_two_way", 1),    # winner
-        "Prvi set":                                                ("_parse_two_way", 57),   # first_set_winner
-        "Prvi set - Kraj":                                         ("_parse_selection", 64),  # first_set_match_combo
-        "Tačan broj setova":                                       ("_parse_selection", 65),  # exact_sets
-        "Ukupno gemova - Par/Nepar":                               ("_parse_odd_even", 15),  # odd_even
-        "Rangovi gemova prvi set":                                 ("_parse_selection", 66),  # games_range_s1
-        "Ukupno gemova prvi set - Par/Nepar":                      ("_parse_odd_even", 59),  # odd_even_s1
-        "Tajbrejk u prvom setu - Da/Ne":                           ("_parse_two_way", 60),   # tiebreak_s1
-        "Rangovi gemova drugi set":                                ("_parse_selection", 67),  # games_range_s2
-        "Ukupno gemova drugi set - Par/Nepar":                     ("_parse_odd_even", 61),  # odd_even_s2
-        "Tajbrejk u drugom setu - Da/Ne":                          ("_parse_two_way", 62),   # tiebreak_s2
-        "Pobeda igrača 1 + Gemovi prvi set":                       ("_parse_selection", 69),  # p1_win_games_s1
-        "Pobeda igrača 1 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 70),   # p1_win_odd_even_s1
-        "Pobeda igrača 2 + Gemovi prvi set":                       ("_parse_selection", 71),  # p2_win_games_s1
-        "Pobeda igrača 2 + Gemovi prvi set - Par/Nepar":           ("_parse_two_way", 72),   # p2_win_odd_even_s1
-        "Konačan ishod + Više gemova - Prvi ili drugi set":        ("_parse_selection", 73),  # winner_set_more_games
-        "Više gemova - Prvi ili drugi set":                        ("_parse_three_way", 63),  # set_with_more_games
-    }
+    @classmethod
+    def parse_basketball(cls, match: Dict) -> List[ScrapedOdds]:
+        return cls._dispatch_groups(
+            match, cls.BASKETBALL_GROUP_MAP,
+            margin_map=cls.BASKETBALL_MARGIN_MAP,
+            combo_margin_map=cls.BASKETBALL_COMBO_MARGIN_MAP,
+        )
 
-    # MARGIN-type groups → bet_type_id (O/U markets)
-    TENNIS_MARGIN_MAP = {
-        "Ukupno gemova":            5,    # total_over_under
-        "Ukupno gemova u 1. setu":  6,    # total_h1
-        "Ukupno gemova u 2. setu":  7,    # total_h2
-    }
+    @classmethod
+    def parse_tennis(cls, match: Dict) -> List[ScrapedOdds]:
+        return cls._dispatch_groups(
+            match, cls.TENNIS_GROUP_MAP,
+            margin_map=cls.TENNIS_MARGIN_MAP,
+            combo_margin_map=cls.TENNIS_COMBO_MARGIN_MAP,
+            handicap_map=cls.TENNIS_HANDICAP_MAP,
+        )
 
-    # Combo groups with MARGIN + selections
-    TENNIS_COMBO_MARGIN_MAP = {
-        "Mozzart kombinazzije":          68,   # winner_total_games
-        "Konačan ishod + Ukupno gemova": 68,   # winner_total_games (alternate name)
-    }
+    @classmethod
+    def parse_hockey(cls, match: Dict) -> List[ScrapedOdds]:
+        return cls._dispatch_groups(
+            match, cls.HOCKEY_GROUP_MAP,
+            margin_map=cls.HOCKEY_MARGIN_MAP,
+        )
 
-    # HANDICAP groups → bet_type_id
-    TENNIS_HANDICAP_MAP = {
-        "Hendikep setova":           56,   # handicap_sets
-        "Hendikep gemova":           9,    # handicap (main tennis handicap)
-        "Hendikep gemova u 1. setu": 58,   # handicap_games_s1
-    }
-
-    def parse_tennis_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse all tennis odds from Mozzart match data using group-based dispatch."""
-        odds_list = []
-        match = match_data.get("match", {})
-
-        if "specialMatchGroupId" in match:
-            return odds_list
-
-        for odds_group in match.get("oddsGroup", []):
-            # Filter out DEACTIVATED odds (template placeholders with value=1)
-            active_odds = [o for o in odds_group.get("odds", [])
-                           if o.get("oddStatus") != "DEACTIVATED"]
-            if not active_odds:
-                continue
-            filtered_group = {**odds_group, "odds": active_odds}
-
-            group_name = odds_group.get("groupName", "")
-
-            # Detect specialOddValueType from first active odd
-            first_type = ""
-            for odd in active_odds:
-                vt = odd.get("game", {}).get("specialOddValueType", "")
-                if vt and vt != "NONE":
-                    first_type = vt
-                    break
-
-            if first_type == "HANDICAP":
-                hc_bt = self.TENNIS_HANDICAP_MAP.get(group_name)
-                if hc_bt is not None:
-                    odds_list.extend(self._parse_handicap_group(filtered_group, hc_bt))
-
-            elif first_type == "MARGIN":
-                # Check combo markets first (they also have MARGIN)
-                combo_bt = self.TENNIS_COMBO_MARGIN_MAP.get(group_name)
-                if combo_bt is not None:
-                    odds_list.extend(self._parse_selection_margin_group(filtered_group, combo_bt))
-                else:
-                    ou_bt = self.TENNIS_MARGIN_MAP.get(group_name)
-                    if ou_bt is not None:
-                        odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
-
-            else:
-                # Simple group — use dispatch map
-                mapping = self.TENNIS_GROUP_MAP.get(group_name)
-                if mapping:
-                    handler_name, bet_type_id = mapping
-                    handler = getattr(self, handler_name)
-                    odds_list.extend(handler(filtered_group, bet_type_id))
-                else:
-                    logger.debug(f"[Mozzart] Unmapped tennis group: '{group_name}'")
-
-        return odds_list
-
-    # ==========================================
-    # Hockey group-based parsing
-    # ==========================================
-
-    # All hockey groups are simple (no HANDICAP/MARGIN specialOddValueType)
-    HOCKEY_GROUP_MAP = {
-        "Konačan ishod":                ("_parse_1x2", 2),          # 1X2
-        "Dupla šansa":                  ("_parse_three_way", 13),   # double chance
-        "Winner":                       ("_parse_two_way", 14),     # draw no bet
-        "Prva trećina":                 ("_parse_1x2", 3),          # first period 1X2
-        "Ukupno golova":                ("_parse_selection", 25),   # total goals range
-        "Konačan ishod + Golovi":       ("_parse_selection", 38),   # result + total goals
-        "Prva trećina + Golovi":        ("_parse_selection", 74),   # first period result + total goals
-        "Prva trećina - Kraj":          ("_parse_selection", 24),   # first period + match result (HT/FT)
-        "Ukupno golova prva trećina":   ("_parse_selection", 29),   # first period goals range
-        "Ukupno golova druga trećina":  ("_parse_selection", 30),   # second period goals range
-    }
-
-    # MARGIN-type hockey groups → bet_type_id (O/U markets)
-    HOCKEY_MARGIN_MAP = {
-        "Ukupno golova":                5,    # total_over_under
-        "Ukupno golova prva trećina":   6,    # total P1
-    }
-
-    def parse_hockey_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse all hockey odds from Mozzart match data using group-based dispatch."""
-        odds_list = []
-        match = match_data.get("match", {})
-
-        if "specialMatchGroupId" in match:
-            return odds_list
-
-        for odds_group in match.get("oddsGroup", []):
-            # Filter out DEACTIVATED odds
-            active_odds = [o for o in odds_group.get("odds", [])
-                           if o.get("oddStatus") != "DEACTIVATED"]
-            if not active_odds:
-                continue
-            filtered_group = {**odds_group, "odds": active_odds}
-
-            group_name = odds_group.get("groupName", "")
-
-            # Detect specialOddValueType from first active odd
-            first_type = ""
-            for odd in active_odds:
-                vt = odd.get("game", {}).get("specialOddValueType", "")
-                if vt and vt != "NONE":
-                    first_type = vt
-                    break
-
-            if first_type == "HANDICAP":
-                odds_list.extend(self._parse_handicap_group(filtered_group, 9))
-            elif first_type == "MARGIN":
-                ou_bt = self.HOCKEY_MARGIN_MAP.get(group_name)
-                if ou_bt is not None:
-                    odds_list.extend(self._parse_ou_group(filtered_group, ou_bt))
-            else:
-                mapping = self.HOCKEY_GROUP_MAP.get(group_name)
-                if mapping:
-                    handler_name, bet_type_id = mapping
-                    handler = getattr(self, handler_name)
-                    odds_list.extend(handler(filtered_group, bet_type_id))
-                else:
-                    logger.debug(f"[Mozzart] Unmapped hockey group: '{group_name}'")
-
-        return odds_list
-
-    def parse_table_tennis_odds(self, match_data: Dict) -> List[ScrapedOdds]:
-        """Parse table tennis odds from Mozzart match data."""
-        odds_list = []
-        match = match_data.get("match", {})
-
-        winner_odds = {"1": 0, "2": 0}
-
+    @classmethod
+    def parse_table_tennis(cls, match: Dict) -> List[ScrapedOdds]:
+        winner_odds = {"1": 0.0, "2": 0.0}
         for odds_group in match.get("oddsGroup", []):
             for odd in odds_group.get("odds", []):
                 game_name = odd.get("game", {}).get("name", "")
                 subgame_name = odd.get("subgame", {}).get("name", "")
-
                 try:
                     value = float(odd.get("value", 0))
                 except (ValueError, TypeError):
                     continue
-
-                # Winner
                 if game_name == "Pobednik meča":
                     if subgame_name == "1":
                         winner_odds["1"] = value
                     elif subgame_name == "2":
                         winner_odds["2"] = value
-
         if winner_odds["1"] and winner_odds["2"]:
-            odds_list.append(ScrapedOdds(
-                bet_type_id=1,
-                odd1=winner_odds["1"],
-                odd2=winner_odds["2"]
-            ))
-
-        return odds_list
-
-    def parse_odds(self, match_data: Dict, sport_id: int) -> List[ScrapedOdds]:
-        """Parse odds based on sport type."""
-        if match_data is None:
-            return []
-        if sport_id == 1:
-            return self.parse_football_odds(match_data)
-        elif sport_id == 2:
-            return self.parse_basketball_odds(match_data)
-        elif sport_id == 3:
-            return self.parse_tennis_odds(match_data)
-        elif sport_id == 4:
-            return self.parse_hockey_odds(match_data)
-        elif sport_id == 5:
-            return self.parse_table_tennis_odds(match_data)
+            return [ScrapedOdds(bet_type_id=1, odd1=winner_odds["1"], odd2=winner_odds["2"])]
         return []
 
-    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
-        """Scrape all matches for a sport."""
-        matches: List[ScrapedMatch] = []
-        processed_matches = set()
+    @classmethod
+    def parse(cls, match: Dict, sport_id: int) -> List[ScrapedOdds]:
+        parsers = {1: cls.parse_football, 2: cls.parse_basketball,
+                   3: cls.parse_tennis, 4: cls.parse_hockey, 5: cls.parse_table_tennis}
+        parser = parsers.get(sport_id)
+        return parser(match) if parser else []
 
+
+# ============================================================
+# Main scraper (inherits from BaseScraper)
+# ============================================================
+
+class MozzartScraper(BaseScraper):
+    """
+    Mozzart Bet scraper v3.0 — Mobile API edition.
+
+    Uses tls_client to hit the mobile API directly.
+    No Playwright, no browser needed.
+
+    Flow:  /sports → iterate competitions → /matches (paginated)
+           → /match-by-id (parallel via ThreadPool) → parse odds
+    """
+
+    MAX_WORKERS = 5
+
+    def __init__(self):
+        super().__init__(bookmaker_id=1, bookmaker_name="Mozzart")
+        self._api = MozzartMobileAPI()
+        self._executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
+
+    def get_base_url(self) -> str:
+        return MozzartMobileAPI.BASE
+
+    def get_supported_sports(self) -> List[int]:
+        return [1, 2, 3, 4, 5]
+
+    @staticmethod
+    def _parse_timestamp(ts) -> Optional[datetime]:
+        """Parse Mozzart timestamp (epoch millis or ISO string)."""
+        if not ts:
+            return None
         try:
-            # Ensure browser is ready (Cloudflare bypassed)
-            await self._ensure_browser()
+            if isinstance(ts, (int, float)):
+                return datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+            return datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        except Exception:
+            return None
 
-            leagues = await self.fetch_leagues(sport_id)
-            if not leagues:
-                logger.warning(f"[Mozzart] No leagues found for sport {sport_id}")
-                return matches
+    @staticmethod
+    def _restructure_odds(match_item: Dict) -> Dict:
+        """Transform mobile API flat odds[] into oddsGroup[] for parsers.
 
-            logger.debug(f"[Mozzart] Found {len(leagues)} leagues for sport {sport_id}")
+        Mobile API returns: match.odds[] with game.name per odd
+        Parsers expect:     match.oddsGroup[] with groupName and nested odds[]
+        """
+        flat_odds = match_item.get("odds", [])
+        if not flat_odds:
+            return match_item
 
-            # Phase 1: Fetch all league match IDs in parallel
-            league_tasks = [self.fetch_match_ids(sport_id, lid) for lid, _ in leagues]
-            league_results = await asyncio.gather(*league_tasks, return_exceptions=True)
+        groups = {}
+        for odd in flat_odds:
+            game_name = odd.get("game", {}).get("name", "Unknown")
+            if game_name not in groups:
+                groups[game_name] = []
+            groups[game_name].append(odd)
 
-            # Collect all (match_id, league_name) pairs
-            all_match_info = []  # list of (match_id, league_name)
-            for (league_id, league_name), result in zip(leagues, league_results):
-                if isinstance(result, Exception):
-                    logger.warning(f"[Mozzart] Error fetching league {league_name}: {result}")
-                    continue
-                for mid in (result or []):
-                    all_match_info.append((mid, league_name))
+        odds_groups = []
+        for group_name, odds in groups.items():
+            odds_groups.append({
+                "groupName": group_name,
+                "odds": odds,
+            })
 
-            if not all_match_info:
-                return matches
+        match_item["oddsGroup"] = odds_groups
+        return match_item
 
-            logger.debug(f"[Mozzart] Fetching {len(all_match_info)} match details for sport {sport_id}")
+    def _scrape_sport_sync(self, sport_id: int) -> List[ScrapedMatch]:
+        """Synchronous implementation of sport scraping."""
+        mozzart_sport_id = INTERNAL_TO_MOZZART.get(sport_id)
+        if mozzart_sport_id is None:
+            return []
 
-            # Phase 2: Fetch all match details in one big parallel batch
-            detail_tasks = [self.fetch_match_details(mid, sport_id, 0) for mid, _ in all_match_info]
-            detail_results = await asyncio.gather(*detail_tasks, return_exceptions=True)
+        matches: List[ScrapedMatch] = []
+        seen = set()
+        debug_logged = False
 
-            # Phase 3: Process all results
-            for (match_id, league_name), result in zip(all_match_info, detail_results):
-                try:
-                    if isinstance(result, Exception):
-                        logger.warning(f"[Mozzart] Error fetching match {match_id}: {result}")
+        # Step 1: get competitions for this sport
+        sports_data = self._api.get_sports(mozzart_sport_id)
+        if not sports_data or not sports_data.get("items"):
+            logger.warning(f"[Mozzart] No data from /sports for sport {sport_id}")
+            return []
+
+        competitions = sports_data["items"]
+        logger.info(f"[Mozzart] Sport {sport_id}: found {len(competitions)} competitions")
+
+        # Step 2: for each competition, fetch matches (with pagination)
+        for comp in competitions:
+            comp_name = comp.get("name", "Unknown")
+            comp_filter = comp.get("filter")
+            if not comp_filter:
+                continue
+
+            comp_filter["groupationId"] = 1
+            comp_filter["uberOffer"] = True
+            comp_filter["packGroupsInMatch"] = True
+
+            all_match_items = []
+            page = 0
+            while True:
+                comp_filter["currentPage"] = page
+                matches_data = self._api.get_matches(comp_filter)
+                if not matches_data or not matches_data.get("items"):
+                    break
+                items = matches_data["items"]
+                all_match_items.extend(items)
+                if len(items) < comp_filter.get("pageSize", 100):
+                    break
+                page += 1
+
+            if not all_match_items:
+                continue
+
+            logger.info(f"[Mozzart]   {comp_name}: {len(all_match_items)} match items")
+
+            # Step 3: fetch match details in parallel
+            match_ids_to_fetch = []
+            for match_item in all_match_items:
+                mid = match_item.get("id")
+                if mid and mid not in seen:
+                    seen.add(mid)
+                    match_ids_to_fetch.append(mid)
+
+            def fetch_detail(mid):
+                return mid, self._api.get_match_details(mid)
+
+            with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+                futures = {executor.submit(fetch_detail, mid): mid for mid in match_ids_to_fetch}
+                for future in as_completed(futures):
+                    try:
+                        match_id, detail_data = future.result()
+                    except Exception as e:
+                        logger.warning(f"[Mozzart] Thread error: {e}")
                         continue
 
-                    match_data = result
-                    if not match_data:
+                    if not detail_data or not detail_data.get("items"):
                         continue
 
-                    match = match_data.get("match", {})
+                    for item in detail_data["items"]:
+                        match_obj = item if "home" in item else item.get("match", item)
 
-                    # Skip special matches
-                    if "specialMatchGroupId" in match:
-                        continue
+                        if "specialMatchGroupId" in match_obj:
+                            continue
 
-                    home = match.get("home", {}).get("name")
-                    away = match.get("visitor", {}).get("name")
+                        home = match_obj.get("home", {}).get("name") if isinstance(match_obj.get("home"), dict) else None
+                        away = match_obj.get("visitor", {}).get("name") if isinstance(match_obj.get("visitor"), dict) else None
 
-                    if not home or not away:
-                        continue
+                        if not home or not away:
+                            home = match_obj.get("homeName", home)
+                            away = match_obj.get("visitorName", away)
+                            if not home or not away:
+                                continue
 
-                    # Deduplicate
-                    match_key = f"{home}_{away}"
-                    if match_key in processed_matches:
-                        continue
-                    processed_matches.add(match_key)
+                        start_time = self._parse_timestamp(match_obj.get("startTime"))
+                        if not start_time:
+                            continue
 
-                    start_time = self.parse_timestamp(match.get("startTime"))
-                    if not start_time:
-                        continue
+                        match_obj = self._restructure_odds(match_obj)
 
-                    scraped = ScrapedMatch(
-                        team1=home,
-                        team2=away,
-                        sport_id=sport_id,
-                        start_time=start_time,
-                        league_name=league_name,
-                        external_id=str(match.get("id")),
-                    )
+                        scraped = ScrapedMatch(
+                            team1=home,
+                            team2=away,
+                            sport_id=sport_id,
+                            start_time=start_time,
+                            league_name=comp_name,
+                            external_id=str(match_id),
+                        )
 
-                    scraped.odds = self.parse_odds(match_data, sport_id)
+                        scraped.odds = OddsParser.parse(match_obj, sport_id)
 
-                    if scraped.odds:
-                        matches.append(scraped)
+                        if scraped.odds:
+                            matches.append(scraped)
+                        elif match_obj.get("oddsGroup"):
+                            if not debug_logged:
+                                debug_logged = True
+                                group_names = [g.get("groupName") for g in match_obj.get("oddsGroup", [])]
+                                logger.warning(
+                                    f"[Mozzart] DEBUG: {home} vs {away} has "
+                                    f"{len(match_obj.get('odds', []))} raw odds, "
+                                    f"{len(match_obj.get('oddsGroup', []))} groups: "
+                                    f"{group_names[:10]}"
+                                )
 
-                except Exception as e:
-                    logger.warning(f"[Mozzart] Error processing match {match_id}: {e}")
-
-        except Exception as e:
-            logger.error(f"[Mozzart] Error scraping sport {sport_id}: {e}")
+        # Update stats
+        self._request_count = self._api._request_count
+        self._error_count = self._api._error_count
 
         return matches
+
+    async def scrape_sport(self, sport_id: int) -> List[ScrapedMatch]:
+        """Async wrapper around sync scraper (tls_client is synchronous)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._scrape_sport_sync, sport_id)
+
+    async def close(self) -> None:
+        """Cleanup resources."""
+        self._executor.shutdown(wait=False)
+        await super().close()

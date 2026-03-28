@@ -26,6 +26,9 @@ python-dotenv>=1.0.0
 # HTML parsing (used by some scrapers)
 beautifulsoup4>=4.12.0
 
+# TLS fingerprint bypass (Mozzart mobile API)
+tls_client>=1.0.0
+
 # ==========================================
 # NEW v2.0 Dependencies
 # ==========================================
