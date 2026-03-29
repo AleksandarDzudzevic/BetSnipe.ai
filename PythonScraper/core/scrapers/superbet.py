@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,15 @@ SUPERBET_SPORTS = {
     2: 3,    # Tennis
     3: 4,    # Hockey
     24: 5,   # Table Tennis
+}
+
+# Sport slugs for Superbet URL construction
+SUPERBET_SPORT_SLUGS = {
+    1: "fudbal",
+    2: "kosarka",
+    3: "tenis",
+    4: "hokej",
+    5: "stoni-tenis",
 }
 
 # ── Football market dispatch ────────────────────────────────────────
@@ -1417,12 +1426,23 @@ class SuperbetScraper(BaseScraper):
                 if not start_time:
                     continue
 
+                event_id = data.get("eventId", "")
+                sport_slug = SUPERBET_SPORT_SLUGS.get(sport_id, "fudbal")
+                t1_slug = slugify(team1)
+                t2_slug = slugify(team2)
+                match_url = (
+                    f"https://superbet.rs/kvote/{sport_slug}/"
+                    f"{t1_slug}-vs-{t2_slug}-{event_id}"
+                    f"/?t=offer-prematch-1440&mdt=o"
+                )
+
                 scraped = ScrapedMatch(
                     team1=team1,
                     team2=team2,
                     sport_id=sport_id,
                     start_time=start_time,
-                    external_id=str(data.get("eventId")),
+                    external_id=str(event_id),
+                    metadata={'match_url': match_url},
                 )
 
                 scraped.odds = self.parse_odds(data, sport_id)

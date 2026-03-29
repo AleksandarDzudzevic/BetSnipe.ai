@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,15 @@ MAXBET_SPORTS = {
 
 # Reverse mapping
 INTERNAL_TO_MAXBET = {v: k for k, v in MAXBET_SPORTS.items()}
+
+# Sport slugs for MaxBet URL construction
+MAXBET_SPORT_SLUGS = {
+    1: "fudbal",
+    2: "kosarka",
+    3: "tenis",
+    4: "hokej",
+    5: "stoni-tenis",
+}
 
 # ============================================================================
 # FOOTBALL CODE MAPPINGS (tipType codes from betPickMap with _S suffix)
@@ -1119,13 +1128,27 @@ class MaxbetScraper(BaseScraper):
                 if not start_time:
                     continue
 
+                sport_slug = MAXBET_SPORT_SLUGS.get(sport_id, "fudbal")
+                league_nm = detail.get("leagueName", "")
+                league_id_val = detail.get("leagueId", "")
+                league_slug = slugify(league_nm)
+                t1_slug = slugify(team1)
+                t2_slug = slugify(team2)
+                mid = detail.get("id", "")
+                match_url = (
+                    f"https://www.maxbet.rs/sr/sportsko-kladjenje/{sport_slug}/S/"
+                    f"{league_slug}/{league_id_val}/specijal/"
+                    f"{t1_slug}-v-{t2_slug}/{mid}"
+                )
+
                 scraped = ScrapedMatch(
                     team1=team1,
                     team2=team2,
                     sport_id=sport_id,
                     start_time=start_time,
-                    league_name=detail.get("leagueName"),
-                    external_id=str(detail.get("id")),
+                    league_name=league_nm,
+                    external_id=str(mid),
+                    metadata={'match_url': match_url},
                 )
 
                 scraped.odds = self.parse_odds(detail, sport_id)

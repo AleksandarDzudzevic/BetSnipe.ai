@@ -12,7 +12,8 @@ import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from urllib.parse import quote
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,15 @@ SPORT_MAPPING = {
 }
 
 INTERNAL_TO_ADMIRAL = {v: k for k, v in SPORT_MAPPING.items()}
+
+# Sport name slugs for Admiral URL construction
+ADMIRAL_SPORT_NAMES = {
+    1: "Fudbal",
+    2: "Košarka",
+    3: "Tenis",
+    4: "Hokej",
+    5: "Stoni tenis",
+}
 
 # ============================================================================
 # BET TYPE DISPATCH MAPS
@@ -822,6 +832,17 @@ class AdmiralScraper(BaseScraper):
                 if not start_time:
                     continue
 
+                admiral_sport_name = ADMIRAL_SPORT_NAMES.get(sport_id, "Fudbal")
+                t1_slug = team1.replace(' ', '_')
+                t2_slug = team2.replace(' ', '_')
+                event_id = match_data.get('id', '')
+                match_url = (
+                    f"https://admiralbet.rs/sport-prematch"
+                    f"?sport={quote(admiral_sport_name)}"
+                    f"&event={event_id}"
+                    f"&eventName={quote(t1_slug + '_' + t2_slug)}"
+                )
+
                 scraped_match = ScrapedMatch(
                     team1=team1,
                     team2=team2,
@@ -831,6 +852,7 @@ class AdmiralScraper(BaseScraper):
                     external_id=str(match_data.get("id")),
                     metadata={
                         'region': competition.get("regionName"),
+                        'match_url': match_url,
                     }
                 )
 

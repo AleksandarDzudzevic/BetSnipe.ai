@@ -6,6 +6,8 @@ All bookmaker scrapers inherit from this base class.
 
 import asyncio
 import logging
+import re
+import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -16,6 +18,21 @@ from aiohttp import ClientTimeout, ClientSession
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def slugify(text) -> str:
+    """Convert text to URL-safe slug: lowercase, hyphens, no special chars."""
+    if not text:
+        return ''
+    text = str(text)
+    # Normalize unicode (handle č, š, ž, ć, đ, etc.)
+    text = unicodedata.normalize('NFKD', text)
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s-]', '', text)
+    text = re.sub(r'[\s_]+', '-', text)
+    text = re.sub(r'-+', '-', text)
+    return text.strip('-')
 
 
 @dataclass

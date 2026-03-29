@@ -75,8 +75,8 @@ class Database:
         try:
             self._pool = await asyncpg.create_pool(
                 self.database_url,
-                min_size=5,
-                max_size=20,
+                min_size=3,
+                max_size=10,
                 command_timeout=300,
                 statement_cache_size=100,
                 init=_init_connection,
@@ -363,6 +363,27 @@ class Database:
         async with self.acquire() as conn:
             processed = 0
 
+            # Step 0: Bulk upsert leagues and build a lookup
+            league_lookup = {}  # (name_normalized, sport_id) -> league_id
+            league_pairs = set()
+            for m in unique_matches:
+                ln = m.get('league_name')
+                if ln and ln.strip():
+                    league_pairs.add((ln.strip(), ln.strip().lower(), m['sport_id']))
+
+            if league_pairs:
+                names = [p[0] for p in league_pairs]
+                names_norm = [p[1] for p in league_pairs]
+                sids_l = [p[2] for p in league_pairs]
+                league_rows = await conn.fetch("""
+                    INSERT INTO leagues (name, name_normalized, sport_id)
+                    SELECT unnest($1::text[]), unnest($2::text[]), unnest($3::int[])
+                    ON CONFLICT (name_normalized, sport_id) DO UPDATE SET name = EXCLUDED.name
+                    RETURNING id, name_normalized, sport_id
+                """, names, names_norm, sids_l)
+                for row in league_rows:
+                    league_lookup[(row['name_normalized'], row['sport_id'])] = row['id']
+
             # Process in chunks (200 matches -> ~20K odds per batch, avoids long index locks)
             chunk_size = 200
             for i in range(0, len(unique_matches), chunk_size):
@@ -380,22 +401,37 @@ class Database:
                     {str(bookmaker_id): m['external_id']} if m.get('external_id') else {}
                     for m in chunk
                 ]
+                match_urls = [
+                    {str(bookmaker_id): m['match_url']} if m.get('match_url') else {}
+                    for m in chunk
+                ]
+                league_ids = []
+                for m in chunk:
+                    ln = m.get('league_name', '')
+                    if ln and ln.strip():
+                        league_ids.append(league_lookup.get((ln.strip().lower(), m['sport_id'])))
+                    else:
+                        league_ids.append(None)
 
                 # Bulk insert/update matches and get all IDs back
                 match_rows = await conn.fetch("""
                     INSERT INTO matches (team1, team2, team1_normalized, team2_normalized,
-                                        sport_id, start_time, external_ids)
+                                        sport_id, league_id, start_time, external_ids, match_urls)
                     SELECT
                         unnest($1::text[]), unnest($2::text[]),
                         unnest($3::text[]), unnest($4::text[]),
-                        unnest($5::int[]), unnest($6::timestamptz[]),
-                        unnest($7::jsonb[])
+                        unnest($5::int[]), unnest($8::int[]),
+                        unnest($6::timestamptz[]),
+                        unnest($7::jsonb[]),
+                        unnest($9::jsonb[])
                     ON CONFLICT (team1_normalized, team2_normalized, sport_id, start_time)
                     DO UPDATE SET
                         updated_at = NOW(),
-                        external_ids = matches.external_ids || EXCLUDED.external_ids
+                        external_ids = matches.external_ids || EXCLUDED.external_ids,
+                        match_urls = COALESCE(matches.match_urls, '{}'::jsonb) || EXCLUDED.match_urls,
+                        league_id = COALESCE(EXCLUDED.league_id, matches.league_id)
                     RETURNING id, team1_normalized, team2_normalized, sport_id, start_time
-                """, t1, t2, t1n, t2n, sids, times, ext_ids)
+                """, t1, t2, t1n, t2n, sids, times, ext_ids, league_ids, match_urls)
 
                 # Build lookup from returned rows
                 match_id_lookup = {}
@@ -567,6 +603,8 @@ class Database:
                 sport_id, time_start, time_end, team1_normalized, team2_normalized
             )
 
+            # Build match_urls from metadata
+            match_url = (metadata or {}).get('match_url', '')
             if existing:
                 match_id = existing['id']
                 # Update external_ids if provided
@@ -582,24 +620,39 @@ class Database:
                         """,
                         current_ids, match_id
                     )
+                # Update match_urls if we have a URL
+                if match_url and external_id:
+                    bookmaker_id = external_id[0]
+                    await conn.execute(
+                        """
+                        UPDATE matches
+                        SET match_urls = COALESCE(match_urls, '{}'::jsonb) || $1::jsonb,
+                            updated_at = NOW()
+                        WHERE id = $2
+                        """,
+                        {str(bookmaker_id): match_url}, match_id
+                    )
                 return match_id
             else:
                 # Insert new match
                 external_ids = {}
+                match_urls_val = {}
                 if external_id:
                     bookmaker_id, ext_id = external_id
                     external_ids[str(bookmaker_id)] = ext_id
+                    if match_url:
+                        match_urls_val[str(bookmaker_id)] = match_url
 
                 match_id = await conn.fetchval(
                     """
                     INSERT INTO matches (
                         team1, team2, team1_normalized, team2_normalized,
-                        sport_id, league_id, start_time, external_ids
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                        sport_id, league_id, start_time, external_ids, match_urls
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                     RETURNING id
                     """,
                     team1, team2, team1_normalized, team2_normalized,
-                    sport_id, league_id, start_time, external_ids
+                    sport_id, league_id, start_time, external_ids, match_urls_val
                 )
                 return match_id
 
@@ -939,6 +992,49 @@ class Database:
             # Parse affected rows from result
             count = int(result.split()[-1]) if result else 0
             return count
+
+    async def update_arbitrage(
+        self,
+        arb_hash: str,
+        profit_percentage: float,
+        best_odds: list,
+        stakes: list,
+    ) -> None:
+        """Update an existing arbitrage opportunity with current odds and profit."""
+        async with self.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE arbitrage_opportunities
+                SET profit_percentage = $1,
+                    best_odds = $2::jsonb,
+                    stakes = $3::jsonb,
+                    updated_at = NOW()
+                WHERE arb_hash = $4 AND is_active = true
+                """,
+                profit_percentage, json.dumps(best_odds), json.dumps(stakes), arb_hash
+            )
+
+    async def deactivate_stale_arbitrage(self, valid_hashes: set) -> int:
+        """Deactivate active arbs that were not re-detected in this cycle."""
+        if not valid_hashes:
+            # No valid arbs at all — deactivate everything
+            async with self.acquire() as conn:
+                result = await conn.execute(
+                    "UPDATE arbitrage_opportunities SET is_active = false WHERE is_active = true"
+                )
+                return int(result.split()[-1]) if result else 0
+
+        async with self.acquire() as conn:
+            result = await conn.execute(
+                """
+                UPDATE arbitrage_opportunities
+                SET is_active = false
+                WHERE is_active = true
+                  AND arb_hash != ALL($1::text[])
+                """,
+                list(valid_hashes)
+            )
+            return int(result.split()[-1]) if result else 0
 
     # ==========================================
     # LEAGUE OPERATIONS

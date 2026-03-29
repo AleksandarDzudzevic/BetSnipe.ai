@@ -12,7 +12,7 @@ from typing import Optional, List, Dict, Any
 
 import aiohttp
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,15 @@ MERIDIAN_SPORTS = {
     69: 3,   # Tennis
     64: 4,   # Hockey
     92: 5,   # Table Tennis
+}
+
+# Sport slugs for Meridian URL construction
+MERIDIAN_SPORT_SLUGS = {
+    1: "fudbal",
+    2: "kosarka",
+    3: "tenis",
+    4: "hokej",
+    5: "stoni-tenis",
 }
 
 
@@ -409,6 +418,14 @@ class MeridianScraper(BaseScraper):
                         continue
 
                     try:
+                        sport_slug = MERIDIAN_SPORT_SLUGS.get(sport_id, "fudbal")
+                        t1_slug = slugify(rivals[0])
+                        t2_slug = slugify(rivals[1])
+                        match_url = (
+                            f"https://meridianbet.rs/sr/kladjenje/{sport_slug}/"
+                            f"{t1_slug}-{t2_slug}/{event_id}"
+                        )
+
                         scraped = ScrapedMatch(
                             team1=rivals[0],
                             team2=rivals[1],
@@ -416,6 +433,7 @@ class MeridianScraper(BaseScraper):
                             start_time=start_time,
                             league_name=league_name,
                             external_id=str(event_id),
+                            metadata={'match_url': match_url},
                         )
                         scraped.odds = self.parse_odds(all_groups, sport_id)
                         if scraped.odds:

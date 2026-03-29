@@ -245,6 +245,7 @@ class ScraperEngine:
                     'start_time': match.start_time,
                     'external_id': match.external_id,
                     'league_name': match.league_name,
+                    'match_url': match.metadata.get('match_url', ''),
                     'odds': odds_list,
                 })
 

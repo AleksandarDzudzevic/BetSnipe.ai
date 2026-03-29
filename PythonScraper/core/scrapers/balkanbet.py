@@ -15,7 +15,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -860,13 +860,32 @@ class BalkanBetScraper(BaseScraper):
             if not sport_id:
                 return None
 
+            # Build match URL from NSoft hierarchy data
+            bb_sport_id = data.get('sportId', '')
+            sport_name = slugify(data.get('sportName', ''))
+            cat_id = data.get('categoryId', '')
+            cat_name = slugify(data.get('categoryName', ''))
+            tourn_id = data.get('tournamentId', '')
+            tourn_name = slugify(data.get('tournamentName', ''))
+            mid = data.get('id', '')
+            t1_slug = slugify(team1)
+            t2_slug = slugify(team2)
+            match_url = (
+                f"https://www.balkanbet.rs/sportsko-kladjenje/1-offer/"
+                f"{bb_sport_id}-{sport_name}/"
+                f"{cat_id}-{cat_name}/"
+                f"{tourn_id}-{tourn_name}/"
+                f"{mid}-{t1_slug}-{t2_slug}"
+            )
+
             match = ScrapedMatch(
                 team1=team1,
                 team2=team2,
                 sport_id=sport_id,
                 start_time=start_time,
-                external_id=str(data.get('id', '')),
-                league_name=None,
+                external_id=str(mid),
+                league_name=data.get('tournamentName'),
+                metadata={'match_url': match_url},
             )
 
             # Parse all markets

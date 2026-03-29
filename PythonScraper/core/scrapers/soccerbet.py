@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,15 @@ SPORT_CODES = {
     3: 'T',   # Tennis
     4: 'H',   # Hockey
     5: 'TT',  # Table Tennis
+}
+
+# Sport slugs for Soccerbet URL construction
+SOCCERBET_SPORT_SLUGS = {
+    1: "fudbal",
+    2: "kosarka",
+    3: "tenis",
+    4: "hokej",
+    5: "stoni-tenis",
 }
 
 # ============================================================================
@@ -879,13 +888,25 @@ class SoccerbetScraper(BaseScraper):
                         if not start_time:
                             continue
 
+                        sport_slug = SOCCERBET_SPORT_SLUGS.get(sport_id, "fudbal")
+                        league_slug = slugify(league_name)
+                        t1_slug = slugify(team1)
+                        t2_slug = slugify(team2)
+                        mid = match_data.get("id", "")
+                        match_url = (
+                            f"https://www.soccerbet.rs/sr/sportsko-kladjenje/"
+                            f"{sport_slug}/S/{league_slug}/{league_id}/special/"
+                            f"{t1_slug}-v-{t2_slug}/{mid}"
+                        )
+
                         scraped_match = ScrapedMatch(
                             team1=team1,
                             team2=team2,
                             sport_id=sport_id,
                             start_time=start_time,
                             league_name=league_name,
-                            external_id=str(match_data.get("id")),
+                            external_id=str(mid),
+                            metadata={'match_url': match_url},
                         )
 
                         bet_map = detail.get("betMap", {})

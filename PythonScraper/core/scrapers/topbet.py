@@ -15,7 +15,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any, Tuple
 
-from .base import BaseScraper, ScrapedMatch, ScrapedOdds
+from .base import BaseScraper, ScrapedMatch, ScrapedOdds, slugify
 
 logger = logging.getLogger(__name__)
 
@@ -602,12 +602,31 @@ class TopbetScraper(BaseScraper):
                     if not start_time:
                         continue
 
+                # Build URL from NSoft compressed event fields
+                tb_sport_id = event.get("b", "")
+                sport_name = slugify(event.get("e", "") if event.get("e") else "")
+                cat_id = event.get("c", "")
+                cat_name = slugify(event.get("f", "") if event.get("f") else "")
+                tourn_id = event.get("d", "")
+                tourn_name = slugify(event.get("g", "") if event.get("g") else "")
+                mid = event.get("a", "")
+                t1_slug = slugify(team1)
+                t2_slug = slugify(team2)
+                match_url = (
+                    f"https://www.topbet.rs/sportsko-kladjenje/1-offer/"
+                    f"{tb_sport_id}-{sport_name}/"
+                    f"{cat_id}-{cat_name}/"
+                    f"{tourn_id}-{tourn_name}/"
+                    f"{mid}-{t1_slug}-{t2_slug}"
+                )
+
                 scraped = ScrapedMatch(
                     team1=team1,
                     team2=team2,
                     sport_id=sport_id,
                     start_time=start_time,
-                    external_id=str(event.get("a")),
+                    external_id=str(mid),
+                    metadata={'match_url': match_url},
                 )
 
                 scraped.odds = self.parse_overview_odds(event, sport_id)

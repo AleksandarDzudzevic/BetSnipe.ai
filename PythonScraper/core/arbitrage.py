@@ -341,7 +341,7 @@ class ArbitrageDetector:
         opportunities = []
 
         # Get current odds, filtering out stale data (>5 min old) to prevent phantom arbs
-        current_odds = await db.get_current_odds_for_match(match_id, max_staleness_minutes=5)
+        current_odds = await db.get_current_odds_for_match(match_id, max_staleness_minutes=15)
 
         if len(current_odds) < 2:
             return opportunities
@@ -456,7 +456,12 @@ class ArbitrageDetector:
         all_results = await asyncio.gather(*[bounded_detect(m) for m in matches])
         match_opportunities_list = [opp for result in all_results if result for opp in result]
 
+        # Collect all valid arb hashes from this cycle
+        valid_arb_hashes = set()
+
         for opp in match_opportunities_list:
+            valid_arb_hashes.add(opp.arb_hash)
+
             # Check if already detected
             if not await db.check_arbitrage_exists(opp.arb_hash):
                 # Store new opportunity
@@ -477,6 +482,16 @@ class ArbitrageDetector:
                         f"New arbitrage: {opp.team1} vs {opp.team2} "
                         f"({opp.bet_type_name}) - {opp.profit_percentage:.2f}%"
                     )
+            else:
+                # Update existing arb with current odds and profit
+                await db.update_arbitrage(
+                    opp.arb_hash, opp.profit_percentage, opp.best_odds, opp.stakes
+                )
+
+        # Deactivate arbs that were not re-detected in this cycle
+        deactivated = await db.deactivate_stale_arbitrage(valid_arb_hashes)
+        if deactivated:
+            logger.info(f"Deactivated {deactivated} stale arbitrage opportunities")
 
         return opportunities
 

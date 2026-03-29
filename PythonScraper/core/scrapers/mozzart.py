@@ -133,7 +133,7 @@ class OddsParser:
         "Winner":                       ("_parse_two_way", 14),
         "Dupla pobeda":                 ("_parse_two_way", 16),
         "Sigurna pobeda":               ("_parse_two_way", 17),
-        "Daje prvi gol":                ("_parse_three_way", 18),
+        "Daje prvi gol":                ("_parse_1x2", 18),
         "Poluvreme sa više golova":     ("_parse_1x2", 19),
         "Prvo poluvreme":               ("_parse_1x2", 3),
         "Dupla šansa prvo poluvreme":   ("_parse_three_way", 20),
