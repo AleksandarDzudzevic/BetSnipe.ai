@@ -9,7 +9,7 @@ Usage:
     python test_scrapers.py                    # Test all scrapers
     python test_scrapers.py --scraper admiral  # Test specific scraper
     python test_scrapers.py --sport 1          # Test specific sport (1=Football)
-    python test_scrapers.py --telegram         # Also test Telegram notification
+    python test_scrapers.py --arbitrage         # Include arbitrage detection
 """
 
 import argparse
@@ -35,7 +35,6 @@ from core.scrapers.topbet import TopbetScraper
 from core.scrapers.mozzart import MozzartScraper
 from core.scrapers.balkanbet import BalkanBetScraper
 from core.arbitrage import ArbitrageDetector, ArbitrageOpportunity
-from telegram_utils import TelegramNotifier
 
 logging.basicConfig(
     level=logging.INFO,
@@ -328,41 +327,10 @@ def detect_arbitrage_simple(all_matches: dict):
     return arbitrage_opps
 
 
-async def test_telegram():
-    """Test Telegram notification."""
-    notifier = TelegramNotifier()
-
-    if not notifier.is_configured:
-        logger.warning("Telegram not configured. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env")
-        return False
-
-    logger.info("Sending test Telegram message...")
-
-    test_message = """
-🧪 *BetSnipe.ai v2.0 Test*
-
-This is a test message from the scraper test script.
-
-If you see this, Telegram notifications are working!
-
-Timestamp: {}
-""".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
-    success = await notifier.send_message(test_message)
-
-    if success:
-        logger.info("Telegram test message sent successfully!")
-    else:
-        logger.error("Failed to send Telegram test message")
-
-    return success
-
-
 async def main():
     parser = argparse.ArgumentParser(description='Test BetSnipe.ai scrapers')
     parser.add_argument('--scraper', type=str, help='Test specific scraper (admiral, soccerbet, etc.)')
     parser.add_argument('--sport', type=int, help='Test specific sport (1=Football, 2=Basketball, etc.)')
-    parser.add_argument('--telegram', action='store_true', help='Test Telegram notification')
     parser.add_argument('--arbitrage', action='store_true', help='Run arbitrage detection on results')
     args = parser.parse_args()
 
@@ -370,11 +338,6 @@ async def main():
     print("  BetSnipe.ai v2.0 - Scraper Test")
     print("=" * 60)
     print()
-
-    # Test Telegram if requested
-    if args.telegram:
-        await test_telegram()
-        print()
 
     # Test scrapers
     if args.scraper:

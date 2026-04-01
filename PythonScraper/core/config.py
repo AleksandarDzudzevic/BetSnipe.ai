@@ -35,10 +35,6 @@ class Settings(BaseSettings):
         description="Service role key for admin operations"
     )
 
-    # Telegram notifications
-    telegram_bot_token: Optional[str] = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
-    telegram_chat_id: Optional[str] = Field(default=None, alias="TELEGRAM_CHAT_ID")
-
     # Scraper settings
     scrape_interval_seconds: float = Field(
         default=2.0,
@@ -89,7 +85,6 @@ class Settings(BaseSettings):
     )
 
     # Feature flags
-    enable_telegram: bool = Field(default=True)
     enable_websocket: bool = Field(default=True)
     enable_odds_history: bool = Field(default=True)
 

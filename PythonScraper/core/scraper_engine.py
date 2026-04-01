@@ -14,18 +14,8 @@ from typing import Optional, List, Dict, Any, Callable
 from .config import settings, SPORTS
 from .db import db, Database
 from .matching import MatchMatcher, normalize_team_name
-from .arbitrage import ArbitrageDetector, ArbitrageOpportunity, format_arbitrage_message
+from .arbitrage import ArbitrageDetector, ArbitrageOpportunity
 from .scrapers.base import BaseScraper, ScrapedMatch
-
-# Import telegram notifier (lazy to avoid circular imports)
-_telegram_notifier = None
-
-def get_telegram_notifier():
-    global _telegram_notifier
-    if _telegram_notifier is None:
-        from telegram_utils import notifier
-        _telegram_notifier = notifier
-    return _telegram_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -300,14 +290,6 @@ class ScraperEngine:
         for opp in arbitrage_opportunities:
             self._stats['arbitrage_found'] += 1
             await self._notify_update('arbitrage', opp.to_dict())
-
-            # Send Telegram notification
-            try:
-                telegram = get_telegram_notifier()
-                if telegram.is_configured:
-                    await telegram.send_arbitrage_alert(opp)
-            except Exception as e:
-                logger.error(f"Error sending Telegram notification: {e}")
 
         # Deactivate expired arbitrage
         await db.deactivate_expired_arbitrage()

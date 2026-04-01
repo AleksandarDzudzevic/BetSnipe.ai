@@ -399,22 +399,6 @@ async def run_scraper_only():
         else:
             logger.info(f"Skipping disabled bookmaker id={bookmaker_id} ({bm_config.get('name', '?')})")
 
-    # Optional Telegram notifications
-    if settings.enable_telegram and settings.telegram_bot_token:
-        from telegram_utils import send_telegram_message
-        from core.arbitrage import format_arbitrage_message
-
-        async def on_arbitrage(update_type: str, data):
-            if update_type == 'arbitrage':
-                from core.arbitrage import ArbitrageOpportunity
-                # Convert data back to ArbitrageOpportunity if needed
-                # and send notification
-                message = f"New arbitrage detected: {data.get('profit_percentage', 0):.2f}% profit"
-                logger.info(message)
-                # await send_telegram_message(message)
-
-        engine.register_update_callback(on_arbitrage)
-
     try:
         await engine.start()
     except KeyboardInterrupt:

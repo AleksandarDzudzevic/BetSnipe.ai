@@ -56,7 +56,6 @@ ScraperEngine (core/scraper_engine.py)
     │   └── Runs after each scrape cycle, checks all 124 bet types
     │
     └── Broadcasts updates → WebSocket (api/websocket.py)
-                          → Telegram (telegram_utils.py)
                           → Push notifications (core/push_notifications.py)
 ```
 
@@ -89,8 +88,6 @@ ScraperEngine (core/scraper_engine.py)
 
 ```bash
 DATABASE_URL=postgresql://user:pass@host:5432/betsnipe
-TELEGRAM_BOT_TOKEN=your-token
-TELEGRAM_CHAT_ID=your-chat-id
 MIN_PROFIT_PERCENTAGE=1.0      # Minimum arbitrage profit to report
 MATCH_SIMILARITY_THRESHOLD=75  # Fuzzy match threshold (0-100)
 SCRAPE_INTERVAL_SECONDS=2      # Time between scrape cycles
